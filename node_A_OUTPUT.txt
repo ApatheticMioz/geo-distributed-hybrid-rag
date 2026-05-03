@@ -1,0 +1,827 @@
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '43'
+INFO:     127.0.0.1:45275 - "POST /query?mode=parallel HTTP/1.1" 200 OK
+2026-05-03 22:40:43,743 | INFO | app | [19790de5] Pipeline start | 'dummy benchmark query 44: what is retrieval case 44?'
+2026-05-03 22:40:43,744 | ERROR | app | Streaming error: Field does not exist: '44'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '44'
+INFO:     127.0.0.1:45281 - "POST /query?mode=sequential HTTP/1.1" 200 OK
+2026-05-03 22:40:43,746 | INFO | app | [47614d0c] Pipeline start | 'dummy benchmark query 45: what is retrieval case 45?'
+2026-05-03 22:40:43,746 | ERROR | app | Streaming error: Field does not exist: '45'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '45'
+INFO:     127.0.0.1:45285 - "POST /query?mode=parallel HTTP/1.1" 200 OK
+2026-05-03 22:40:43,749 | INFO | app | [c1ea2822] Pipeline start | 'dummy benchmark query 46: what is retrieval case 46?'
+2026-05-03 22:40:43,749 | ERROR | app | Streaming error: Field does not exist: '46'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '46'
+INFO:     127.0.0.1:45301 - "POST /query?mode=sequential HTTP/1.1" 200 OK
+2026-05-03 22:40:43,752 | INFO | app | [8c9e6a1e] Pipeline start | 'dummy benchmark query 47: what is retrieval case 47?'
+2026-05-03 22:40:43,752 | ERROR | app | Streaming error: Field does not exist: '47'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '47'
+INFO:     127.0.0.1:45311 - "POST /query?mode=parallel HTTP/1.1" 200 OK
+2026-05-03 22:40:43,754 | INFO | app | [ac2c3c53] Pipeline start | 'dummy benchmark query 48: what is retrieval case 48?'
+2026-05-03 22:40:43,755 | ERROR | app | Streaming error: Field does not exist: '48'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '48'
+INFO:     127.0.0.1:45323 - "POST /query?mode=sequential HTTP/1.1" 200 OK
+2026-05-03 22:40:43,757 | INFO | app | [313dee01] Pipeline start | 'dummy benchmark query 49: what is retrieval case 49?'
+2026-05-03 22:40:43,757 | ERROR | app | Streaming error: Field does not exist: '49'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '49'
+INFO:     127.0.0.1:45339 - "POST /query?mode=parallel HTTP/1.1" 200 OK
+2026-05-03 22:40:43,760 | INFO | app | [fe0e2f3c] Pipeline start | 'dummy benchmark query 50: what is retrieval case 50?'
+2026-05-03 22:40:43,761 | ERROR | app | Streaming error: Field does not exist: '50'
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Field does not exist: '50'
+2026-05-03 22:40:44,452 | INFO | clients | Node B dispatch ack for dummy benchmark query 04: what is retrie -> accepted=True
+2026-05-03 22:40:44,622 | INFO | clients | Node B dispatch ack for dummy benchmark query 02: what is retrie -> accepted=True
+2026-05-03 22:40:44,772 | INFO | clients | Node B dispatch ack for dummy benchmark query 01: what is retrie -> accepted=True
+2026-05-03 22:40:44,893 | INFO | clients | Node B dispatch ack for dummy benchmark query 05: what is retrie -> accepted=True
+2026-05-03 22:40:45,038 | INFO | clients | Node B dispatch ack for dummy benchmark query 06: what is retrie -> accepted=True
+2026-05-03 22:40:45,149 | INFO | clients | Node B dispatch ack for dummy benchmark query 07: what is retrie -> accepted=True
+2026-05-03 22:40:45,263 | INFO | clients | Node B dispatch ack for dummy benchmark query 08: what is retrie -> accepted=True
+2026-05-03 22:40:45,359 | INFO | clients | Node B dispatch ack for dummy benchmark query 09: what is retrie -> accepted=True
+2026-05-03 22:40:45,457 | INFO | clients | Node B dispatch ack for dummy benchmark query 10: what is retrie -> accepted=True
+2026-05-03 22:40:45,549 | INFO | clients | Node B dispatch ack for dummy benchmark query 11: what is retrie -> accepted=True
+2026-05-03 22:40:45,630 | INFO | clients | Node B dispatch ack for dummy benchmark query 12: what is retrie -> accepted=True
+2026-05-03 22:40:45,718 | INFO | clients | Node B dispatch ack for dummy benchmark query 13: what is retrie -> accepted=True
+2026-05-03 22:40:45,807 | INFO | clients | Node B dispatch ack for dummy benchmark query 14: what is retrie -> accepted=True
+2026-05-03 22:40:45,902 | INFO | clients | Node B dispatch ack for dummy benchmark query 15: what is retrie -> accepted=True
+2026-05-03 22:40:45,997 | INFO | clients | Node B dispatch ack for dummy benchmark query 16: what is retrie -> accepted=True
+2026-05-03 22:40:46,075 | INFO | clients | Node B dispatch ack for dummy benchmark query 17: what is retrie -> accepted=True
+2026-05-03 22:40:46,161 | INFO | clients | Node B dispatch ack for dummy benchmark query 18: what is retrie -> accepted=True
+2026-05-03 22:40:46,252 | INFO | clients | Node B dispatch ack for dummy benchmark query 19: what is retrie -> accepted=True
+2026-05-03 22:40:46,325 | INFO | clients | Node B dispatch ack for dummy benchmark query 20: what is retrie -> accepted=True
+2026-05-03 22:40:46,412 | INFO | clients | Node B dispatch ack for dummy benchmark query 21: what is retrie -> accepted=True
+2026-05-03 22:40:46,507 | INFO | clients | Node B dispatch ack for dummy benchmark query 22: what is retrie -> accepted=True
+2026-05-03 22:40:46,586 | INFO | clients | Node B dispatch ack for dummy benchmark query 23: what is retrie -> accepted=True
+2026-05-03 22:40:46,669 | INFO | clients | Node B dispatch ack for dummy benchmark query 24: what is retrie -> accepted=True
+2026-05-03 22:40:46,745 | INFO | clients | Node B dispatch ack for dummy benchmark query 25: what is retrie -> accepted=True
+2026-05-03 22:40:46,830 | INFO | clients | Node B dispatch ack for dummy benchmark query 26: what is retrie -> accepted=True
+2026-05-03 22:40:46,900 | INFO | clients | Node B dispatch ack for dummy benchmark query 27: what is retrie -> accepted=True
+2026-05-03 22:40:46,979 | INFO | clients | Node B dispatch ack for dummy benchmark query 28: what is retrie -> accepted=True
+2026-05-03 22:40:47,055 | INFO | clients | Node B dispatch ack for dummy benchmark query 29: what is retrie -> accepted=True
+2026-05-03 22:40:47,133 | INFO | clients | Node B dispatch ack for dummy benchmark query 30: what is retrie -> accepted=True
+2026-05-03 22:40:47,218 | INFO | clients | Node B dispatch ack for dummy benchmark query 31: what is retrie -> accepted=True
+2026-05-03 22:40:47,300 | INFO | clients | Node B dispatch ack for dummy benchmark query 32: what is retrie -> accepted=True
+2026-05-03 22:40:47,381 | INFO | clients | Node B dispatch ack for dummy benchmark query 33: what is retrie -> accepted=True
+2026-05-03 22:40:47,469 | INFO | clients | Node B dispatch ack for dummy benchmark query 34: what is retrie -> accepted=True
+2026-05-03 22:40:47,544 | INFO | clients | Node B dispatch ack for dummy benchmark query 35: what is retrie -> accepted=True
+2026-05-03 22:40:47,622 | INFO | clients | Node B dispatch ack for dummy benchmark query 36: what is retrie -> accepted=True
+2026-05-03 22:40:47,700 | INFO | clients | Node B dispatch ack for dummy benchmark query 37: what is retrie -> accepted=True
+2026-05-03 22:40:47,776 | INFO | clients | Node B dispatch ack for dummy benchmark query 38: what is retrie -> accepted=True
+2026-05-03 22:40:47,855 | INFO | clients | Node B dispatch ack for dummy benchmark query 39: what is retrie -> accepted=True
+2026-05-03 22:40:47,929 | INFO | clients | Node B dispatch ack for dummy benchmark query 40: what is retrie -> accepted=True
+2026-05-03 22:40:48,008 | INFO | clients | Node B dispatch ack for dummy benchmark query 41: what is retrie -> accepted=True
+2026-05-03 22:40:48,078 | INFO | clients | Node B dispatch ack for dummy benchmark query 42: what is retrie -> accepted=True
+2026-05-03 22:40:48,150 | INFO | clients | Node B dispatch ack for dummy benchmark query 43: what is retrie -> accepted=True
+2026-05-03 22:40:48,218 | INFO | clients | Node B dispatch ack for dummy benchmark query 44: what is retrie -> accepted=True
+2026-05-03 22:40:48,290 | INFO | clients | Node B dispatch ack for dummy benchmark query 45: what is retrie -> accepted=True
+2026-05-03 22:40:48,361 | INFO | clients | Node B dispatch ack for dummy benchmark query 46: what is retrie -> accepted=True
+2026-05-03 22:40:48,436 | INFO | clients | Node B dispatch ack for dummy benchmark query 47: what is retrie -> accepted=True
+2026-05-03 22:40:48,518 | INFO | clients | Node B dispatch ack for dummy benchmark query 48: what is retrie -> accepted=True
+2026-05-03 22:40:48,592 | INFO | clients | Node B dispatch ack for dummy benchmark query 49: what is retrie -> accepted=True
+2026-05-03 22:40:48,670 | INFO | clients | Node B dispatch ack for dummy benchmark query 50: what is retrie -> accepted=True
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:11,312 | INFO | app | [adac56ba] Pipeline start | 'how big is bmc software in houston, tx'
+2026-05-03 22:41:11,313 | INFO | app | [adac56ba] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:41:11,317 | INFO | clients | Node B dispatch ack for how big is bmc software in houston, tx -> accepted=True
+2026-05-03 22:41:11,506 | INFO | app | [adac56ba] First token received | Edge-TTFT=194.1 ms
+2026-05-03 22:41:14,110 | INFO | app | [adac56ba] Pipeline complete: 2797.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:14,113 | INFO | app | [88d24e2d] Pipeline start | 'how long was i love lucy on the air'
+2026-05-03 22:41:14,113 | INFO | app | [88d24e2d] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:41:14,124 | INFO | clients | Node B dispatch ack for how long was i love lucy on the air -> accepted=True
+2026-05-03 22:41:14,303 | INFO | app | [88d24e2d] First token received | Edge-TTFT=191.0 ms
+2026-05-03 22:41:16,113 | INFO | app | [88d24e2d] Pipeline complete: 2000.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:16,115 | INFO | app | [c17062f0] Pipeline start | 'how did armando christian perez become famous'
+2026-05-03 22:41:16,115 | INFO | app | [c17062f0] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:41:16,125 | INFO | clients | Node B dispatch ack for how did armando christian perez become f -> accepted=True
+2026-05-03 22:41:16,305 | INFO | app | [c17062f0] First token received | Edge-TTFT=190.0 ms
+2026-05-03 22:41:20,222 | INFO | app | [c17062f0] Pipeline complete: 5020.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:20,224 | INFO | app | [03358671] Pipeline start | 'what bird family is the owl'
+2026-05-03 22:41:20,225 | INFO | app | [03358671] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:41:20,229 | INFO | clients | Node B dispatch ack for what bird family is the owl -> accepted=True
+2026-05-03 22:41:20,415 | INFO | app | [03358671] First token received | Edge-TTFT=191.2 ms
+2026-05-03 22:41:22,047 | INFO | app | [03358671] Pipeline complete: 1822.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:22,049 | INFO | app | [fc7097e2] Pipeline start | 'how many people were killed in the oklahoma city bombing'
+2026-05-03 22:41:22,049 | INFO | app | [fc7097e2] BM25 done: 0.7 ms | 1 docs
+2026-05-03 22:41:22,054 | INFO | clients | Node B dispatch ack for how many people were killed in the oklah -> accepted=True
+2026-05-03 22:41:22,239 | INFO | app | [fc7097e2] First token received | Edge-TTFT=190.7 ms
+2026-05-03 22:41:23,426 | INFO | app | [fc7097e2] Pipeline complete: 1377.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:23,428 | INFO | app | [41f8cdbe] Pipeline start | 'how many xbox 360 games are there'
+2026-05-03 22:41:23,428 | INFO | app | [41f8cdbe] BM25 done: 0.6 ms | 1 docs
+2026-05-03 22:41:23,432 | INFO | clients | Node B dispatch ack for how many xbox 360 games are there -> accepted=True
+2026-05-03 22:41:23,619 | INFO | app | [41f8cdbe] First token received | Edge-TTFT=191.4 ms
+2026-05-03 22:41:24,722 | INFO | app | [41f8cdbe] Pipeline complete: 1294.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:24,724 | INFO | app | [341edf7b] Pipeline start | 'how many planets is jupiter away from the sun?'
+2026-05-03 22:41:24,724 | INFO | app | [341edf7b] BM25 done: 0.6 ms | 3 docs
+2026-05-03 22:41:24,728 | INFO | clients | Node B dispatch ack for how many planets is jupiter away from th -> accepted=True
+2026-05-03 22:41:24,916 | INFO | app | [341edf7b] First token received | Edge-TTFT=191.7 ms
+2026-05-03 22:41:26,168 | INFO | app | [341edf7b] Pipeline complete: 1444.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:26,170 | INFO | app | [af3106b9] Pipeline start | 'what happened on the moon during the period of Late Heavy Bo'
+2026-05-03 22:41:26,170 | INFO | app | [af3106b9] BM25 done: 0.6 ms | 3 docs
+2026-05-03 22:41:26,180 | INFO | clients | Node B dispatch ack for what happened on the moon during the per -> accepted=True
+2026-05-03 22:41:26,397 | INFO | app | [af3106b9] First token received | Edge-TTFT=227.5 ms
+2026-05-03 22:41:27,694 | INFO | app | [af3106b9] Pipeline complete: 1524.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:27,696 | INFO | app | [c8682891] Pipeline start | 'what does the federal reserve do'
+2026-05-03 22:41:27,697 | INFO | app | [c8682891] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:41:27,700 | INFO | clients | Node B dispatch ack for what does the federal reserve do -> accepted=True
+2026-05-03 22:41:27,887 | INFO | app | [c8682891] First token received | Edge-TTFT=190.9 ms
+2026-05-03 22:41:30,882 | INFO | app | [c8682891] Pipeline complete: 3185.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:30,883 | INFO | app | [85f7bfb3] Pipeline start | 'how many nature oceans are on earth'
+2026-05-03 22:41:30,884 | INFO | app | [85f7bfb3] BM25 done: 0.6 ms | 4 docs
+2026-05-03 22:41:30,888 | INFO | clients | Node B dispatch ack for how many nature oceans are on earth -> accepted=True
+2026-05-03 22:41:31,075 | INFO | app | [85f7bfb3] First token received | Edge-TTFT=191.4 ms
+2026-05-03 22:41:32,562 | INFO | app | [85f7bfb3] Pipeline complete: 1678.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:32,564 | INFO | app | [475f3734] Pipeline start | 'what does a plus-minus sign mean'
+2026-05-03 22:41:32,564 | INFO | app | [475f3734] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:41:32,568 | INFO | clients | Node B dispatch ack for what does a plus-minus sign mean -> accepted=True
+2026-05-03 22:41:32,758 | INFO | app | [475f3734] First token received | Edge-TTFT=194.2 ms
+2026-05-03 22:41:35,899 | INFO | app | [475f3734] Pipeline complete: 3335.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:35,901 | INFO | app | [5f39e23c] Pipeline start | 'what does judgment as a matter of law mean'
+2026-05-03 22:41:35,901 | INFO | app | [5f39e23c] BM25 done: 0.6 ms | 4 docs
+2026-05-03 22:41:35,904 | INFO | clients | Node B dispatch ack for what does judgment as a matter of law me -> accepted=True
+2026-05-03 22:41:36,092 | INFO | app | [5f39e23c] First token received | Edge-TTFT=192.0 ms
+2026-05-03 22:41:39,820 | INFO | app | [5f39e23c] Pipeline complete: 3919.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:39,822 | INFO | app | [ee42f150] Pipeline start | 'what county is Holly Ridge nc in?'
+2026-05-03 22:41:39,822 | INFO | app | [ee42f150] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:41:39,831 | INFO | clients | Node B dispatch ack for what county is Holly Ridge nc in? -> accepted=True
+2026-05-03 22:41:40,013 | INFO | app | [ee42f150] First token received | Edge-TTFT=191.5 ms
+2026-05-03 22:41:40,209 | INFO | app | [ee42f150] Pipeline complete: 387.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:40,211 | INFO | app | [e922cbd4] Pipeline start | 'what forms seasons'
+2026-05-03 22:41:40,211 | INFO | app | [e922cbd4] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:41:40,217 | INFO | clients | Node B dispatch ack for what forms seasons -> accepted=True
+2026-05-03 22:41:40,506 | INFO | app | [e922cbd4] First token received | Edge-TTFT=295.4 ms
+2026-05-03 22:41:41,110 | INFO | app | [e922cbd4] Pipeline complete: 898.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:41,111 | INFO | app | [455e2ff8] Pipeline start | 'what kind of literature did john steinbeck writing'
+2026-05-03 22:41:41,112 | INFO | app | [455e2ff8] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:41:41,115 | INFO | clients | Node B dispatch ack for what kind of literature did john steinbe -> accepted=True
+2026-05-03 22:41:41,337 | INFO | app | [455e2ff8] First token received | Edge-TTFT=226.0 ms
+2026-05-03 22:41:43,369 | INFO | app | [455e2ff8] Pipeline complete: 2258.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:43,371 | INFO | app | [08f972e0] Pipeline start | 'whatever happened clint walker'
+2026-05-03 22:41:43,372 | INFO | app | [08f972e0] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:41:43,375 | INFO | clients | Node B dispatch ack for whatever happened clint walker -> accepted=True
+2026-05-03 22:41:43,561 | INFO | app | [08f972e0] First token received | Edge-TTFT=189.7 ms
+2026-05-03 22:41:45,746 | INFO | app | [08f972e0] Pipeline complete: 2374.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:45,747 | INFO | app | [6e1cf8f7] Pipeline start | 'what channel is shopnbc on'
+2026-05-03 22:41:45,748 | INFO | app | [6e1cf8f7] BM25 done: 0.6 ms | 4 docs
+2026-05-03 22:41:45,762 | INFO | clients | Node B dispatch ack for what channel is shopnbc on -> accepted=True
+2026-05-03 22:41:45,940 | INFO | app | [6e1cf8f7] First token received | Edge-TTFT=193.1 ms
+2026-05-03 22:41:47,668 | INFO | app | [6e1cf8f7] Pipeline complete: 1920.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:47,669 | INFO | app | [862c73b0] Pipeline start | 'how post and lintels are used'
+2026-05-03 22:41:47,670 | INFO | app | [862c73b0] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:41:47,673 | INFO | clients | Node B dispatch ack for how post and lintels are used -> accepted=True
+2026-05-03 22:41:47,863 | INFO | app | [862c73b0] First token received | Edge-TTFT=193.7 ms
+2026-05-03 22:41:49,300 | INFO | app | [862c73b0] Pipeline complete: 2609.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:49,302 | INFO | app | [2a87455b] Pipeline start | 'what hormones produce thyroid'
+2026-05-03 22:41:49,302 | INFO | app | [2a87455b] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:41:49,306 | INFO | clients | Node B dispatch ack for what hormones produce thyroid -> accepted=True
+2026-05-03 22:41:49,485 | INFO | app | [2a87455b] First token received | Edge-TTFT=183.7 ms
+2026-05-03 22:41:51,484 | INFO | app | [2a87455b] Pipeline complete: 2182.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:51,486 | INFO | app | [c3c46cf1] Pipeline start | 'how did James Dean die?'
+2026-05-03 22:41:51,486 | INFO | app | [c3c46cf1] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:41:51,492 | INFO | clients | Node B dispatch ack for how did James Dean die? -> accepted=True
+2026-05-03 22:41:51,675 | INFO | app | [c3c46cf1] First token received | Edge-TTFT=189.9 ms
+2026-05-03 22:41:53,607 | INFO | app | [c3c46cf1] Pipeline complete: 2121.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:53,609 | INFO | app | [ee08465a] Pipeline start | 'How Works Diaphragm Pump'
+2026-05-03 22:41:53,609 | INFO | app | [ee08465a] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:41:53,612 | INFO | clients | Node B dispatch ack for How Works Diaphragm Pump -> accepted=True
+2026-05-03 22:41:53,799 | INFO | app | [ee08465a] First token received | Edge-TTFT=190.5 ms
+2026-05-03 22:41:57,492 | INFO | app | [ee08465a] Pipeline complete: 3883.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:57,494 | INFO | app | [f8fccf95] Pipeline start | 'What happened to "The Glades" tv series'
+2026-05-03 22:41:57,495 | INFO | app | [f8fccf95] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:41:57,500 | INFO | clients | Node B dispatch ack for What happened to "The Glades" tv series -> accepted=True
+2026-05-03 22:41:57,686 | INFO | app | [f8fccf95] First token received | Edge-TTFT=192.1 ms
+2026-05-03 22:41:59,791 | INFO | app | [f8fccf95] Pipeline complete: 2297.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:41:59,793 | INFO | app | [4ce27e54] Pipeline start | 'what kind of company is Microsoft?'
+2026-05-03 22:41:59,794 | INFO | app | [4ce27e54] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:41:59,797 | INFO | clients | Node B dispatch ack for what kind of company is Microsoft? -> accepted=True
+2026-05-03 22:41:59,986 | INFO | app | [4ce27e54] First token received | Edge-TTFT=193.3 ms
+2026-05-03 22:42:01,327 | INFO | app | [4ce27e54] Pipeline complete: 1534.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:01,329 | INFO | app | [6ebe9565] Pipeline start | 'what area code is 949'
+2026-05-03 22:42:01,330 | INFO | app | [6ebe9565] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:42:01,333 | INFO | clients | Node B dispatch ack for what area code is 949 -> accepted=True
+2026-05-03 22:42:01,591 | INFO | app | [6ebe9565] First token received | Edge-TTFT=262.4 ms
+2026-05-03 22:42:04,127 | INFO | app | [6ebe9565] Pipeline complete: 2798.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:04,129 | INFO | app | [dee3e7ac] Pipeline start | 'who sings the song never ending story'
+2026-05-03 22:42:04,129 | INFO | app | [dee3e7ac] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:42:04,134 | INFO | clients | Node B dispatch ack for who sings the song never ending story -> accepted=True
+2026-05-03 22:42:04,318 | INFO | app | [dee3e7ac] First token received | Edge-TTFT=189.1 ms
+2026-05-03 22:42:05,385 | INFO | app | [dee3e7ac] Pipeline complete: 1256.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:05,386 | INFO | app | [648e909a] Pipeline start | 'what are risk for infections'
+2026-05-03 22:42:05,387 | INFO | app | [648e909a] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:42:05,405 | INFO | clients | Node B dispatch ack for what are risk for infections -> accepted=True
+2026-05-03 22:42:05,577 | INFO | app | [648e909a] First token received | Edge-TTFT=191.2 ms
+2026-05-03 22:42:10,393 | INFO | app | [648e909a] Pipeline complete: 5006.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:10,395 | INFO | app | [7fab677e] Pipeline start | 'who discovered neptune the planet'
+2026-05-03 22:42:10,395 | INFO | app | [7fab677e] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:42:10,407 | INFO | clients | Node B dispatch ack for who discovered neptune the planet -> accepted=True
+2026-05-03 22:42:10,585 | INFO | app | [7fab677e] First token received | Edge-TTFT=190.7 ms
+2026-05-03 22:42:12,112 | INFO | app | [7fab677e] Pipeline complete: 1717.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:12,113 | INFO | app | [96ec6efa] Pipeline start | 'what separates me from you album'
+2026-05-03 22:42:12,114 | INFO | app | [96ec6efa] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:42:12,118 | INFO | clients | Node B dispatch ack for what separates me from you album -> accepted=True
+2026-05-03 22:42:12,414 | INFO | app | [96ec6efa] First token received | Edge-TTFT=300.8 ms
+2026-05-03 22:42:13,850 | INFO | app | [96ec6efa] Pipeline complete: 1736.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:13,851 | INFO | app | [b7a5c0ff] Pipeline start | 'when did freddie mercury die'
+2026-05-03 22:42:13,852 | INFO | app | [b7a5c0ff] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:42:13,856 | INFO | clients | Node B dispatch ack for when did freddie mercury die -> accepted=True
+2026-05-03 22:42:14,050 | INFO | app | [b7a5c0ff] First token received | Edge-TTFT=198.9 ms
+2026-05-03 22:42:15,046 | INFO | app | [b7a5c0ff] Pipeline complete: 1194.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:15,048 | INFO | app | [f8c8f5f2] Pipeline start | 'what tensions preceded the berlin blockade'
+2026-05-03 22:42:15,048 | INFO | app | [f8c8f5f2] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:42:15,052 | INFO | clients | Node B dispatch ack for what tensions preceded the berlin blocka -> accepted=True
+2026-05-03 22:42:15,239 | INFO | app | [f8c8f5f2] First token received | Edge-TTFT=190.9 ms
+2026-05-03 22:42:20,453 | INFO | app | [f8c8f5f2] Pipeline complete: 6320.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:20,455 | INFO | app | [2bb59a7c] Pipeline start | 'who sang proud mary'
+2026-05-03 22:42:20,455 | INFO | app | [2bb59a7c] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:42:20,462 | INFO | clients | Node B dispatch ack for who sang proud mary -> accepted=True
+2026-05-03 22:42:20,638 | INFO | app | [2bb59a7c] First token received | Edge-TTFT=183.6 ms
+2026-05-03 22:42:22,181 | INFO | app | [2bb59a7c] Pipeline complete: 1726.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:22,183 | INFO | app | [e8a10510] Pipeline start | 'what percentage of the human body is water'
+2026-05-03 22:42:22,183 | INFO | app | [e8a10510] BM25 done: 0.6 ms | 4 docs
+2026-05-03 22:42:22,191 | INFO | clients | Node B dispatch ack for what percentage of the human body is wat -> accepted=True
+2026-05-03 22:42:22,385 | INFO | app | [e8a10510] First token received | Edge-TTFT=202.7 ms
+2026-05-03 22:42:23,692 | INFO | app | [e8a10510] Pipeline complete: 1509.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:23,694 | INFO | app | [d7ed6973] Pipeline start | 'what part of the pre-world war 1 arms race was the most inte'
+2026-05-03 22:42:23,695 | INFO | app | [d7ed6973] BM25 done: 0.8 ms | 2 docs
+2026-05-03 22:42:23,701 | INFO | clients | Node B dispatch ack for what part of the pre-world war 1 arms ra -> accepted=True
+2026-05-03 22:42:23,888 | INFO | app | [d7ed6973] First token received | Edge-TTFT=194.4 ms
+2026-05-03 22:42:28,469 | INFO | app | [d7ed6973] Pipeline complete: 4775.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:28,471 | INFO | app | [d2eb4388] Pipeline start | 'what are the three primary colors in the subtractive color m'
+2026-05-03 22:42:28,471 | INFO | app | [d2eb4388] BM25 done: 0.6 ms | 5 docs
+2026-05-03 22:42:28,475 | INFO | clients | Node B dispatch ack for what are the three primary colors in the -> accepted=True
+2026-05-03 22:42:28,663 | INFO | app | [d2eb4388] First token received | Edge-TTFT=192.4 ms
+2026-05-03 22:42:29,533 | INFO | app | [d2eb4388] Pipeline complete: 1062.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:29,534 | INFO | app | [305f2fcb] Pipeline start | 'what is 6 pin din connector'
+2026-05-03 22:42:29,535 | INFO | app | [305f2fcb] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:42:29,541 | INFO | clients | Node B dispatch ack for what is 6 pin din connector -> accepted=True
+2026-05-03 22:42:29,818 | INFO | app | [305f2fcb] First token received | Edge-TTFT=283.5 ms
+2026-05-03 22:42:31,344 | INFO | app | [305f2fcb] Pipeline complete: 1810.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:31,346 | INFO | app | [69773c83] Pipeline start | 'what are the uses for gui'
+2026-05-03 22:42:31,346 | INFO | app | [69773c83] BM25 done: 0.7 ms | 5 docs
+2026-05-03 22:42:31,350 | INFO | clients | Node B dispatch ack for what are the uses for gui -> accepted=True
+2026-05-03 22:42:31,538 | INFO | app | [69773c83] First token received | Edge-TTFT=192.0 ms
+2026-05-03 22:42:36,534 | INFO | app | [69773c83] Pipeline complete: 5188.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:36,536 | INFO | app | [e761f3d7] Pipeline start | 'what are banana plugs for'
+2026-05-03 22:42:36,536 | INFO | app | [e761f3d7] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:42:36,543 | INFO | clients | Node B dispatch ack for what are banana plugs for -> accepted=True
+2026-05-03 22:42:36,727 | INFO | app | [e761f3d7] First token received | Edge-TTFT=190.8 ms
+2026-05-03 22:42:38,662 | INFO | app | [e761f3d7] Pipeline complete: 2125.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:38,663 | INFO | app | [7a4846f7] Pipeline start | 'when did the trojan war take place'
+2026-05-03 22:42:38,664 | INFO | app | [7a4846f7] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:42:38,676 | INFO | clients | Node B dispatch ack for when did the trojan war take place -> accepted=True
+2026-05-03 22:42:38,854 | INFO | app | [7a4846f7] First token received | Edge-TTFT=191.1 ms
+2026-05-03 22:42:40,412 | INFO | app | [7a4846f7] Pipeline complete: 1748.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:40,414 | INFO | app | [92626fa1] Pipeline start | 'when did the free soilers party start?'
+2026-05-03 22:42:40,414 | INFO | app | [92626fa1] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:42:40,418 | INFO | clients | Node B dispatch ack for when did the free soilers party start? -> accepted=True
+2026-05-03 22:42:40,715 | INFO | app | [92626fa1] First token received | Edge-TTFT=301.0 ms
+2026-05-03 22:42:42,448 | INFO | app | [92626fa1] Pipeline complete: 2034.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:42,450 | INFO | app | [92754f54] Pipeline start | 'when did steven adler play for guns and roses'
+2026-05-03 22:42:42,450 | INFO | app | [92754f54] BM25 done: 0.6 ms | 4 docs
+2026-05-03 22:42:42,456 | INFO | clients | Node B dispatch ack for when did steven adler play for guns and  -> accepted=True
+2026-05-03 22:42:42,641 | INFO | app | [92754f54] First token received | Edge-TTFT=191.0 ms
+2026-05-03 22:42:43,678 | INFO | app | [92754f54] Pipeline complete: 1228.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:43,680 | INFO | app | [3251398e] Pipeline start | 'who sings stand by me'
+2026-05-03 22:42:43,680 | INFO | app | [3251398e] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:42:43,690 | INFO | clients | Node B dispatch ack for who sings stand by me -> accepted=True
+2026-05-03 22:42:43,871 | INFO | app | [3251398e] First token received | Edge-TTFT=191.3 ms
+2026-05-03 22:42:45,016 | INFO | app | [3251398e] Pipeline complete: 1336.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:45,018 | INFO | app | [f0ce3801] Pipeline start | 'what year was elvis born'
+2026-05-03 22:42:45,019 | INFO | app | [f0ce3801] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:42:45,025 | INFO | clients | Node B dispatch ack for what year was elvis born -> accepted=True
+2026-05-03 22:42:45,325 | INFO | app | [f0ce3801] First token received | Edge-TTFT=307.1 ms
+2026-05-03 22:42:45,759 | INFO | app | [f0ce3801] Pipeline complete: 740.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:45,761 | INFO | app | [55dc979d] Pipeline start | 'what are the arb medications'
+2026-05-03 22:42:45,761 | INFO | app | [55dc979d] BM25 done: 0.6 ms | 1 docs
+2026-05-03 22:42:45,774 | INFO | clients | Node B dispatch ack for what are the arb medications -> accepted=True
+2026-05-03 22:42:45,951 | INFO | app | [55dc979d] First token received | Edge-TTFT=190.1 ms
+2026-05-03 22:42:47,728 | INFO | app | [55dc979d] Pipeline complete: 2877.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:47,729 | INFO | app | [85a5ef3a] Pipeline start | 'what the atmosphere on mercury'
+2026-05-03 22:42:47,730 | INFO | app | [85a5ef3a] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:42:47,735 | INFO | clients | Node B dispatch ack for what the atmosphere on mercury -> accepted=True
+2026-05-03 22:42:47,920 | INFO | app | [85a5ef3a] First token received | Edge-TTFT=191.4 ms
+2026-05-03 22:42:49,692 | INFO | app | [85a5ef3a] Pipeline complete: 1963.1 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:49,694 | INFO | app | [886d9533] Pipeline start | 'what religion is westminster abbey'
+2026-05-03 22:42:49,694 | INFO | app | [886d9533] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:42:49,698 | INFO | clients | Node B dispatch ack for what religion is westminster abbey -> accepted=True
+2026-05-03 22:42:49,946 | INFO | app | [886d9533] First token received | Edge-TTFT=251.8 ms
+2026-05-03 22:42:51,549 | INFO | app | [886d9533] Pipeline complete: 1855.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:51,551 | INFO | app | [d6535ca2] Pipeline start | 'what are stanzas in poetry'
+2026-05-03 22:42:51,552 | INFO | app | [d6535ca2] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:42:51,558 | INFO | clients | Node B dispatch ack for what are stanzas in poetry -> accepted=True
+2026-05-03 22:42:51,743 | INFO | app | [d6535ca2] First token received | Edge-TTFT=191.6 ms
+2026-05-03 22:42:56,143 | INFO | app | [d6535ca2] Pipeline complete: 4591.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:56,144 | INFO | app | [6532476e] Pipeline start | 'who won the super in xl1'
+2026-05-03 22:42:56,145 | INFO | app | [6532476e] BM25 done: 0.6 ms | 1 docs
+2026-05-03 22:42:56,149 | INFO | clients | Node B dispatch ack for who won the super in xl1 -> accepted=True
+2026-05-03 22:42:56,335 | INFO | app | [6532476e] First token received | Edge-TTFT=190.7 ms
+2026-05-03 22:42:58,093 | INFO | app | [6532476e] Pipeline complete: 1948.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:58,094 | INFO | app | [1a6e7122] Pipeline start | 'who won the 2010 world cup'
+2026-05-03 22:42:58,095 | INFO | app | [1a6e7122] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:42:58,102 | INFO | clients | Node B dispatch ack for who won the 2010 world cup -> accepted=True
+2026-05-03 22:42:58,470 | INFO | app | [1a6e7122] First token received | Edge-TTFT=376.0 ms
+2026-05-03 22:42:58,862 | INFO | app | [1a6e7122] Pipeline complete: 768.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:42:58,864 | INFO | app | [f9ceef5d] Pipeline start | 'what part of the plant are avocados'
+2026-05-03 22:42:58,865 | INFO | app | [f9ceef5d] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:42:58,869 | INFO | clients | Node B dispatch ack for what part of the plant are avocados -> accepted=True
+2026-05-03 22:42:59,058 | INFO | app | [f9ceef5d] First token received | Edge-TTFT=193.8 ms
+2026-05-03 22:43:00,494 | INFO | app | [f9ceef5d] Pipeline complete: 1630.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:00,496 | INFO | app | [659637c1] Pipeline start | 'who starred in the original true grit'
+2026-05-03 22:43:00,496 | INFO | app | [659637c1] BM25 done: 0.7 ms | 1 docs
+2026-05-03 22:43:00,499 | INFO | clients | Node B dispatch ack for who starred in the original true grit -> accepted=True
+2026-05-03 22:43:00,785 | INFO | app | [659637c1] First token received | Edge-TTFT=289.6 ms
+2026-05-03 22:43:01,355 | INFO | app | [659637c1] Pipeline complete: 859.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:01,357 | INFO | app | [844f7aa3] Pipeline start | 'what motor does a 2001 monte carlo'
+2026-05-03 22:43:01,357 | INFO | app | [844f7aa3] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:43:01,363 | INFO | clients | Node B dispatch ack for what motor does a 2001 monte carlo -> accepted=True
+2026-05-03 22:43:01,548 | INFO | app | [844f7aa3] First token received | Edge-TTFT=191.9 ms
+2026-05-03 22:43:03,088 | INFO | app | [844f7aa3] Pipeline complete: 1731.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:03,089 | INFO | app | [6d144399] Pipeline start | 'where scottsdale?'
+2026-05-03 22:43:03,090 | INFO | app | [6d144399] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:03,095 | INFO | clients | Node B dispatch ack for where scottsdale? -> accepted=True
+2026-05-03 22:43:03,408 | INFO | app | [6d144399] First token received | Edge-TTFT=319.0 ms
+2026-05-03 22:43:04,549 | INFO | app | [6d144399] Pipeline complete: 1459.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:04,551 | INFO | app | [9015fdd6] Pipeline start | 'what are the most known sports in america'
+2026-05-03 22:43:04,552 | INFO | app | [9015fdd6] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:43:04,555 | INFO | clients | Node B dispatch ack for what are the most known sports in americ -> accepted=True
+2026-05-03 22:43:04,742 | INFO | app | [9015fdd6] First token received | Edge-TTFT=190.9 ms
+2026-05-03 22:43:07,574 | INFO | app | [9015fdd6] Pipeline complete: 3023.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:07,576 | INFO | app | [8a362ebb] Pipeline start | 'what is an "N.M?'
+2026-05-03 22:43:07,577 | ERROR | app | Streaming error: Syntax Error: what is an "N.M?
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Syntax Error: what is an "N.M?
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:07,578 | INFO | app | [e6bed886] Pipeline start | 'what year did john adams become  president?'
+2026-05-03 22:43:07,579 | INFO | app | [e6bed886] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:07,580 | INFO | clients | Node B dispatch ack for what is an "N.M? -> accepted=True
+2026-05-03 22:43:07,770 | INFO | app | [e6bed886] First token received | Edge-TTFT=191.5 ms
+2026-05-03 22:43:07,834 | INFO | clients | Node B dispatch ack for what year did john adams become  preside -> accepted=True
+2026-05-03 22:43:08,303 | INFO | app | [e6bed886] Pipeline complete: 724.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:08,305 | INFO | app | [da32c146] Pipeline start | 'what is am 2201'
+2026-05-03 22:43:08,305 | INFO | app | [da32c146] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:43:08,309 | INFO | clients | Node B dispatch ack for what is am 2201 -> accepted=True
+2026-05-03 22:43:08,575 | INFO | app | [da32c146] First token received | Edge-TTFT=270.3 ms
+2026-05-03 22:43:10,096 | INFO | app | [da32c146] Pipeline complete: 1791.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:10,098 | INFO | app | [096c1a9c] Pipeline start | 'when did george washington died?'
+2026-05-03 22:43:10,098 | INFO | app | [096c1a9c] BM25 done: 0.7 ms | 0 docs
+2026-05-03 22:43:10,102 | INFO | clients | Node B dispatch ack for when did george washington died? -> accepted=True
+2026-05-03 22:43:10,289 | INFO | app | [096c1a9c] First token received | Edge-TTFT=191.5 ms
+2026-05-03 22:43:11,243 | INFO | app | [096c1a9c] Pipeline complete: 1145.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:11,245 | INFO | app | [9b1a9919] Pipeline start | 'what is a wiki platform'
+2026-05-03 22:43:11,245 | INFO | app | [9b1a9919] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:43:11,249 | INFO | clients | Node B dispatch ack for what is a wiki platform -> accepted=True
+2026-05-03 22:43:11,559 | INFO | app | [9b1a9919] First token received | Edge-TTFT=314.3 ms
+2026-05-03 22:43:13,356 | INFO | app | [9b1a9919] Pipeline complete: 2111.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:13,358 | INFO | app | [6f6f19ee] Pipeline start | 'who plays dumbledore in harry potter 6'
+2026-05-03 22:43:13,359 | INFO | app | [6f6f19ee] BM25 done: 0.7 ms | 1 docs
+2026-05-03 22:43:13,372 | INFO | clients | Node B dispatch ack for who plays dumbledore in harry potter 6 -> accepted=True
+2026-05-03 22:43:13,551 | INFO | app | [6f6f19ee] First token received | Edge-TTFT=193.0 ms
+2026-05-03 22:43:14,766 | INFO | app | [6f6f19ee] Pipeline complete: 1408.1 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:14,768 | INFO | app | [c6bddb5c] Pipeline start | 'where do dungeness crab live'
+2026-05-03 22:43:14,768 | INFO | app | [c6bddb5c] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:14,772 | INFO | clients | Node B dispatch ack for where do dungeness crab live -> accepted=True
+2026-05-03 22:43:15,071 | INFO | app | [c6bddb5c] First token received | Edge-TTFT=303.0 ms
+2026-05-03 22:43:15,815 | INFO | app | [c6bddb5c] Pipeline complete: 1424.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:15,816 | INFO | app | [855c9fb7] Pipeline start | 'when did Emperor Justinian die'
+2026-05-03 22:43:15,817 | INFO | app | [855c9fb7] BM25 done: 0.5 ms | 0 docs
+2026-05-03 22:43:15,820 | INFO | clients | Node B dispatch ack for when did Emperor Justinian die -> accepted=True
+2026-05-03 22:43:15,458 | INFO | app | [855c9fb7] First token received | Edge-TTFT=191.5 ms
+2026-05-03 22:43:16,244 | INFO | app | [855c9fb7] Pipeline complete: 977.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:16,246 | INFO | app | [8ed84f1a] Pipeline start | 'what mountains are on appalachian trail'
+2026-05-03 22:43:16,246 | INFO | app | [8ed84f1a] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:43:16,250 | INFO | clients | Node B dispatch ack for what mountains are on appalachian trail -> accepted=True
+2026-05-03 22:43:16,440 | INFO | app | [8ed84f1a] First token received | Edge-TTFT=194.2 ms
+2026-05-03 22:43:20,859 | INFO | app | [8ed84f1a] Pipeline complete: 4613.1 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:20,860 | INFO | app | [b7368db5] Pipeline start | 'when did scott pilgrim come out'
+2026-05-03 22:43:20,861 | INFO | app | [b7368db5] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:20,865 | INFO | clients | Node B dispatch ack for when did scott pilgrim come out -> accepted=True
+2026-05-03 22:43:21,050 | INFO | app | [b7368db5] First token received | Edge-TTFT=190.3 ms
+2026-05-03 22:43:22,055 | INFO | app | [b7368db5] Pipeline complete: 1195.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:22,057 | INFO | app | [3b6f41b8] Pipeline start | 'what season is  dexter on'
+2026-05-03 22:43:22,057 | INFO | app | [3b6f41b8] BM25 done: 0.6 ms | 4 docs
+2026-05-03 22:43:22,061 | INFO | clients | Node B dispatch ack for what season is  dexter on -> accepted=True
+2026-05-03 22:43:22,201 | INFO | app | [3b6f41b8] First token received | Edge-TTFT=144.2 ms
+2026-05-03 22:43:23,107 | INFO | app | [3b6f41b8] Pipeline complete: 1049.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:23,108 | INFO | app | [c92682bf] Pipeline start | 'What are context effects of memory?'
+2026-05-03 22:43:23,109 | INFO | app | [c92682bf] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:43:23,113 | INFO | clients | Node B dispatch ack for What are context effects of memory? -> accepted=True
+2026-05-03 22:43:23,334 | INFO | app | [c92682bf] First token received | Edge-TTFT=226.0 ms
+2026-05-03 22:43:25,083 | INFO | app | [c92682bf] Pipeline complete: 1975.1 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:25,085 | INFO | app | [88cea7ef] Pipeline start | 'who won the 1998 world cup'
+2026-05-03 22:43:25,086 | INFO | app | [88cea7ef] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:25,091 | INFO | clients | Node B dispatch ack for who won the 1998 world cup -> accepted=True
+2026-05-03 22:43:25,278 | INFO | app | [88cea7ef] First token received | Edge-TTFT=193.3 ms
+2026-05-03 22:43:26,555 | INFO | app | [88cea7ef] Pipeline complete: 1469.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:26,557 | INFO | app | [cb26bd70] Pipeline start | 'what kind of people are on the show skins'
+2026-05-03 22:43:26,557 | INFO | app | [cb26bd70] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:43:26,561 | INFO | clients | Node B dispatch ack for what kind of people are on the show skin -> accepted=True
+2026-05-03 22:43:26,746 | INFO | app | [cb26bd70] First token received | Edge-TTFT=189.4 ms
+2026-05-03 22:43:29,081 | INFO | app | [cb26bd70] Pipeline complete: 2524.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:29,083 | INFO | app | [e9563714] Pipeline start | 'what nationality is kris jenner'
+2026-05-03 22:43:29,084 | INFO | app | [e9563714] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:43:29,087 | INFO | clients | Node B dispatch ack for what nationality is kris jenner -> accepted=True
+2026-05-03 22:43:29,275 | INFO | app | [e9563714] First token received | Edge-TTFT=192.5 ms
+2026-05-03 22:43:30,741 | INFO | app | [e9563714] Pipeline complete: 1657.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:30,742 | INFO | app | [9c020575] Pipeline start | 'what are the boundaries of the pelvic outlet'
+2026-05-03 22:43:30,743 | INFO | app | [9c020575] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:43:30,746 | INFO | clients | Node B dispatch ack for what are the boundaries of the pelvic ou -> accepted=True
+2026-05-03 22:43:30,937 | INFO | app | [9c020575] First token received | Edge-TTFT=195.1 ms
+2026-05-03 22:43:34,164 | INFO | app | [9c020575] Pipeline complete: 3421.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:34,166 | INFO | app | [47800830] Pipeline start | 'what time will the world end on may 21'
+2026-05-03 22:43:34,167 | INFO | app | [47800830] BM25 done: 0.8 ms | 2 docs
+2026-05-03 22:43:34,170 | INFO | clients | Node B dispatch ack for what time will the world end on may 21 -> accepted=True
+2026-05-03 22:43:34,362 | INFO | app | [47800830] First token received | Edge-TTFT=196.0 ms
+2026-05-03 22:43:36,325 | INFO | app | [47800830] Pipeline complete: 2159.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:36,327 | INFO | app | [cac9ecc2] Pipeline start | 'who makes triumph motorcycles'
+2026-05-03 22:43:36,327 | INFO | app | [cac9ecc2] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:36,331 | INFO | clients | Node B dispatch ack for who makes triumph motorcycles -> accepted=True
+2026-05-03 22:43:36,511 | INFO | app | [cac9ecc2] First token received | Edge-TTFT=184.3 ms
+2026-05-03 22:43:38,784 | INFO | app | [cac9ecc2] Pipeline complete: 2457.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:38,786 | INFO | app | [d8b18968] Pipeline start | 'where do sesame seeds come from'
+2026-05-03 22:43:38,787 | INFO | app | [d8b18968] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:43:38,790 | INFO | clients | Node B dispatch ack for where do sesame seeds come from -> accepted=True
+2026-05-03 22:43:38,979 | INFO | app | [d8b18968] First token received | Edge-TTFT=193.4 ms
+2026-05-03 22:43:45,292 | INFO | app | [d8b18968] Pipeline complete: 7436.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:45,294 | INFO | app | [9ad64e48] Pipeline start | 'where did the olmecs come from'
+2026-05-03 22:43:45,294 | INFO | app | [9ad64e48] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:43:45,303 | INFO | clients | Node B dispatch ack for where did the olmecs come from -> accepted=True
+2026-05-03 22:43:45,487 | INFO | app | [9ad64e48] First token received | Edge-TTFT=193.4 ms
+2026-05-03 22:43:46,720 | INFO | app | [9ad64e48] Pipeline complete: 1426.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:46,722 | INFO | app | [3d5123e8] Pipeline start | 'what state is milwaukee in'
+2026-05-03 22:43:46,722 | INFO | app | [3d5123e8] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:43:46,726 | INFO | clients | Node B dispatch ack for what state is milwaukee in -> accepted=True
+2026-05-03 22:43:46,973 | INFO | app | [3d5123e8] First token received | Edge-TTFT=251.7 ms
+2026-05-03 22:43:47,135 | INFO | app | [3d5123e8] Pipeline complete: 413.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:47,137 | INFO | app | [738a290d] Pipeline start | 'what are garnishments'
+2026-05-03 22:43:47,137 | INFO | app | [738a290d] BM25 done: 0.6 ms | 1 docs
+2026-05-03 22:43:47,141 | INFO | clients | Node B dispatch ack for what are garnishments -> accepted=True
+2026-05-03 22:43:47,349 | INFO | app | [738a290d] First token received | Edge-TTFT=212.0 ms
+2026-05-03 22:43:49,785 | INFO | app | [738a290d] Pipeline complete: 2648.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:49,786 | INFO | app | [d03ee249] Pipeline start | 'what are the charges against Casey Anthony'
+2026-05-03 22:43:49,787 | INFO | app | [d03ee249] BM25 done: 0.7 ms | 1 docs
+2026-05-03 22:43:49,790 | INFO | clients | Node B dispatch ack for what are the charges against Casey Antho -> accepted=True
+2026-05-03 22:43:49,978 | INFO | app | [d03ee249] First token received | Edge-TTFT=191.5 ms
+2026-05-03 22:43:52,336 | INFO | app | [d03ee249] Pipeline complete: 2549.3 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:52,337 | INFO | app | [889be7f5] Pipeline start | 'what are arizona's symbols'
+2026-05-03 22:43:52,338 | ERROR | app | Streaming error: Syntax Error: what are arizona's symbols
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Syntax Error: what are arizona's symbols
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:52,339 | INFO | app | [69fa5a9f] Pipeline start | 'what are SLR cameras'
+2026-05-03 22:43:52,340 | INFO | app | [69fa5a9f] BM25 done: 0.6 ms | 1 docs
+2026-05-03 22:43:52,342 | INFO | clients | Node B dispatch ack for what are arizona's symbols -> accepted=True
+2026-05-03 22:43:52,530 | INFO | app | [69fa5a9f] First token received | Edge-TTFT=190.7 ms
+2026-05-03 22:43:52,536 | INFO | clients | Node B dispatch ack for what are SLR cameras -> accepted=True
+2026-05-03 22:43:56,358 | INFO | app | [69fa5a9f] Pipeline complete: 4018.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:56,360 | INFO | app | [a4a3d430] Pipeline start | 'what is the scientific name of the eastern tiger salamander?'
+2026-05-03 22:43:56,360 | INFO | app | [a4a3d430] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:43:56,364 | INFO | clients | Node B dispatch ack for what is the scientific name of the easte -> accepted=True
+2026-05-03 22:43:56,551 | INFO | app | [a4a3d430] First token received | Edge-TTFT=191.9 ms
+2026-05-03 22:43:56,827 | INFO | app | [a4a3d430] Pipeline complete: 467.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:56,828 | INFO | app | [d6c557ab] Pipeline start | 'what was the steelworkers strike'
+2026-05-03 22:43:56,829 | INFO | app | [d6c557ab] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:56,832 | INFO | clients | Node B dispatch ack for what was the steelworkers strike -> accepted=True
+2026-05-03 22:43:57,084 | INFO | app | [d6c557ab] First token received | Edge-TTFT=256.0 ms
+2026-05-03 22:43:58,545 | INFO | app | [d6c557ab] Pipeline complete: 1716.7 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:43:58,547 | INFO | app | [9a460a3b] Pipeline start | 'when was the web invented'
+2026-05-03 22:43:58,547 | INFO | app | [9a460a3b] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:43:58,551 | INFO | clients | Node B dispatch ack for when was the web invented -> accepted=True
+2026-05-03 22:43:58,736 | INFO | app | [9a460a3b] First token received | Edge-TTFT=189.6 ms
+2026-05-03 22:44:00,617 | INFO | app | [9a460a3b] Pipeline complete: 2070.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:00,619 | INFO | app | [808a19fc] Pipeline start | 'where is andy whitfield from?'
+2026-05-03 22:44:00,619 | INFO | app | [808a19fc] BM25 done: 0.6 ms | 3 docs
+2026-05-03 22:44:00,623 | INFO | clients | Node B dispatch ack for where is andy whitfield from? -> accepted=True
+2026-05-03 22:44:00,811 | INFO | app | [808a19fc] First token received | Edge-TTFT=192.8 ms
+2026-05-03 22:44:02,050 | INFO | app | [808a19fc] Pipeline complete: 1431.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:02,052 | INFO | app | [544568cc] Pipeline start | 'where is scotty mccreery from'
+2026-05-03 22:44:02,052 | INFO | app | [544568cc] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:44:02,059 | INFO | clients | Node B dispatch ack for where is scotty mccreery from -> accepted=True
+2026-05-03 22:44:02,240 | INFO | app | [544568cc] First token received | Edge-TTFT=188.3 ms
+2026-05-03 22:44:04,064 | INFO | app | [544568cc] Pipeline complete: 2012.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:04,066 | INFO | app | [bb8ee78f] Pipeline start | 'where is david ortiz from'
+2026-05-03 22:44:04,066 | INFO | app | [bb8ee78f] BM25 done: 0.6 ms | 3 docs
+2026-05-03 22:44:04,073 | INFO | clients | Node B dispatch ack for where is david ortiz from -> accepted=True
+2026-05-03 22:44:04,258 | INFO | app | [bb8ee78f] First token received | Edge-TTFT=192.1 ms
+2026-05-03 22:44:05,380 | INFO | app | [bb8ee78f] Pipeline complete: 1314.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:05,382 | INFO | app | [4dd992b7] Pipeline start | 'when was kirstie alley on cheers'
+2026-05-03 22:44:05,382 | INFO | app | [4dd992b7] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:44:05,386 | INFO | clients | Node B dispatch ack for when was kirstie alley on cheers -> accepted=True
+2026-05-03 22:44:05,629 | INFO | app | [4dd992b7] First token received | Edge-TTFT=247.1 ms
+2026-05-03 22:44:06,320 | INFO | app | [4dd992b7] Pipeline complete: 938.9 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:06,322 | INFO | app | [1932f813] Pipeline start | 'what is the cabin pressure of us airlines'
+2026-05-03 22:44:06,323 | INFO | app | [1932f813] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:44:06,326 | INFO | clients | Node B dispatch ack for what is the cabin pressure of us airline -> accepted=True
+2026-05-03 22:44:06,584 | INFO | app | [1932f813] First token received | Edge-TTFT=261.8 ms
+2026-05-03 22:44:07,963 | INFO | app | [1932f813] Pipeline complete: 1641.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:07,965 | INFO | app | [6503aa58] Pipeline start | 'where is penn state stadium'
+2026-05-03 22:44:07,966 | INFO | app | [6503aa58] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:44:07,973 | INFO | clients | Node B dispatch ack for where is penn state stadium -> accepted=True
+2026-05-03 22:44:08,157 | INFO | app | [6503aa58] First token received | Edge-TTFT=192.1 ms
+2026-05-03 22:44:09,793 | INFO | app | [6503aa58] Pipeline complete: 1827.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:09,794 | INFO | app | [9a87283d] Pipeline start | 'what was the parthenon used for'
+2026-05-03 22:44:09,795 | INFO | app | [9a87283d] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:44:09,798 | INFO | clients | Node B dispatch ack for what was the parthenon used for -> accepted=True
+2026-05-03 22:44:10,036 | INFO | app | [9a87283d] First token received | Edge-TTFT=241.5 ms
+2026-05-03 22:44:11,337 | INFO | app | [9a87283d] Pipeline complete: 1543.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:11,339 | INFO | app | [4a25a6c4] Pipeline start | 'what is stepwise linear regression'
+2026-05-03 22:44:11,340 | INFO | app | [4a25a6c4] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:44:11,346 | INFO | clients | Node B dispatch ack for what is stepwise linear regression -> accepted=True
+2026-05-03 22:44:11,530 | INFO | app | [4a25a6c4] First token received | Edge-TTFT=191.3 ms
+2026-05-03 22:44:14,400 | INFO | app | [4a25a6c4] Pipeline complete: 3994.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:14,402 | INFO | app | [21ba66d4] Pipeline start | 'what is the definition of a hung jury'
+2026-05-03 22:44:14,402 | INFO | app | [21ba66d4] BM25 done: 0.6 ms | 3 docs
+2026-05-03 22:44:14,408 | INFO | clients | Node B dispatch ack for what is the definition of a hung jury -> accepted=True
+2026-05-03 22:44:14,594 | INFO | app | [21ba66d4] First token received | Edge-TTFT=192.6 ms
+2026-05-03 22:44:15,963 | INFO | app | [21ba66d4] Pipeline complete: 1561.4 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:15,964 | INFO | app | [76772904] Pipeline start | 'where was jfk buried'
+2026-05-03 22:44:15,965 | INFO | app | [76772904] BM25 done: 0.6 ms | 0 docs
+2026-05-03 22:44:15,970 | INFO | clients | Node B dispatch ack for where was jfk buried -> accepted=True
+2026-05-03 22:44:16,155 | INFO | app | [76772904] First token received | Edge-TTFT=191.0 ms
+2026-05-03 22:44:17,824 | INFO | app | [76772904] Pipeline complete: 1860.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:17,826 | INFO | app | [3c11a36d] Pipeline start | 'what is baklava recipe'
+2026-05-03 22:44:17,827 | INFO | app | [3c11a36d] BM25 done: 0.6 ms | 2 docs
+2026-05-03 22:44:17,844 | INFO | clients | Node B dispatch ack for what is baklava recipe -> accepted=True
+2026-05-03 22:44:18,017 | INFO | app | [3c11a36d] First token received | Edge-TTFT=190.8 ms
+2026-05-03 22:44:24,009 | INFO | app | [3c11a36d] Pipeline complete: 6183.2 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:24,011 | INFO | app | [7f12ac91] Pipeline start | 'who is carlos pena on big time rush'
+2026-05-03 22:44:24,012 | INFO | app | [7f12ac91] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:44:24,016 | INFO | clients | Node B dispatch ack for who is carlos pena on big time rush -> accepted=True
+2026-05-03 22:44:24,204 | INFO | app | [7f12ac91] First token received | Edge-TTFT=192.6 ms
+2026-05-03 22:44:27,029 | INFO | app | [7f12ac91] Pipeline complete: 3017.5 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:27,030 | INFO | app | [2c9e3131] Pipeline start | 'where is the arctic circle located on the earth'
+2026-05-03 22:44:27,031 | INFO | app | [2c9e3131] BM25 done: 0.7 ms | 4 docs
+2026-05-03 22:44:27,037 | INFO | clients | Node B dispatch ack for where is the arctic circle located on th -> accepted=True
+2026-05-03 22:44:27,223 | INFO | app | [2c9e3131] First token received | Edge-TTFT=192.9 ms
+2026-05-03 22:44:28,767 | INFO | app | [2c9e3131] Pipeline complete: 1737.0 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:28,769 | INFO | app | [e00dfc18] Pipeline start | 'where are colors on stoplight'
+2026-05-03 22:44:28,770 | INFO | app | [e00dfc18] BM25 done: 0.6 ms | 3 docs
+2026-05-03 22:44:28,774 | INFO | clients | Node B dispatch ack for where are colors on stoplight -> accepted=True
+2026-05-03 22:44:28,985 | INFO | app | [e00dfc18] First token received | Edge-TTFT=215.5 ms
+2026-05-03 22:44:30,334 | INFO | app | [e00dfc18] Pipeline complete: 1564.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:30,336 | INFO | app | [e370c032] Pipeline start | 'what was the GE building in rockefeller plaza called before.'
+2026-05-03 22:44:30,336 | INFO | app | [e370c032] BM25 done: 0.6 ms | 1 docs
+2026-05-03 22:44:30,340 | INFO | clients | Node B dispatch ack for what was the GE building in rockefeller  -> accepted=True
+2026-05-03 22:44:30,526 | INFO | app | [e370c032] First token received | Edge-TTFT=190.7 ms
+2026-05-03 22:44:31,694 | INFO | app | [e370c032] Pipeline complete: 1358.6 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:31,696 | INFO | app | [77316220] Pipeline start | 'WHO WAS IN THE MOVIE I CONFESS WITH MONTGOMERY CLIFT'
+2026-05-03 22:44:31,696 | ERROR | app | Streaming error: Syntax Error: WHO WAS IN THE MOVIE I CONFESS WITH MONTGOMERY CLIFT
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 231, in token_stream
+  File "/home/apath/Work/PDC/Project/Node C/app.py", line 103, in handle_query
+    )
+      
+  File "/usr/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/Node C/bm25.py", line 40, in query
+    query = self._index.parse_query(query_text, ["body"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Syntax Error: WHO WAS IN THE MOVIE I CONFESS WITH MONTGOMERY CLIFT
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:31,700 | INFO | app | [5f73e69d] Pipeline start | 'what is article 5 about'
+2026-05-03 22:44:31,700 | INFO | clients | Node B dispatch ack for WHO WAS IN THE MOVIE I CONFESS WITH MONT -> accepted=True
+2026-05-03 22:44:31,700 | INFO | app | [5f73e69d] BM25 done: 0.8 ms | 2 docs
+2026-05-03 22:44:31,887 | INFO | clients | Node B dispatch ack for what is article 5 about -> accepted=True
+2026-05-03 22:44:31,891 | INFO | app | [5f73e69d] First token received | Edge-TTFT=190.9 ms
+2026-05-03 22:44:34,493 | INFO | app | [5f73e69d] Pipeline complete: 2793.8 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:34,495 | INFO | app | [6066351b] Pipeline start | 'What is the function of albumin?'
+2026-05-03 22:44:34,496 | INFO | app | [6066351b] BM25 done: 0.7 ms | 3 docs
+2026-05-03 22:44:34,499 | INFO | clients | Node B dispatch ack for What is the function of albumin? -> accepted=True
+2026-05-03 22:44:34,688 | INFO | app | [6066351b] First token received | Edge-TTFT=193.1 ms
+2026-05-03 22:44:36,304 | INFO | app | [6066351b] Pipeline complete: 1809.1 ms total
+INFO:     127.0.0.1:46089 - "POST /query HTTP/1.1" 200 OK
+2026-05-03 22:44:36,306 | INFO | app | [f40d9198] Pipeline start | 'what is chicken chow mein'
+2026-05-03 22:44:36,306 | INFO | app | [f40d9198] BM25 done: 0.7 ms | 2 docs
+2026-05-03 22:44:36,310 | INFO | clients | Node B dispatch ack for what is chicken chow mein -> accepted=True
+2026-05-03 22:44:36,528 | INFO | app | [f40d9198] First token received | Edge-TTFT=222.2 ms
+2026-05-03 22:44:37,940 | INFO | app | [f40d9198] Pipeline complete: 1634.1 ms total
+E0503 22:45:38.012454181   14412 chttp2_transport.cc:1180]             ipv4:10.8.0.5:50051: Received a GOAWAY with error code ENHANCE_YOUR_CALM and debug data equal to "too_many_pings". Current keepalive time (before throttling): 20000ms

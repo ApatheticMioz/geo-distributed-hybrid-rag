@@ -1,0 +1,219 @@
+(.venv) apath@PC:~/Work/PDC/Project$ python benchmark_parallel_vs_sequential.py
+2026-05-03 22:40:43,614 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,616 | INFO | [01/50] mode=sequential ttft=12.86ms query='dummy benchmark query 01: what is retrieval case 1?'
+2026-05-03 22:40:43,618 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,619 | INFO | [02/50] mode=parallel ttft=2.85ms query='dummy benchmark query 02: what is retrieval case 2?'
+2026-05-03 22:40:43,621 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,622 | INFO | [03/50] mode=sequential ttft=3.07ms query='dummy benchmark query 03: what is retrieval case 3?'
+2026-05-03 22:40:43,624 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,626 | INFO | [04/50] mode=parallel ttft=3.78ms query='dummy benchmark query 04: what is retrieval case 4?'
+2026-05-03 22:40:43,628 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,629 | INFO | [05/50] mode=sequential ttft=2.94ms query='dummy benchmark query 05: what is retrieval case 5?'
+2026-05-03 22:40:43,632 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,632 | INFO | [06/50] mode=parallel ttft=2.96ms query='dummy benchmark query 06: what is retrieval case 6?'
+2026-05-03 22:40:43,634 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,635 | INFO | [07/50] mode=sequential ttft=2.64ms query='dummy benchmark query 07: what is retrieval case 7?'
+2026-05-03 22:40:43,638 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,639 | INFO | [08/50] mode=parallel ttft=3.18ms query='dummy benchmark query 08: what is retrieval case 8?'
+2026-05-03 22:40:43,641 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,642 | INFO | [09/50] mode=sequential ttft=2.84ms query='dummy benchmark query 09: what is retrieval case 9?'
+2026-05-03 22:40:43,644 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,645 | INFO | [10/50] mode=parallel ttft=2.86ms query='dummy benchmark query 10: what is retrieval case 10?'
+2026-05-03 22:40:43,647 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,648 | INFO | [11/50] mode=sequential ttft=3.35ms query='dummy benchmark query 11: what is retrieval case 11?'
+2026-05-03 22:40:43,650 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,651 | INFO | [12/50] mode=parallel ttft=2.60ms query='dummy benchmark query 12: what is retrieval case 12?'
+2026-05-03 22:40:43,654 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,655 | INFO | [13/50] mode=sequential ttft=3.24ms query='dummy benchmark query 13: what is retrieval case 13?'
+2026-05-03 22:40:43,657 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,658 | INFO | [14/50] mode=parallel ttft=2.83ms query='dummy benchmark query 14: what is retrieval case 14?'
+2026-05-03 22:40:43,660 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,661 | INFO | [15/50] mode=sequential ttft=2.81ms query='dummy benchmark query 15: what is retrieval case 15?'
+2026-05-03 22:40:43,663 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,663 | INFO | [16/50] mode=parallel ttft=2.64ms query='dummy benchmark query 16: what is retrieval case 16?'
+2026-05-03 22:40:43,666 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,666 | INFO | [17/50] mode=sequential ttft=2.73ms query='dummy benchmark query 17: what is retrieval case 17?'
+2026-05-03 22:40:43,669 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,669 | INFO | [18/50] mode=parallel ttft=2.74ms query='dummy benchmark query 18: what is retrieval case 18?'
+2026-05-03 22:40:43,671 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,672 | INFO | [19/50] mode=sequential ttft=2.72ms query='dummy benchmark query 19: what is retrieval case 19?'
+2026-05-03 22:40:43,675 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,675 | INFO | [20/50] mode=parallel ttft=2.88ms query='dummy benchmark query 20: what is retrieval case 20?'
+2026-05-03 22:40:43,677 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,678 | INFO | [21/50] mode=sequential ttft=2.30ms query='dummy benchmark query 21: what is retrieval case 21?'
+2026-05-03 22:40:43,680 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,681 | INFO | [22/50] mode=parallel ttft=2.90ms query='dummy benchmark query 22: what is retrieval case 22?'
+2026-05-03 22:40:43,683 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,684 | INFO | [23/50] mode=sequential ttft=2.57ms query='dummy benchmark query 23: what is retrieval case 23?'
+2026-05-03 22:40:43,686 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,687 | INFO | [24/50] mode=parallel ttft=2.74ms query='dummy benchmark query 24: what is retrieval case 24?'
+2026-05-03 22:40:43,689 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,689 | INFO | [25/50] mode=sequential ttft=2.37ms query='dummy benchmark query 25: what is retrieval case 25?'
+2026-05-03 22:40:43,691 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,692 | INFO | [26/50] mode=parallel ttft=2.76ms query='dummy benchmark query 26: what is retrieval case 26?'
+2026-05-03 22:40:43,694 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,695 | INFO | [27/50] mode=sequential ttft=2.86ms query='dummy benchmark query 27: what is retrieval case 27?'
+2026-05-03 22:40:43,697 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,698 | INFO | [28/50] mode=parallel ttft=2.71ms query='dummy benchmark query 28: what is retrieval case 28?'
+2026-05-03 22:40:43,700 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,701 | INFO | [29/50] mode=sequential ttft=2.78ms query='dummy benchmark query 29: what is retrieval case 29?'
+2026-05-03 22:40:43,703 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,704 | INFO | [30/50] mode=parallel ttft=2.87ms query='dummy benchmark query 30: what is retrieval case 30?'
+2026-05-03 22:40:43,706 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,707 | INFO | [31/50] mode=sequential ttft=2.70ms query='dummy benchmark query 31: what is retrieval case 31?'
+2026-05-03 22:40:43,709 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,710 | INFO | [32/50] mode=parallel ttft=2.68ms query='dummy benchmark query 32: what is retrieval case 32?'
+2026-05-03 22:40:43,712 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,713 | INFO | [33/50] mode=sequential ttft=2.84ms query='dummy benchmark query 33: what is retrieval case 33?'
+2026-05-03 22:40:43,715 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,716 | INFO | [34/50] mode=parallel ttft=2.49ms query='dummy benchmark query 34: what is retrieval case 34?'
+2026-05-03 22:40:43,718 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,719 | INFO | [35/50] mode=sequential ttft=2.92ms query='dummy benchmark query 35: what is retrieval case 35?'
+2026-05-03 22:40:43,721 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,721 | INFO | [36/50] mode=parallel ttft=2.37ms query='dummy benchmark query 36: what is retrieval case 36?'
+2026-05-03 22:40:43,723 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,724 | INFO | [37/50] mode=sequential ttft=2.59ms query='dummy benchmark query 37: what is retrieval case 37?'
+2026-05-03 22:40:43,726 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,727 | INFO | [38/50] mode=parallel ttft=2.78ms query='dummy benchmark query 38: what is retrieval case 38?'
+2026-05-03 22:40:43,729 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,730 | INFO | [39/50] mode=sequential ttft=2.91ms query='dummy benchmark query 39: what is retrieval case 39?'
+2026-05-03 22:40:43,732 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,733 | INFO | [40/50] mode=parallel ttft=2.54ms query='dummy benchmark query 40: what is retrieval case 40?'
+2026-05-03 22:40:43,735 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,736 | INFO | [41/50] mode=sequential ttft=2.85ms query='dummy benchmark query 41: what is retrieval case 41?'
+2026-05-03 22:40:43,738 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,738 | INFO | [42/50] mode=parallel ttft=2.40ms query='dummy benchmark query 42: what is retrieval case 42?'
+2026-05-03 22:40:43,741 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,741 | INFO | [43/50] mode=sequential ttft=2.71ms query='dummy benchmark query 43: what is retrieval case 43?'
+2026-05-03 22:40:43,744 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,744 | INFO | [44/50] mode=parallel ttft=2.83ms query='dummy benchmark query 44: what is retrieval case 44?'
+2026-05-03 22:40:43,746 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,747 | INFO | [45/50] mode=sequential ttft=2.54ms query='dummy benchmark query 45: what is retrieval case 45?'
+2026-05-03 22:40:43,749 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,750 | INFO | [46/50] mode=parallel ttft=2.71ms query='dummy benchmark query 46: what is retrieval case 46?'
+2026-05-03 22:40:43,752 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,753 | INFO | [47/50] mode=sequential ttft=2.40ms query='dummy benchmark query 47: what is retrieval case 47?'
+2026-05-03 22:40:43,755 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,755 | INFO | [48/50] mode=parallel ttft=2.49ms query='dummy benchmark query 48: what is retrieval case 48?'
+2026-05-03 22:40:43,757 | INFO | HTTP Request: POST http://localhost:8000/query?mode=sequential "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,758 | INFO | [49/50] mode=sequential ttft=2.45ms query='dummy benchmark query 49: what is retrieval case 49?'
+2026-05-03 22:40:43,761 | INFO | HTTP Request: POST http://localhost:8000/query?mode=parallel "HTTP/1.1 200 OK"
+2026-05-03 22:40:43,761 | INFO | [50/50] mode=parallel ttft=3.29ms query='dummy benchmark query 50: what is retrieval case 50?'
+
+==========================================================================
+Node C TTFT Benchmark
+==========================================================================
+Total queries: 50
+WAN delay header: disabled
+
+Mode           Count   P50 TTFT (ms)   P95 TTFT (ms)   Mean TTFT (ms)
+--------------------------------------------------------------------------
+sequential        25            2.78            3.33             3.16
+parallel          25            2.76            3.27             2.80
+--------------------------------------------------------------------------
+Errors: 0
+(.venv) apath@PC:~/Work/PDC/Project$ python evaluate_wikiqa.py
+[001] EM=0 F1=0.124
+[002] EM=0 F1=0.212
+[003] EM=0 F1=0.112
+[004] EM=0 F1=0.187
+[005] EM=0 F1=0.240
+[006] EM=0 F1=0.182
+[007] EM=0 F1=0.200
+[008] EM=0 F1=0.256
+[009] EM=0 F1=0.227
+[010] EM=0 F1=0.245
+[011] EM=0 F1=0.106
+[012] EM=0 F1=0.137
+[013] EM=0 F1=0.800
+[014] EM=0 F1=0.694
+[015] EM=0 F1=0.224
+[016] EM=0 F1=0.188
+[017] EM=0 F1=0.185
+[018] EM=0 F1=0.181
+[019] EM=0 F1=0.250
+[020] EM=0 F1=0.084
+[021] EM=0 F1=0.250
+[022] EM=0 F1=0.037
+[023] EM=0 F1=0.314
+[024] EM=0 F1=0.129
+[025] EM=0 F1=0.171
+[026] EM=0 F1=0.097
+[027] EM=0 F1=0.418
+[028] EM=0 F1=0.289
+[029] EM=0 F1=0.370
+[030] EM=0 F1=0.110
+[031] EM=0 F1=0.283
+[032] EM=0 F1=0.149
+[033] EM=0 F1=0.141
+[034] EM=0 F1=0.203
+[035] EM=0 F1=0.099
+[036] EM=0 F1=0.061
+[037] EM=0 F1=0.193
+[038] EM=0 F1=0.189
+[039] EM=0 F1=0.250
+[040] EM=0 F1=0.234
+[041] EM=0 F1=0.356
+[042] EM=0 F1=0.323
+[043] EM=0 F1=0.094
+[044] EM=0 F1=0.218
+[045] EM=0 F1=0.269
+[046] EM=0 F1=0.187
+[047] EM=0 F1=0.020
+[048] EM=0 F1=0.125
+[049] EM=0 F1=0.267
+[050] EM=0 F1=0.560
+[051] EM=0 F1=0.165
+[052] EM=0 F1=0.270
+[053] EM=0 F1=0.209
+[054] EM=0 F1=0.111
+[055] EM=0 F1=0.308
+[056] EM=0 F1=0.047
+[057] EM=0 F1=0.301
+[058] EM=0 F1=0.183
+[059] EM=0 F1=0.254
+[060] EM=0 F1=0.148
+[061] EM=0 F1=0.327
+[062] EM=0 F1=0.125
+[063] EM=0 F1=0.686
+[064] EM=0 F1=0.237
+[065] EM=0 F1=0.153
+[066] EM=0 F1=0.239
+[067] EM=0 F1=0.200
+[068] EM=0 F1=0.247
+[069] EM=0 F1=0.133
+[070] EM=0 F1=0.088
+[071] EM=0 F1=0.090
+[072] EM=0 F1=0.020
+[073] EM=0 F1=0.205
+[074] EM=0 F1=0.387
+[075] EM=0 F1=0.105
+[076] EM=0 F1=0.104
+[077] EM=0 F1=0.000
+[078] EM=0 F1=0.205
+[079] EM=0 F1=0.667
+[080] EM=0 F1=0.291
+[081] EM=0 F1=0.343
+[082] EM=0 F1=0.286
+[083] EM=0 F1=0.283
+[084] EM=0 F1=0.313
+[085] EM=0 F1=0.222
+[086] EM=0 F1=0.211
+[087] EM=0 F1=0.275
+[088] EM=0 F1=0.313
+[089] EM=0 F1=0.094
+[090] EM=0 F1=0.288
+[091] EM=0 F1=0.196
+[092] EM=0 F1=0.115
+[093] EM=0 F1=0.136
+[094] EM=0 F1=0.248
+[095] EM=0 F1=0.099
+[096] EM=0 F1=0.228
+[097] EM=0 F1=0.182
+[098] EM=0 F1=0.039
+[099] EM=0 F1=0.121
+[100] EM=0 F1=0.242
+========================================================================
+Questions evaluated: 100
+Final EM: 0.0000
+Final F1: 0.2198
