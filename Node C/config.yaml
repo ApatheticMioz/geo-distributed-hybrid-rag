@@ -6,7 +6,7 @@ node_b:
 node_a:
   grpc_host: "10.8.0.1"     # Node A WireGuard IP — Node C -> Node A gRPC over WireGuard
   grpc_port: 50052          # Node A gRPC GenerationOrchestrator port
-  lan_host:  "192.168.1.100" # Node A PHYSICAL LAN IP for Node B -> Node A forwarding
+  lan_host:  "10.8.0.1"     # Node A WireGuard IP for Node B -> Node A forwarding
 
 # Tantivy disk-backed BM25 index
 corpus:

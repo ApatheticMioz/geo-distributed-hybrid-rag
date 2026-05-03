@@ -1,0 +1,30 @@
+syntax = "proto3";
+package coordination;
+
+message RetrievedDocument {
+  string doc_id = 1;
+  string text   = 2;
+  float  score  = 3;
+  int32  rank   = 4;
+}
+
+// Node C sends this to Node A on the bidirectional stream.
+message SparseContextRequest {
+  string query_id                    = 1;
+  string query_text                  = 2;
+  repeated RetrievedDocument docs    = 3;
+  double t_sparse_ms                 = 4;
+  bool   node_b_dispatch_failed      = 5;
+}
+
+// Node A streams tokens back to Node C as they are generated.
+message GenerationToken {
+  string query_id  = 1;
+  string token     = 2;
+  bool   is_final  = 3;
+  double ttft_ms   = 4;
+}
+
+service GenerationOrchestrator {
+  rpc GenerateStream (stream SparseContextRequest) returns (stream GenerationToken);
+}

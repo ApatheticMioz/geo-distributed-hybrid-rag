@@ -30,6 +30,7 @@ class LatencyRecord:
     t_sparse_ms: float
     t_total_ms: float
     ttft_ms: float
+    mode: str = "parallel"  # "sequential" or "parallel" for benchmarking
     timestamp: float = field(default_factory=time.time)
 
 
@@ -135,6 +136,7 @@ class PipelineOrchestrator:
             t_sparse_ms=t_sparse_ms,
             t_total_ms=t_total_ms,
             ttft_ms=ttft_ms_recorded or 0.0,
+            mode="parallel",
         )
 
 
