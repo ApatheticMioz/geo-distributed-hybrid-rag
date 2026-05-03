@@ -20,6 +20,8 @@ TEMPERATURE: float = 0.2
 # vLLM options
 GPU_MEMORY_UTILIZATION: float = 0.90
 QUANTIZATION: str = "awq"
+MAX_MODEL_LEN: int = 1024
+ENFORCE_EAGER: bool = True
 
 # Small helper to allow env overrides
 def env(key: str, default):
