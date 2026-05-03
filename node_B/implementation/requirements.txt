@@ -16,7 +16,11 @@ protobuf>=4.25.0
 # Data Handlers (Pinned below 2.0.0 to prevent breaking changes in ML ecosystem)
 numpy<2.0.0
 
-# Transformers compatibility for torch 2.2.2
-transformers<4.40.0
+# Transformers compatibility for torch 2.2.2 and FlagEmbedding
+transformers<=4.39.3
 peft<=0.10.0
 sentence-transformers<=2.7.0
+
+# For WikiQA dataset ingestion and syncing to Qdrant
+datasets>=2.14.0
+tqdm>=4.66.0
