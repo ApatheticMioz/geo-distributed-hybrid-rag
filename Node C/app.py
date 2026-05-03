@@ -3,11 +3,13 @@ import json
 import logging
 import time
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import AsyncGenerator, AsyncIterator, Tuple, Optional
+import sys
 
+import grpc
 import httpx
 import yaml
 from fastapi import FastAPI, HTTPException
@@ -16,6 +18,13 @@ from pydantic import BaseModel
 
 from bm25 import TantivyBM25Index
 from clients import NodeBDenseClient
+
+_generated_dir = Path(__file__).parent / "generated"
+if str(_generated_dir) not in sys.path:
+    sys.path.insert(0, str(_generated_dir))
+
+import coordination_pb2  # noqa: E402
+import coordination_pb2_grpc  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,13 +67,15 @@ class PipelineOrchestrator:
         bm25_index: TantivyBM25Index,
         node_b_client: NodeBDenseClient,
         top_k: int,
-        node_a_http_url: str,
+        node_a_grpc_host: str,
+        node_a_grpc_port: int,
         recorder: LatencyRecorder,
     ):
         self.bm25 = bm25_index
         self.node_b = node_b_client
         self.top_k = top_k
-        self.node_a_http_url = node_a_http_url
+        self.node_a_grpc_host = node_a_grpc_host
+        self.node_a_grpc_port = node_a_grpc_port
         self.recorder = recorder
 
     async def handle_query(
@@ -85,7 +96,7 @@ class PipelineOrchestrator:
             name=f"{query_id}_bm25",
         )
         dense_task = asyncio.create_task(
-            self.node_b.retrieve(query_text=query_text, top_k=k),
+            self.node_b.retrieve(query_id=query_id, query_text=query_text, top_k=k),
             name=f"{query_id}_dense",
         )
 
@@ -93,33 +104,44 @@ class PipelineOrchestrator:
         t_sparse_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
 
-        # Dynamic timeout fallback (150ms threshold) for dense results
-        dense_results = None
-        try:
-            # wait_for takes seconds
-            dense_results = await asyncio.wait_for(dense_task, timeout=0.150)
-            logger.info(f"[{query_id}] Dense done | {len(dense_results)} docs")
-        except asyncio.TimeoutError:
-            logger.warning(f"[{query_id}] Dense delayed beyond 150ms, triggering fallback using sparse context only")
-            dense_results = None
+        node_b_dispatch_failed = False
+        if dense_task.done():
+            try:
+                node_b_dispatch_failed = not bool(await dense_task)
+            except Exception:
+                node_b_dispatch_failed = True
 
-        payload = {
-            "query": query_text,
-            "sparse": [d["doc_id"] for d in sparse_results],
-            "dense": [d["doc_id"] for d in dense_results] if dense_results is not None else None
-        }
+        sparse_docs = [
+            coordination_pb2.RetrievedDocument(
+                doc_id=str(doc.get("doc_id", "")),
+                text=str(doc.get("text", "")),
+                score=float(doc.get("score", 0.0)),
+                rank=int(doc.get("rank", index + 1)),
+            )
+            for index, doc in enumerate(sparse_results)
+            if doc.get("doc_id")
+        ]
 
         first_token = True
         ttft_ms_recorded = None
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", self.node_a_http_url, json=payload) as response:
-                if response.status_code != 200:
-                    error_msg = await response.aread()
-                    yield f"[ERROR] Node A returned {response.status_code}: {error_msg.decode('utf-8', errors='ignore')}"
-                    return
-                
-                async for chunk in response.aiter_text():
+        async def request_iterator():
+            yield coordination_pb2.SparseContextRequest(
+                query_id=query_id,
+                query_text=query_text,
+                docs=sparse_docs,
+                t_sparse_ms=t_sparse_ms,
+                node_b_dispatch_failed=node_b_dispatch_failed,
+            )
+
+        target = f"{self.node_a_grpc_host}:{self.node_a_grpc_port}"
+        async with grpc.aio.insecure_channel(target) as channel:
+            stub = coordination_pb2_grpc.GenerationOrchestratorStub(channel)
+            try:
+                async for token in stub.GenerateStream(request_iterator()):
+                    if token.is_final:
+                        break
+
                     if first_token:
                         ttft_ms_recorded = (time.perf_counter() - t0) * 1000
                         first_token = False
@@ -127,7 +149,17 @@ class PipelineOrchestrator:
                             f"[{query_id}] First token received | "
                             f"Edge-TTFT={ttft_ms_recorded:.1f} ms"
                         )
-                    yield chunk
+
+                    if token.token:
+                        yield token.token
+            except grpc.aio.AioRpcError as exc:
+                yield f"[ERROR] Node A gRPC stream failed: {exc.code()} - {exc.details()}"
+                return
+
+        if not dense_task.done():
+            dense_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await dense_task
 
         t_total_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"[{query_id}] Pipeline complete: {t_total_ms:.1f} ms total")
@@ -158,13 +190,14 @@ async def lifespan(app: FastAPI):
     node_a_grpc_port = cfg["node_a"]["grpc_port"]
     node_b = NodeBDenseClient(node_b_host, node_b_port, node_a_lan_host, node_a_grpc_port)
 
-    node_a_url = "http://10.8.0.1:8001/generate"
+    node_a_grpc_host = cfg["node_a"]["grpc_host"]
 
     _orchestrator = PipelineOrchestrator(
         bm25_index=bm25_index,
         node_b_client=node_b,
         top_k=cfg["retrieval"]["top_k"],
-        node_a_http_url=node_a_url,
+        node_a_grpc_host=node_a_grpc_host,
+        node_a_grpc_port=node_a_grpc_port,
         recorder=LatencyRecorder(),
     )
     logger.info("Node C gateway ready.")

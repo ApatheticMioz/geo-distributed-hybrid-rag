@@ -36,7 +36,7 @@ QDRANT_PORT = 6333
 
 # SQLite Database Configuration (Node A - text hydration)
 # Update this path if running from a different location
-CORPUS_DB_PATH = "../node_A/implementation/corpus.sqlite"
+CORPUS_DB_PATH = str(Path(__file__).resolve().parent / "corpus.sqlite")
 
 # Embedding Model Configuration
 EMBEDDING_MODEL = "BAAI/bge-m3"
