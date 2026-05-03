@@ -3,9 +3,9 @@ import logging
 import sys
 import time
 import uuid
-from typing import Any, Dict, List
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from contextlib import asynccontextmanager
+from typing import Any, Dict
 
 import grpc
 from fastapi import FastAPI, Request, HTTPException
@@ -31,6 +31,9 @@ logging.basicConfig(level=logging.INFO)
 
 # Global vLLM engine
 engine: Any = None
+
+# Background gRPC server task created during FastAPI startup.
+grpc_task: asyncio.Task[None] | None = None
 
 # Query state management: query_id -> {sparse_docs, dense_docs, event}
 query_state: Dict[str, Dict[str, Any]] = {}
@@ -97,9 +100,17 @@ async def _llm_stream_generator(prompt: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: startup & shutdown."""
+    global grpc_task
+
     logger.info("Starting Node A...")
     create_engine()
+    grpc_task = asyncio.create_task(run_grpc_server())
     yield
+    if grpc_task is not None:
+        grpc_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await grpc_task
+        grpc_task = None
     logger.info("Shutting down Node A...")
 
 
@@ -295,18 +306,20 @@ async def run_grpc_server():
         ResultForwarderServicer(), server
     )
     
-    server.add_insecure_port(f"0.0.0.0:50052")
+    port = server.add_insecure_port("0.0.0.0:50052")
+    if port == 0:
+        raise RuntimeError("Failed to bind Node A gRPC server to port 50052")
     await server.start()
     logger.info("gRPC server listening on 0.0.0.0:50052")
-    await server.wait_for_termination()
+    try:
+        await server.wait_for_termination()
+    finally:
+        await server.stop(0)
 
 
 def run_servers():
     """Run both HTTP and gRPC servers in async context."""
     async def main():
-        # Start gRPC server in background
-        grpc_task = asyncio.create_task(run_grpc_server())
-        
         # Run FastAPI with uvicorn
         config_uvicorn = uvicorn.Config(
             app=app,
@@ -316,11 +329,7 @@ def run_servers():
         )
         server = uvicorn.Server(config_uvicorn)
         
-        try:
-            await server.serve()
-        except KeyboardInterrupt:
-            logger.info("Shutting down...")
-            grpc_task.cancel()
+        await server.serve()
     
     asyncio.run(main())
 

@@ -1,10 +1,11 @@
-"""Dense retrieval gRPC server for Node B."""
+"""Async dense retrieval and forwarding server for Node B."""
 
-from concurrent import futures
+import asyncio
 import logging
 import os
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -13,9 +14,13 @@ import numpy as np
 from FlagEmbedding import BGEM3FlagModel
 from qdrant_client import QdrantClient
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import retrieval_pb2  # noqa: E402
-import retrieval_pb2_grpc  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generated"))
+import coordination_pb2  # noqa: E402
+import coordination_pb2_grpc  # noqa: E402
+import dispatch_pb2  # noqa: E402
+import dispatch_pb2_grpc  # noqa: E402
+import result_forward_pb2  # noqa: E402
+import result_forward_pb2_grpc  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,65 +65,110 @@ def initialize_globals() -> None:
     )
 
 
-class DenseRetrievalServicer(retrieval_pb2_grpc.DenseRetrievalServicer):
-    def Retrieve(
-        self,
-        request: retrieval_pb2.QueryRequest,
-        context: grpc.ServicerContext,
-    ) -> retrieval_pb2.RetrievalResponse:
-        try:
-            query = request.query.strip()
-            top_k = request.top_k or DEFAULT_TOP_K
+async def forward_dense_results_to_node_a(
+    query_id: str,
+    node_a_lan_host: str,
+    node_a_grpc_port: int,
+    documents: list[coordination_pb2.RetrievedDocument],
+    t_dense_ms: float,
+) -> None:
+    target = f"{node_a_lan_host}:{node_a_grpc_port}"
+    try:
+        async with grpc.aio.insecure_channel(target) as channel:
+            stub = result_forward_pb2_grpc.ResultForwarderStub(channel)
+            request = result_forward_pb2.DenseResultForward(
+                query_id=query_id,
+                docs=documents,
+                t_dense_ms=t_dense_ms,
+            )
+            await stub.ForwardDenseResults(request, timeout=5.0)
+            logger.info("[%s] Forwarded dense results to Node A at %s", query_id, target)
+    except Exception as exc:
+        logger.error("[%s] Failed to forward dense results to Node A at %s: %s", query_id, target, exc)
 
-            if not query:
-                return retrieval_pb2.RetrievalResponse(documents=[])
 
-            assert model is not None
-            assert qdrant_client is not None
+async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest) -> None:
+    query_id = request.query_id
+    query = request.query_text.strip()
+    top_k = request.top_k or DEFAULT_TOP_K
 
-            embedding = model.encode([query], return_dense=True)
-            query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
+    if not query:
+        logger.info("[%s] Empty dense query; skipping retrieval", query_id)
+        return
 
-            search_results = qdrant_client.search(
-                collection_name=COLLECTION_NAME,
-                query_vector=query_vector,
-                limit=top_k,
-                with_payload=True,
+    assert model is not None
+    assert qdrant_client is not None
+
+    try:
+        started = time.perf_counter()
+        embedding = model.encode([query], return_dense=True)
+        query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
+
+        search_results = qdrant_client.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_vector,
+            limit=top_k,
+            with_payload=True,
+        )
+
+        documents: list[coordination_pb2.RetrievedDocument] = []
+        for rank, result in enumerate(search_results, start=1):
+            payload = result.payload or {}
+            doc_id = str(payload.get("doc_id", result.id))
+            documents.append(
+                coordination_pb2.RetrievedDocument(
+                    doc_id=doc_id,
+                    text=_load_text(doc_id),
+                    score=float(result.score),
+                    rank=rank,
+                )
             )
 
-            documents = []
-            for rank, result in enumerate(search_results, start=1):
-                payload = result.payload or {}
-                doc_id = str(payload.get("doc_id", result.id))
-                documents.append(
-                    retrieval_pb2.RetrievedDocument(
-                        doc_id=doc_id,
-                        text=_load_text(doc_id),
-                        score=float(result.score),
-                        rank=rank,
-                    )
-                )
+        t_dense_ms = (time.perf_counter() - started) * 1000.0
+        logger.info("[%s] Dense retrieval complete in %.1fms (%d docs)", query_id, t_dense_ms, len(documents))
 
-            return retrieval_pb2.RetrievalResponse(documents=documents)
-        except Exception as exc:
-            logger.exception("Dense retrieval failed: %s", exc)
-            context.set_details(str(exc))
-            context.set_code(grpc.StatusCode.INTERNAL)
-            return retrieval_pb2.RetrievalResponse(documents=[])
+        await forward_dense_results_to_node_a(
+            query_id=query_id,
+            node_a_lan_host=request.node_a_lan_host,
+            node_a_grpc_port=request.node_a_grpc_port,
+            documents=documents,
+            t_dense_ms=t_dense_ms,
+        )
+    except Exception as exc:
+        logger.exception("[%s] Dense retrieval failed: %s", query_id, exc)
 
 
-def serve() -> None:
+class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
+    async def Dispatch(
+        self,
+        request: dispatch_pb2.DenseDispatchRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> dispatch_pb2.DenseDispatchAck:
+        logger.info(
+            "[%s] Dispatch received for Node A %s:%s",
+            request.query_id,
+            request.node_a_lan_host,
+            request.node_a_grpc_port,
+        )
+        asyncio.create_task(_async_retrieve_and_forward(request))
+        return dispatch_pb2.DenseDispatchAck(query_id=request.query_id, accepted=True)
+
+
+async def run_async_server() -> None:
     initialize_globals()
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    retrieval_pb2_grpc.add_DenseRetrievalServicer_to_server(
-        DenseRetrievalServicer(),
-        server,
-    )
-    server.add_insecure_port(f"0.0.0.0:{SERVER_PORT}")
-    logger.info("Starting gRPC server on 0.0.0.0:%s", SERVER_PORT)
-    server.start()
-    server.wait_for_termination()
+    server = grpc.aio.server()
+    dispatch_pb2_grpc.add_DenseDispatcherServicer_to_server(DenseDispatcherServicer(), server)
+    port = server.add_insecure_port(f"0.0.0.0:{SERVER_PORT}")
+    if port == 0:
+        raise RuntimeError(f"Failed to bind Node B gRPC server to port {SERVER_PORT}")
+
+    await server.start()
+    logger.info("gRPC server listening on 0.0.0.0:%s", SERVER_PORT)
+    try:
+        await server.wait_for_termination()
+    finally:
+        await server.stop(0)
 
 
 if __name__ == "__main__":
-    serve()
+    asyncio.run(run_async_server())
