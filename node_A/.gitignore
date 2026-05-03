@@ -1,0 +1,41 @@
+*.pdf
+
+# ---------------------------------------------------
+# Python Virtual Environments
+# ---------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------------------------------------------
+# Python Cache and Compiled Files
+# ---------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---------------------------------------------------
+# Large Databases & Data Files
+# ---------------------------------------------------
+# Ignoring the 3.4GB corpus.sqlite to prevent Git from crashing/bloating
+*.sqlite
+*.sqlite3
+*.db
+corpus.sqlite
+
+# ---------------------------------------------------
+# External Models / Heavy Dependencies
+# ---------------------------------------------------
+# Assuming llama3-awq contains heavy model weights or is a cloned submodule.
+# (Remove this if you actually wrote the contents of this directory and need it tracked)
+llama3-awq/
+
+# ---------------------------------------------------
+# OS Generated Files & Download Artifacts
+# ---------------------------------------------------
+# Ignores NTFS alternate data streams created when downloading files in Windows/WSL
+*:Zone.Identifier
+*Zone.Identifier
+.DS_Store
+Thumbs.db
