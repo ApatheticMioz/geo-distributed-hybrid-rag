@@ -60,7 +60,7 @@ def initialize_globals() -> None:
     )
 
 
-class DenseRetrievalServicer(retrieval_pb2_grpc.DenseRetrievalServiceServicer):
+class DenseRetrievalServicer(retrieval_pb2_grpc.DenseRetrievalServicer):
     def Retrieve(
         self,
         request: retrieval_pb2.QueryRequest,
@@ -110,7 +110,7 @@ class DenseRetrievalServicer(retrieval_pb2_grpc.DenseRetrievalServiceServicer):
 def serve() -> None:
     initialize_globals()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    retrieval_pb2_grpc.add_DenseRetrievalServiceServicer_to_server(
+    retrieval_pb2_grpc.add_DenseRetrievalServicer_to_server(
         DenseRetrievalServicer(),
         server,
     )
