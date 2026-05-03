@@ -35,7 +35,7 @@ QDRANT_GRPC_PORT = int(os.environ.get("QDRANT_GRPC_PORT", "6334"))
 COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "msmarco_passages")
 SERVER_PORT = int(os.environ.get("NODE_B_GRPC_PORT", "50051"))
 DEFAULT_TOP_K = int(os.environ.get("NODE_B_TOP_K", "10"))
-DB_PATH = Path(__file__).resolve().parents[2] / "corpus.sqlite"
+DB_PATH = Path(__file__).resolve().parents[1] / "corpus.sqlite"
 NODE_A_GRPC_HOST = os.environ.get("NODE_A_GRPC_HOST", "10.8.0.1")
 
 model: Optional[BGEM3FlagModel] = None
@@ -117,12 +117,13 @@ async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest
         embedding = model.encode([query], return_dense=True)
         query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
 
-        search_results = qdrant_client.search(
+        search_response = qdrant_client.query_points(
             collection_name=COLLECTION_NAME,
-            query_vector=query_vector,
+            query=query_vector,
             limit=top_k,
             with_payload=True,
         )
+        search_results = search_response.points
 
         documents: list[coordination_pb2.RetrievedDocument] = []
         for rank, result in enumerate(search_results, start=1):

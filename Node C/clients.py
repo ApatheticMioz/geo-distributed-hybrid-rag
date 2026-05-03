@@ -1,8 +1,6 @@
-import asyncio
 import logging
 import os
 import sys
-import uuid
 from typing import List, Dict, Any, AsyncIterator
 
 import grpc
@@ -36,11 +34,12 @@ class NodeBDenseClient:
 
     async def retrieve(
         self,
+        query_id: str,
         query_text: str,
         top_k: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> bool:
         request = dispatch_pb2.DenseDispatchRequest(
-            query_id=uuid.uuid4().hex,
+            query_id=query_id,
             query_text=query_text,
             top_k=top_k,
             node_a_lan_host=self._node_a_lan_host,
@@ -53,10 +52,10 @@ class NodeBDenseClient:
                 query_text[:40],
                 response.accepted,
             )
-            return []
+            return bool(response.accepted)
         except grpc.aio.AioRpcError as e:
             logger.error(f"Node B dispatch failed: {e.code()} - {e.details()}")
-            return []
+            return False
 
     async def close(self):
         await self._channel.close()

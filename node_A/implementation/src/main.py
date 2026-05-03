@@ -42,6 +42,31 @@ grpc_task_owner: str | None = None
 query_state: Dict[str, Dict[str, Any]] = {}
 
 
+def _get_dense_ready_event(query_id: str) -> asyncio.Event:
+    state = query_state.setdefault(query_id, {})
+    event = state.get("dense_ready")
+    if not isinstance(event, asyncio.Event):
+        event = asyncio.Event()
+        state["dense_ready"] = event
+    return event
+
+
+async def _wait_for_dense_docs(query_id: str, timeout_s: float) -> list[str] | None:
+    state = query_state.setdefault(query_id, {})
+    dense_docs = state.get("dense_docs")
+    if dense_docs:
+        return dense_docs
+
+    event = _get_dense_ready_event(query_id)
+    try:
+        await asyncio.wait_for(event.wait(), timeout=timeout_s)
+    except asyncio.TimeoutError:
+        return None
+
+    dense_docs = state.get("dense_docs")
+    return dense_docs if dense_docs else None
+
+
 def create_engine():
     """Initialize vLLM engine."""
     global engine
@@ -194,8 +219,15 @@ class GenerationOrchestratorServicer(coordination_pb2_grpc.GenerationOrchestrato
                     f"node_b_failed={node_b_failed}"
                 )
                 
+                if node_b_failed:
+                    dense_doc_ids = []
+                else:
+                    dense_doc_ids = await _wait_for_dense_docs(
+                        query_id,
+                        timeout_s=config.T_THRESHOLD_MS / 1000.0,
+                    ) or []
+
                 # Merge with any dense docs received from Node B
-                dense_doc_ids = [doc for doc in dense_docs]
                 fused = reciprocal_rank_fusion(
                     sparse_docs, dense_doc_ids if dense_doc_ids else None, config.RRF_K
                 )
@@ -293,10 +325,10 @@ class ResultForwarderServicer(result_forward_pb2_grpc.ResultForwarderServicer):
         dense_doc_ids = [doc.doc_id for doc in request.docs]
         
         # Store in query state for later use
-        if query_id not in query_state:
-            query_state[query_id] = {}
-        query_state[query_id]["dense_docs"] = dense_doc_ids
-        query_state[query_id]["t_dense_ms"] = t_dense_ms
+        state = query_state.setdefault(query_id, {})
+        state["dense_docs"] = dense_doc_ids
+        state["t_dense_ms"] = t_dense_ms
+        _get_dense_ready_event(query_id).set()
         
         ack = result_forward_pb2.DenseResultAck(query_id=query_id, accepted=True)
         return ack
