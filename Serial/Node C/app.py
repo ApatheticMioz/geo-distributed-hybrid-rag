@@ -30,7 +30,7 @@ class LatencyRecord:
     t_sparse_ms: float
     t_total_ms: float
     ttft_ms: float
-    mode: str = "parallel"  # "sequential" or "parallel" for benchmarking
+    mode: str = "sequential"  # "sequential" or "parallel" for benchmarking
     timestamp: float = field(default_factory=time.time)
 
 
@@ -78,30 +78,28 @@ class PipelineOrchestrator:
 
         t0 = t_request_start if t_request_start is not None else time.perf_counter()
 
-        logger.info(f"[{query_id}] Pipeline start | '{query_text[:60]}'")
+        logger.info(f"[{query_id}] SEQUENTIAL Pipeline start | '{query_text[:60]}'")
 
-        bm25_task = asyncio.create_task(
-            asyncio.to_thread(self.bm25.query, query_text, k),
-            name=f"{query_id}_bm25",
-        )
-        dense_task = asyncio.create_task(
-            self.node_b.retrieve(query_text=query_text, top_k=k),
-            name=f"{query_id}_dense",
-        )
-
-        sparse_results = await bm25_task
+        # ========== SEQUENTIAL EXECUTION ==========
+        # Phase 1: BM25 sparse retrieval (no parallelism, wait for completion)
+        logger.info(f"[{query_id}] Starting BM25 sparse retrieval...")
+        sparse_results = await asyncio.to_thread(self.bm25.query, query_text, k)
         t_sparse_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
 
-        # Dynamic timeout fallback (150ms threshold) for dense results
+        # Phase 2: Dense retrieval from Node B (after BM25 completes, no parallelism)
+        logger.info(f"[{query_id}] Starting dense retrieval from Node B...")
         dense_results = None
+        t_dense_start = time.perf_counter()
         try:
-            # wait_for takes seconds
-            dense_results = await asyncio.wait_for(dense_task, timeout=0.150)
-            logger.info(f"[{query_id}] Dense done | {len(dense_results)} docs")
-        except asyncio.TimeoutError:
-            logger.warning(f"[{query_id}] Dense delayed beyond 150ms, triggering fallback using sparse context only")
+            dense_results = await self.node_b.retrieve(query_text=query_text, top_k=k)
+            t_dense_ms = (time.perf_counter() - t_dense_start) * 1000
+            logger.info(f"[{query_id}] Dense done: {t_dense_ms:.1f} ms | {len(dense_results)} docs")
+        except Exception as e:
+            t_dense_ms = (time.perf_counter() - t_dense_start) * 1000
+            logger.error(f"[{query_id}] Dense retrieval failed after {t_dense_ms:.1f} ms: {e}")
             dense_results = None
+        # ========== END SEQUENTIAL EXECUTION ==========
 
         payload = {
             "query": query_text,
@@ -130,13 +128,13 @@ class PipelineOrchestrator:
                     yield chunk
 
         t_total_ms = (time.perf_counter() - t0) * 1000
-        logger.info(f"[{query_id}] Pipeline complete: {t_total_ms:.1f} ms total")
+        logger.info(f"[{query_id}] SEQUENTIAL Pipeline complete: {t_total_ms:.1f} ms total")
         self.recorder.record(
             query_id=query_id,
             t_sparse_ms=t_sparse_ms,
             t_total_ms=t_total_ms,
             ttft_ms=ttft_ms_recorded or 0.0,
-            mode="parallel",
+            mode="sequential",
         )
 
 

@@ -35,6 +35,9 @@ engine: Any = None
 # Background gRPC server task created during FastAPI startup.
 grpc_task: asyncio.Task[None] | None = None
 
+# Track which entrypoint owns the gRPC task so we do not double-bind port 50052.
+grpc_task_owner: str | None = None
+
 # Query state management: query_id -> {sparse_docs, dense_docs, event}
 query_state: Dict[str, Dict[str, Any]] = {}
 
@@ -100,17 +103,20 @@ async def _llm_stream_generator(prompt: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: startup & shutdown."""
-    global grpc_task
+    global grpc_task, grpc_task_owner
 
     logger.info("Starting Node A...")
     create_engine()
-    grpc_task = asyncio.create_task(run_grpc_server())
+    if grpc_task is None:
+        grpc_task = asyncio.create_task(run_grpc_server())
+        grpc_task_owner = "lifespan"
     yield
-    if grpc_task is not None:
+    if grpc_task is not None and grpc_task_owner == "lifespan":
         grpc_task.cancel()
         with suppress(asyncio.CancelledError):
             await grpc_task
         grpc_task = None
+        grpc_task_owner = None
     logger.info("Shutting down Node A...")
 
 
@@ -320,6 +326,12 @@ async def run_grpc_server():
 def run_servers():
     """Run both HTTP and gRPC servers in async context."""
     async def main():
+        global grpc_task, grpc_task_owner
+
+        if grpc_task is None:
+            grpc_task = asyncio.create_task(run_grpc_server())
+            grpc_task_owner = "run_servers"
+
         # Run FastAPI with uvicorn
         config_uvicorn = uvicorn.Config(
             app=app,
@@ -329,7 +341,15 @@ def run_servers():
         )
         server = uvicorn.Server(config_uvicorn)
         
-        await server.serve()
+        try:
+            await server.serve()
+        finally:
+            if grpc_task is not None and grpc_task_owner == "run_servers":
+                grpc_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await grpc_task
+                grpc_task = None
+                grpc_task_owner = None
     
     asyncio.run(main())
 

@@ -36,7 +36,6 @@ COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "msmarco_passages")
 SERVER_PORT = int(os.environ.get("NODE_B_GRPC_PORT", "50051"))
 DEFAULT_TOP_K = int(os.environ.get("NODE_B_TOP_K", "10"))
 DB_PATH = Path(__file__).resolve().parents[2] / "corpus.sqlite"
-NODE_A_GRPC_HOST = os.environ.get("NODE_A_GRPC_HOST", "10.8.0.1")
 
 model: Optional[BGEM3FlagModel] = None
 qdrant_client: Optional[QdrantClient] = None
@@ -73,31 +72,19 @@ async def forward_dense_results_to_node_a(
     documents: list[coordination_pb2.RetrievedDocument],
     t_dense_ms: float,
 ) -> None:
-    request = result_forward_pb2.DenseResultForward(
-        query_id=query_id,
-        docs=documents,
-        t_dense_ms=t_dense_ms,
-    )
-
-    targets = [
-        f"{NODE_A_GRPC_HOST}:{node_a_grpc_port}",
-        f"{node_a_lan_host}:{node_a_grpc_port}",
-    ]
-
-    last_error: Exception | None = None
-    for target in targets:
-        try:
-            async with grpc.aio.insecure_channel(target) as channel:
-                stub = result_forward_pb2_grpc.ResultForwarderStub(channel)
-                await stub.ForwardDenseResults(request, timeout=5.0)
-                logger.info("[%s] Forwarded dense results to Node A at %s", query_id, target)
-                return
-        except Exception as exc:
-            last_error = exc
-            logger.warning("[%s] Forward to Node A failed at %s: %s", query_id, target, exc)
-
-    if last_error is not None:
-        logger.error("[%s] Dense results could not be forwarded to Node A after all targets failed: %s", query_id, last_error)
+    target = f"{node_a_lan_host}:{node_a_grpc_port}"
+    try:
+        async with grpc.aio.insecure_channel(target) as channel:
+            stub = result_forward_pb2_grpc.ResultForwarderStub(channel)
+            request = result_forward_pb2.DenseResultForward(
+                query_id=query_id,
+                docs=documents,
+                t_dense_ms=t_dense_ms,
+            )
+            await stub.ForwardDenseResults(request, timeout=5.0)
+            logger.info("[%s] Forwarded dense results to Node A at %s", query_id, target)
+    except Exception as exc:
+        logger.error("[%s] Failed to forward dense results to Node A at %s: %s", query_id, target, exc)
 
 
 async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest) -> None:
