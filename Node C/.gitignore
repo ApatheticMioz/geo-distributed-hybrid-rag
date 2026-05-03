@@ -1,4 +1,10 @@
 *.pdf
+*:Zone.Identifier
+*Zone.Identifier
+
+# =====================================================
+# Node C - Search and Indexing Component (Tantivy)
+# =====================================================
 
 # ---------------------------------------------------
 # Python Virtual Environments
@@ -7,6 +13,8 @@
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
 # ---------------------------------------------------
 # Python Cache and Compiled Files
@@ -14,28 +22,94 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # ---------------------------------------------------
-# Large Databases & Data Files
+# Testing and Coverage
 # ---------------------------------------------------
-# Ignoring the 3.4GB corpus.sqlite to prevent Git from crashing/bloating
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+.hypothesis/
+
+# ---------------------------------------------------
+# Large Search Indexes & Data Files
+# ---------------------------------------------------
+# Tantivy search index artifacts (generated, very large)
+data/tantivy_index/
+tantivy_index/
+*.fast
+*.fieldnorm
+*.idx
+*.pos
+*.store
+*.term
+
+# Document databases
 *.sqlite
 *.sqlite3
 *.db
 corpus.sqlite
 
-# ---------------------------------------------------
-# External Models / Heavy Dependencies
-# ---------------------------------------------------
-# Assuming llama3-awq contains heavy model weights or is a cloned submodule.
-# (Remove this if you actually wrote the contents of this directory and need it tracked)
-llama3-awq/
+# Raw document data (if large)
+data/documents.jsonl
 
 # ---------------------------------------------------
-# OS Generated Files & Download Artifacts
+# Generated Protobuf / gRPC Files (regenerated from proto sources)
 # ---------------------------------------------------
-# Ignores NTFS alternate data streams created when downloading files in Windows/WSL
-*:Zone.Identifier
-*Zone.Identifier
+generated/*_pb2.py
+generated/*_pb2_grpc.py
+
+# ---------------------------------------------------
+# IDE and Editor Settings
+# ---------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+.project
+.pydevproject
+.settings/
+
+# ---------------------------------------------------
+# Environment and Configuration
+# ---------------------------------------------------
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------
+# Logs
+# ---------------------------------------------------
+*.log
+logs/
+
+# ---------------------------------------------------
+# Temporary Files
+# ---------------------------------------------------
+*.tmp
+*.bak
+*.swp
+*~
+.~*
+
+# ---------------------------------------------------
+# Jupyter Notebooks
+# ---------------------------------------------------
+.ipynb_checkpoints
+*.ipynb
+
+# ---------------------------------------------------
+# OS Generated Files
+# ---------------------------------------------------
+.DS_Store
+Thumbs.db
 Thumbs.db

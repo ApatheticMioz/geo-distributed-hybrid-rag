@@ -1,0 +1,110 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files (if applicable)
+*.pb.go
+*.pb.py
+
+# Node modules (if any JavaScript dependencies)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Model files (large binary files)
+*.safetensors
+*.bin
+*.ckpt
+*.pt
+
+# Data and cache
+*.jsonl
+data/documents.jsonl
+data/tantivy_index/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+.~*
+
+# IDE workspace settings
+.vscode-settings.json
+launch.json
+settings.json
