@@ -12,7 +12,7 @@ import grpc
 import numpy as np
 from FlagEmbedding import BGEM3FlagModel
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointIdList
+from qdrant_client.models import PointIdsList
 
 # Import generated proto modules
 import sys
