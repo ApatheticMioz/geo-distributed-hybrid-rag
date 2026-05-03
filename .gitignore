@@ -1,0 +1,9 @@
+# Ignore everything by default
+*
+
+# Allow gitignore itself
+!.gitignore
+
+# Allow Node C folder contents only
+!Node C/
+!Node C/**
