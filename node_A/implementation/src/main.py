@@ -23,6 +23,8 @@ from vllm.engine.arg_utils import AsyncEngineArgs
 sys.path.insert(0, str(Path(__file__).parent.parent / "generated"))
 import coordination_pb2
 import coordination_pb2_grpc
+import result_forward_pb2
+import result_forward_pb2_grpc
 
 logger = logging.getLogger("node_a")
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +43,8 @@ def create_engine():
         model=config.MODEL_PATH,
         quantization=config.QUANTIZATION,
         gpu_memory_utilization=config.GPU_MEMORY_UTILIZATION,
+        max_model_len=config.MAX_MODEL_LEN,
+        enforce_eager=config.ENFORCE_EAGER,
     )
     engine = AsyncLLMEngine.from_engine_args(engine_args)
     logger.info("vLLM engine initialized")
@@ -135,8 +139,6 @@ async def generate(request: Request):
 
     # Stream the LLM output back to the client
     return StreamingResponse(_llm_stream_generator(prompt), media_type="text/plain")
-
-<<<<<<< HEAD
 
 # gRPC Servicers
 
@@ -256,10 +258,10 @@ class GenerationOrchestratorServicer(coordination_pb2_grpc.GenerationOrchestrato
             raise
 
 
-class ResultForwarderServicer(coordination_pb2_grpc.ResultForwarderServicer):
+class ResultForwarderServicer(result_forward_pb2_grpc.ResultForwarderServicer):
     """Receives dense results from Node B."""
     
-    async def ForwardDenseResults(self, request: coordination_pb2.DenseResultForward, context):
+    async def ForwardDenseResults(self, request: result_forward_pb2.DenseResultForward, context):
         """
         Receive dense results from Node B and store them for later fusion.
         """
@@ -279,7 +281,7 @@ class ResultForwarderServicer(coordination_pb2_grpc.ResultForwarderServicer):
         query_state[query_id]["dense_docs"] = dense_doc_ids
         query_state[query_id]["t_dense_ms"] = t_dense_ms
         
-        ack = coordination_pb2.DenseResultAck(query_id=query_id, accepted=True)
+        ack = result_forward_pb2.DenseResultAck(query_id=query_id, accepted=True)
         return ack
 
 
@@ -289,7 +291,7 @@ async def run_grpc_server():
     coordination_pb2_grpc.add_GenerationOrchestratorServicer_to_server(
         GenerationOrchestratorServicer(), server
     )
-    coordination_pb2_grpc.add_ResultForwarderServicer_to_server(
+    result_forward_pb2_grpc.add_ResultForwarderServicer_to_server(
         ResultForwarderServicer(), server
     )
     
@@ -325,11 +327,3 @@ def run_servers():
 
 if __name__ == "__main__":
     run_servers()
-
-=======
-if __name__ == "__main__":
-    import uvicorn
-    import os
-    port = int(os.environ.get("PORT", 8001))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
->>>>>>> eb16f7786a9a2df01f287242cf04903c033f7b3f
