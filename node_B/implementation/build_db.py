@@ -1,12 +1,13 @@
 import sqlite3
 import csv
-import sys
+from pathlib import Path
 
-tsv_file = 'collection.tsv'
-db_file = 'corpus.sqlite'
+project_root = Path(__file__).resolve().parent
+tsv_file = project_root / 'collection.tsv'
+db_file = project_root / 'corpus.sqlite'
 
 print("Connecting to SQLite database...")
-conn = sqlite3.connect(db_file)
+conn = sqlite3.connect(str(db_file))
 cursor = conn.cursor()
 
 # Create a table with doc_id as the Primary Key for instant O(1) lookups

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 # Server
 HOST: str = "0.0.0.0"
@@ -6,7 +7,7 @@ PORT: int = 8001
 
 # Model and DB paths (relative to implementation/)
 MODEL_PATH: str = "../llama3-awq"
-DB_PATH: str = "../corpus.sqlite"
+DB_PATH: str = str(Path(__file__).resolve().parent.parent / "corpus.sqlite")
 
 # Timing / ranking constants
 T_THRESHOLD_MS: int = 160
