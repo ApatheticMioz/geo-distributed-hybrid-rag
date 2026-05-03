@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package dense_retrieval;
+
+service DenseRetrieval {
+  rpc Retrieve (QueryRequest) returns (RetrievalResponse) {}
+}
+
+message QueryRequest {
+  string query = 1;
+}
+
+message RetrievalResponse {
+  repeated string doc_ids = 1;
+  repeated float scores = 2;
+}
