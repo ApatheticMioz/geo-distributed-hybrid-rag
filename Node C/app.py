@@ -154,7 +154,9 @@ async def lifespan(app: FastAPI):
     # As per prompt IP requirements:
     node_b_host = "10.8.0.5"
     node_b_port = 50051
-    node_b = NodeBDenseClient(node_b_host, node_b_port)
+    node_a_lan_host = cfg["node_a"]["lan_host"]
+    node_a_grpc_port = cfg["node_a"]["grpc_port"]
+    node_b = NodeBDenseClient(node_b_host, node_b_port, node_a_lan_host, node_a_grpc_port)
 
     node_a_url = "http://10.8.0.1:8001/generate"
 
