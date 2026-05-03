@@ -1,10 +1,10 @@
-# Node VPN addresses
+# Node VPN addresses (WireGuard VPN)
 node_b:
-  host: "10.0.0.2"          # Node B VPN IP — Dense Retrieval Engine
+  host: "10.8.0.5"          # Node B WireGuard IP — Dense Retrieval Engine
   port: 50051               # Node B gRPC DenseDispatcher port
 
 node_a:
-  grpc_host: "10.0.0.1"     # Node A VPN IP — Node C -> Node A gRPC over WireGuard
+  grpc_host: "10.8.0.1"     # Node A WireGuard IP — Node C -> Node A gRPC over WireGuard
   grpc_port: 50052          # Node A gRPC GenerationOrchestrator port
   lan_host:  "192.168.1.100" # Node A PHYSICAL LAN IP for Node B -> Node A forwarding
 

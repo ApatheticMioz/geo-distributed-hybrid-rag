@@ -1,0 +1,29 @@
+Node B alignment issues vs Node C + report
+
+1) Uses retrieval.proto (single unary Retrieve RPC).
+   - Required schema is dispatch.proto (DenseDispatchRequest/Ack).
+   - Node C expects Node B to accept node_a_lan_host and node_a_grpc_port.
+
+2) Returns dense results to the caller instead of pushing to Node A.
+   - Report requires Node B to forward dense results directly to Node A over LAN.
+
+3) No fire-and-forget dispatch ACK.
+   - Node C expects a fast ACK to avoid blocking the sparse branch.
+
+4) No gRPC client to Node A.
+   - Missing logic to send dense results to Node A using the LAN IP.
+
+5) Server is synchronous unary gRPC.
+   - Required flow is async dispatch + separate delivery to Node A.
+
+6) compile_proto.py generates retrieval_pb2*, not dispatch/coordination stubs.
+   - Schema mismatch with Node C/Node A.
+
+7) Config hardcoded for localhost Qdrant.
+   - Report expects deployment across WAN/LAN with explicit node addresses.
+
+8) Request schema missing top_k and query_id.
+   - Node C sends top_k and query_id in DenseDispatchRequest.
+
+9) TOP_K is fixed in server code.
+   - Should be request-driven to match Node C top_k.
