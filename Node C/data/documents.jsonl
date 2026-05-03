@@ -1,0 +1,10 @@
+{"id": "doc_1", "text": "Machine learning is a subset of artificial intelligence that enables systems to learn from data."}
+{"id": "doc_2", "text": "Deep learning uses neural networks with multiple layers to process complex patterns."}
+{"id": "doc_3", "text": "Natural language processing helps computers understand and generate human language."}
+{"id": "doc_4", "text": "Transformers are neural network architectures that revolutionized NLP tasks."}
+{"id": "doc_5", "text": "BERT is a pre-trained transformer model for bidirectional language understanding."}
+{"id": "doc_6", "text": "GPT models use autoregressive training for language generation and understanding."}
+{"id": "doc_7", "text": "Attention mechanisms allow models to focus on relevant parts of input data."}
+{"id": "doc_8", "text": "Embeddings represent words or documents as dense vectors in high-dimensional space."}
+{"id": "doc_9", "text": "Tokenization breaks text into smaller units like words or subwords for processing."}
+{"id": "doc_10", "text": "Transfer learning reuses knowledge from one task to improve performance on another."}
