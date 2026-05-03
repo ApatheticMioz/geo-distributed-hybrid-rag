@@ -13,6 +13,7 @@ import grpc
 import numpy as np
 from FlagEmbedding import BGEM3FlagModel
 from qdrant_client import QdrantClient
+import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "generated"))
 import coordination_pb2  # noqa: E402
@@ -66,6 +67,63 @@ def initialize_globals() -> None:
     )
 
 
+def warmup_model() -> None:
+    assert model is not None
+
+    warmup_query = "Warmup query to compile CUDA kernels"
+    print(f"Priming GPU with warmup query before opening port {SERVER_PORT}...")
+    logger.info("Priming GPU with warmup query before opening port %s...", SERVER_PORT)
+
+    try:
+        with torch.inference_mode():
+            embedding = model.encode([warmup_query], return_dense=True)
+            _ = np.asarray(embedding["dense_vecs"][0], dtype=np.float32)
+    except Exception:
+        logger.exception("GPU warmup failed")
+        raise
+
+    print("GPU warmup complete; server is ready for requests.")
+    logger.info("GPU warmup complete; server is ready for requests.")
+
+
+def _retrieve_documents(query: str, top_k: int, query_id: str) -> tuple[list[coordination_pb2.RetrievedDocument], float]:
+    assert model is not None
+    assert qdrant_client is not None
+
+    started = time.perf_counter()
+
+    try:
+        with torch.inference_mode():
+            embedding = model.encode([query], return_dense=True)
+        query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
+
+        search_response = qdrant_client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=query_vector,
+            limit=top_k,
+            with_payload=True,
+        )
+        search_results = search_response.points
+
+        documents: list[coordination_pb2.RetrievedDocument] = []
+        for rank, result in enumerate(search_results, start=1):
+            payload = result.payload or {}
+            doc_id = str(payload.get("doc_id", result.id))
+            documents.append(
+                coordination_pb2.RetrievedDocument(
+                    doc_id=doc_id,
+                    text=_load_text(doc_id),
+                    score=float(result.score),
+                    rank=rank,
+                )
+            )
+
+        return documents, (time.perf_counter() - started) * 1000.0
+    except Exception as exc:
+        logger.exception("[%s] Dense retrieval failed: %s", query_id, exc)
+        return [], (time.perf_counter() - started) * 1000.0
+
+
 async def forward_dense_results_to_node_a(
     query_id: str,
     node_a_lan_host: str,
@@ -112,33 +170,12 @@ async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest
     assert model is not None
     assert qdrant_client is not None
 
+    documents, t_dense_ms = _retrieve_documents(query=query, top_k=top_k, query_id=query_id)
+    if not documents:
+        logger.warning("[%s] Dense retrieval produced no documents; skipping forward step", query_id)
+        return
+
     try:
-        started = time.perf_counter()
-        embedding = model.encode([query], return_dense=True)
-        query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
-
-        search_response = qdrant_client.query_points(
-            collection_name=COLLECTION_NAME,
-            query=query_vector,
-            limit=top_k,
-            with_payload=True,
-        )
-        search_results = search_response.points
-
-        documents: list[coordination_pb2.RetrievedDocument] = []
-        for rank, result in enumerate(search_results, start=1):
-            payload = result.payload or {}
-            doc_id = str(payload.get("doc_id", result.id))
-            documents.append(
-                coordination_pb2.RetrievedDocument(
-                    doc_id=doc_id,
-                    text=_load_text(doc_id),
-                    score=float(result.score),
-                    rank=rank,
-                )
-            )
-
-        t_dense_ms = (time.perf_counter() - started) * 1000.0
         logger.info("[%s] Dense retrieval complete in %.1fms (%d docs)", query_id, t_dense_ms, len(documents))
 
         await forward_dense_results_to_node_a(
@@ -171,6 +208,7 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
 async def run_async_server() -> None:
     initialize_globals()
     server = grpc.aio.server()
+    warmup_model()
     dispatch_pb2_grpc.add_DenseDispatcherServicer_to_server(DenseDispatcherServicer(), server)
     port = server.add_insecure_port(f"0.0.0.0:{SERVER_PORT}")
     if port == 0:
