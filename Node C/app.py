@@ -6,13 +6,13 @@ import uuid
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import AsyncGenerator, AsyncIterator, Tuple, Optional
+from typing import AsyncGenerator, AsyncIterator
 import sys
 
 import grpc
 import httpx
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -83,33 +83,59 @@ class PipelineOrchestrator:
         query_text: str,
         top_k: int | None = None,
         t_request_start: float | None = None,
+        mode: str = "parallel",
+        simulate_wan_delay_ms: int = 0,
     ) -> AsyncIterator[str]:
         query_id = str(uuid.uuid4())[:8]
         k = top_k or self.top_k
+        normalized_mode = mode.lower().strip()
+        delay_seconds = max(simulate_wan_delay_ms, 0) / 1000.0
+        dense_task = None
 
         t0 = t_request_start if t_request_start is not None else time.perf_counter()
 
-        logger.info(f"[{query_id}] Pipeline start | '{query_text[:60]}'")
+        logger.info(f"[{query_id}] Pipeline start ({normalized_mode}) | '{query_text[:60]}'")
 
-        bm25_task = asyncio.create_task(
-            asyncio.to_thread(self.bm25.query, query_text, k),
-            name=f"{query_id}_bm25",
-        )
-        dense_task = asyncio.create_task(
-            self.node_b.retrieve(query_id=query_id, query_text=query_text, top_k=k),
-            name=f"{query_id}_dense",
-        )
+        async def dense_retrieve() -> bool:
+            if delay_seconds > 0:
+                logger.info(
+                    f"[{query_id}] Simulating WAN delay before Node B dial: {delay_seconds * 1000:.0f} ms"
+                )
+                await asyncio.sleep(delay_seconds)
+            return await self.node_b.retrieve(query_id=query_id, query_text=query_text, top_k=k)
 
-        sparse_results = await bm25_task
-        t_sparse_ms = (time.perf_counter() - t0) * 1000
-        logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
+        if normalized_mode == "sequential":
+            sparse_results = await asyncio.to_thread(self.bm25.query, query_text, k)
+            t_sparse_ms = (time.perf_counter() - t0) * 1000
+            logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
 
-        node_b_dispatch_failed = False
-        if dense_task.done():
+            dense_start = time.perf_counter()
             try:
-                node_b_dispatch_failed = not bool(await dense_task)
-            except Exception:
+                node_b_dispatch_failed = not bool(await dense_retrieve())
+            except Exception as exc:
+                logger.error(f"[{query_id}] Dense retrieval failed: {exc}", exc_info=True)
                 node_b_dispatch_failed = True
+            dense_ms = (time.perf_counter() - dense_start) * 1000
+            logger.info(f"[{query_id}] Node B dispatch complete: {dense_ms:.1f} ms")
+        elif normalized_mode == "parallel":
+            bm25_task = asyncio.create_task(
+                asyncio.to_thread(self.bm25.query, query_text, k),
+                name=f"{query_id}_bm25",
+            )
+            dense_task = asyncio.create_task(dense_retrieve(), name=f"{query_id}_dense")
+
+            sparse_results = await bm25_task
+            t_sparse_ms = (time.perf_counter() - t0) * 1000
+            logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
+
+            node_b_dispatch_failed = False
+            if dense_task.done():
+                try:
+                    node_b_dispatch_failed = not bool(await dense_task)
+                except Exception:
+                    node_b_dispatch_failed = True
+        else:
+            raise ValueError(f"Unsupported query mode: {mode}")
 
         sparse_docs = [
             coordination_pb2.RetrievedDocument(
@@ -156,7 +182,7 @@ class PipelineOrchestrator:
                 yield f"[ERROR] Node A gRPC stream failed: {exc.code()} - {exc.details()}"
                 return
 
-        if not dense_task.done():
+        if dense_task is not None and not dense_task.done():
             dense_task.cancel()
             with suppress(asyncio.CancelledError):
                 await dense_task
@@ -168,7 +194,7 @@ class PipelineOrchestrator:
             t_sparse_ms=t_sparse_ms,
             t_total_ms=t_total_ms,
             ttft_ms=ttft_ms_recorded or 0.0,
-            mode="parallel",
+            mode=normalized_mode,
         )
 
 
@@ -220,16 +246,30 @@ class QueryRequest(BaseModel):
 
 
 @app.post("/query")
-async def query_endpoint(req: QueryRequest):
+async def query_endpoint(
+    req: QueryRequest,
+    mode: str = Query("parallel"),
+    simulate_wan_delay_ms: int | None = Header(default=None, alias="X-Simulate-WAN-Delay"),
+):
     if _orchestrator is None:
         raise HTTPException(status_code=503, detail="Orchestrator not initialized")
+
+    normalized_mode = mode.lower().strip()
+    if normalized_mode not in {"parallel", "sequential"}:
+        raise HTTPException(status_code=400, detail="mode must be 'parallel' or 'sequential'")
+
+    wan_delay_ms = max(simulate_wan_delay_ms or 0, 0)
 
     t_request_start = time.perf_counter()
 
     async def token_stream() -> AsyncGenerator[str, None]:
         try:
             async for token in _orchestrator.handle_query(
-                req.query, req.top_k, t_request_start=t_request_start
+                req.query,
+                req.top_k,
+                t_request_start=t_request_start,
+                mode=normalized_mode,
+                simulate_wan_delay_ms=wan_delay_ms,
             ):
                 yield token
         except Exception as e:
