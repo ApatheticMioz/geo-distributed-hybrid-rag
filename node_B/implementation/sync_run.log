@@ -1,0 +1,70 @@
+/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py:288: UserWarning: Failed to obtain server version. Unable to check client-server compatibility. Set check_compatibility=False to skip version check.
+  show_warning(
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/node_B/implementation/sync_qdrant.py", line 40, in sync_collection
+    target_client.get_collection(collection_name)
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_client.py", line 1590, in get_collection
+    return self._client.get_collection(collection_name=collection_name, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py", line 1877, in get_collection
+    self.grpc_collections.Get(
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_interceptor.py", line 276, in __call__
+    response, ignored_call = self._with_call(
+                             ^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_interceptor.py", line 331, in _with_call
+    return call.result(), call
+           ^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 438, in result
+    raise self
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_interceptor.py", line 314, in continuation
+    response, call = self._thunk(new_method).with_call(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 1173, in with_call
+    return _end_unary_response_blocking(state, call, True, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 990, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)  # pytype: disable=not-instantiable
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.DEADLINE_EXCEEDED
+	details = "Deadline Exceeded"
+	debug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"Deadline Exceeded", grpc_status:4}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/apath/Work/PDC/Project/node_B/implementation/sync_qdrant.py", line 106, in <module>
+    main()
+  File "/home/apath/Work/PDC/Project/node_B/implementation/sync_qdrant.py", line 94, in main
+    sync_collection(
+  File "/home/apath/Work/PDC/Project/node_B/implementation/sync_qdrant.py", line 42, in sync_collection
+    target_client.create_collection(
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_client.py", line 1750, in create_collection
+    return self._client.create_collection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/qdrant_client/qdrant_remote.py", line 2076, in create_collection
+    return self.grpc_collections.Create(create_collection, timeout=self._timeout).result
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_interceptor.py", line 276, in __call__
+    response, ignored_call = self._with_call(
+                             ^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_interceptor.py", line 331, in _with_call
+    return call.result(), call
+           ^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 438, in result
+    raise self
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_interceptor.py", line 314, in continuation
+    response, call = self._thunk(new_method).with_call(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 1173, in with_call
+    return _end_unary_response_blocking(state, call, True, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apath/Work/PDC/Project/node_B/implementation/.venv/lib/python3.12/site-packages/grpc/_channel.py", line 990, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)  # pytype: disable=not-instantiable
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.DEADLINE_EXCEEDED
+	details = "Deadline Exceeded"
+	debug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"Deadline Exceeded", grpc_status:4}"
+>

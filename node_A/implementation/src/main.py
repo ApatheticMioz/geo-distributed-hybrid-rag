@@ -136,6 +136,7 @@ async def generate(request: Request):
     # Stream the LLM output back to the client
     return StreamingResponse(_llm_stream_generator(prompt), media_type="text/plain")
 
+<<<<<<< HEAD
 
 # gRPC Servicers
 
@@ -325,3 +326,10 @@ def run_servers():
 if __name__ == "__main__":
     run_servers()
 
+=======
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+>>>>>>> eb16f7786a9a2df01f287242cf04903c033f7b3f

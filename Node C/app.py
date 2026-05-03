@@ -6,15 +6,16 @@ import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import AsyncGenerator, AsyncIterator, Tuple
+from typing import AsyncGenerator, AsyncIterator, Tuple, Optional
 
+import httpx
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from bm25 import TantivyBM25Index
-from clients import NodeAStreamClient, NodeBDispatchClient
+from clients import NodeBDenseClient
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,28 +47,23 @@ class LatencyRecorder:
 
 class PipelineOrchestrator:
     """
-    Node C orchestration logic — dispatch only.
-
-    No timeout logic, no Tthreshold, no speculative prefill decisions.
-    Those belong to Node A (the Synchronization Controller).
+    Node C orchestration logic — executes sparse and dense retrieval,
+    then forwards to Node A via async HTTP POST.
+    Includes the dynamic timeout fallback (T_threshold = 150ms).
     """
 
     def __init__(
         self,
         bm25_index: TantivyBM25Index,
-        node_b_client: NodeBDispatchClient,
-        node_a_client: NodeAStreamClient,
+        node_b_client: NodeBDenseClient,
         top_k: int,
-        node_a_lan_host: str,
-        node_a_grpc_port: int,
+        node_a_http_url: str,
         recorder: LatencyRecorder,
     ):
         self.bm25 = bm25_index
         self.node_b = node_b_client
-        self.node_a = node_a_client
         self.top_k = top_k
-        self.node_a_lan_host = node_a_lan_host
-        self.node_a_grpc_port = node_a_grpc_port
+        self.node_a_http_url = node_a_http_url
         self.recorder = recorder
 
     async def handle_query(
@@ -75,13 +71,7 @@ class PipelineOrchestrator:
         query_text: str,
         top_k: int | None = None,
         t_request_start: float | None = None,
-    ) -> AsyncIterator[Tuple[str, bool, float]]:
-        """
-        Runs both retrieval branches concurrently.
-        Yields (token_text, is_final, ttft_ms) tuples from Node A's stream.
-
-        TTFT is measured on Node C from t_request_start to first token received.
-        """
+    ) -> AsyncIterator[str]:
         query_id = str(uuid.uuid4())[:8]
         k = top_k or self.top_k
 
@@ -93,40 +83,50 @@ class PipelineOrchestrator:
             asyncio.to_thread(self.bm25.query, query_text, k),
             name=f"{query_id}_bm25",
         )
-        dispatch_task = asyncio.create_task(
-            self.node_b.dispatch(
-                query_id=query_id,
-                query_text=query_text,
-                top_k=k,
-                node_a_lan_host=self.node_a_lan_host,
-                node_a_grpc_port=self.node_a_grpc_port,
-            ),
-            name=f"{query_id}_dispatch",
+        dense_task = asyncio.create_task(
+            self.node_b.retrieve(query_text=query_text, top_k=k),
+            name=f"{query_id}_dense",
         )
 
         sparse_results = await bm25_task
         t_sparse_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
 
-        ttft_ms_recorded = None
+        # Dynamic timeout fallback (150ms threshold) for dense results
+        dense_results = None
+        try:
+            # wait_for takes seconds
+            dense_results = await asyncio.wait_for(dense_task, timeout=0.150)
+            logger.info(f"[{query_id}] Dense done | {len(dense_results)} docs")
+        except asyncio.TimeoutError:
+            logger.warning(f"[{query_id}] Dense delayed beyond 150ms, triggering fallback using sparse context only")
+            dense_results = None
+
+        payload = {
+            "query": query_text,
+            "sparse": [d["doc_id"] for d in sparse_results],
+            "dense": [d["doc_id"] for d in dense_results] if dense_results is not None else None
+        }
+
         first_token = True
+        ttft_ms_recorded = None
 
-        async for token_msg in self.node_a.generate_stream(
-            query_id=query_id,
-            query_text=query_text,
-            sparse_results=sparse_results,
-            t_sparse_ms=t_sparse_ms,
-            dispatch_task=dispatch_task,
-        ):
-            if first_token:
-                ttft_ms_recorded = (time.perf_counter() - t0) * 1000
-                first_token = False
-                logger.info(
-                    f"[{query_id}] First token received | "
-                    f"Edge-TTFT={ttft_ms_recorded:.1f} ms"
-                )
-
-            yield token_msg.token, token_msg.is_final, ttft_ms_recorded or 0.0
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream("POST", self.node_a_http_url, json=payload) as response:
+                if response.status_code != 200:
+                    error_msg = await response.aread()
+                    yield f"[ERROR] Node A returned {response.status_code}: {error_msg.decode('utf-8', errors='ignore')}"
+                    return
+                
+                async for chunk in response.aiter_text():
+                    if first_token:
+                        ttft_ms_recorded = (time.perf_counter() - t0) * 1000
+                        first_token = False
+                        logger.info(
+                            f"[{query_id}] First token received | "
+                            f"Edge-TTFT={ttft_ms_recorded:.1f} ms"
+                        )
+                    yield chunk
 
         t_total_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"[{query_id}] Pipeline complete: {t_total_ms:.1f} ms total")
@@ -148,23 +148,25 @@ async def lifespan(app: FastAPI):
         cfg = yaml.safe_load(f)
 
     bm25_index = TantivyBM25Index(cfg["corpus"]["tantivy_index_path"])
-    node_b = NodeBDispatchClient(cfg["node_b"]["host"], cfg["node_b"]["port"])
-    node_a = NodeAStreamClient(cfg["node_a"]["grpc_host"], cfg["node_a"]["grpc_port"])
+    
+    # As per prompt IP requirements:
+    node_b_host = "10.8.0.5"
+    node_b_port = 50051
+    node_b = NodeBDenseClient(node_b_host, node_b_port)
+
+    node_a_url = "http://10.8.0.1:8001/generate"
 
     _orchestrator = PipelineOrchestrator(
         bm25_index=bm25_index,
         node_b_client=node_b,
-        node_a_client=node_a,
         top_k=cfg["retrieval"]["top_k"],
-        node_a_lan_host=cfg["node_a"]["lan_host"],
-        node_a_grpc_port=cfg["node_a"]["grpc_port"],
+        node_a_http_url=node_a_url,
         recorder=LatencyRecorder(),
     )
     logger.info("Node C gateway ready.")
     yield
 
     await node_b.close()
-    await node_a.close()
     logger.info("Node C gateway shut down.")
 
 
@@ -189,12 +191,10 @@ async def query_endpoint(req: QueryRequest):
 
     async def token_stream() -> AsyncGenerator[str, None]:
         try:
-            async for token, is_final, _ttft_ms in _orchestrator.handle_query(
+            async for token in _orchestrator.handle_query(
                 req.query, req.top_k, t_request_start=t_request_start
             ):
                 yield token
-                if is_final:
-                    break
         except Exception as e:
             logger.error(f"Streaming error: {e}", exc_info=True)
             yield f"\n[ERROR: {e}]"
