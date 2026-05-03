@@ -1,16 +1,23 @@
 syntax = "proto3";
 
-package dense_retrieval;
+package retrieval;
 
-service DenseRetrieval {
+service DenseRetrievalService {
   rpc Retrieve (QueryRequest) returns (RetrievalResponse) {}
 }
 
 message QueryRequest {
   string query = 1;
+  int32 top_k = 2;
+}
+
+message RetrievedDocument {
+  string doc_id = 1;
+  string text = 2;
+  float score = 3;
+  int32 rank = 4;
 }
 
 message RetrievalResponse {
-  repeated string doc_ids = 1;
-  repeated float scores = 2;
+  repeated RetrievedDocument documents = 1;
 }

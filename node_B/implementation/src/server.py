@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 gRPC Server for Node B - Dense Retrieval Engine
 Implements DenseDispatcher.Dispatch() for fire-and-forget dispatch + async forwarding to Node A
@@ -9,6 +10,16 @@ import os
 import sys
 import time
 from concurrent import futures
+=======
+"""Dense retrieval gRPC server for Node B."""
+
+from concurrent import futures
+import logging
+import os
+import sqlite3
+import sys
+from pathlib import Path
+>>>>>>> eb16f7786a9a2df01f287242cf04903c033f7b3f
 from typing import Optional
 from pathlib import Path
 
@@ -17,20 +28,26 @@ import numpy as np
 from FlagEmbedding import BGEM3FlagModel
 from qdrant_client import QdrantClient
 
+<<<<<<< HEAD
 # Import generated proto modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "generated"))
 import dispatch_pb2
 import dispatch_pb2_grpc
 import coordination_pb2
 import coordination_pb2_grpc
+=======
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import retrieval_pb2  # noqa: E402
+import retrieval_pb2_grpc  # noqa: E402
+>>>>>>> eb16f7786a9a2df01f287242cf04903c033f7b3f
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
+<<<<<<< HEAD
 # Configuration
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
@@ -39,30 +56,46 @@ COLLECTION_NAME = "msmarco_passages"
 TOP_K = 10
 MODEL_NAME = "BAAI/bge-m3"
 SERVER_PORT = int(os.environ.get("SERVER_PORT", "50051"))
+=======
+MODEL_NAME = os.environ.get("BGE_M3_MODEL", "BAAI/bge-m3")
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "127.0.0.1")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+QDRANT_GRPC_PORT = int(os.environ.get("QDRANT_GRPC_PORT", "6334"))
+COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "msmarco_passages")
+SERVER_PORT = int(os.environ.get("NODE_B_GRPC_PORT", "50051"))
+DEFAULT_TOP_K = int(os.environ.get("NODE_B_TOP_K", "10"))
+DB_PATH = Path(__file__).resolve().parents[2] / "corpus.sqlite"
+>>>>>>> eb16f7786a9a2df01f287242cf04903c033f7b3f
 
-# Global instances (loaded on startup)
 model: Optional[BGEM3FlagModel] = None
 qdrant_client: Optional[QdrantClient] = None
 
 
-def initialize_globals():
-    """Initialize global model and Qdrant client."""
+def _load_text(doc_id: str) -> str:
+    if not DB_PATH.exists():
+        return ""
+
+    with sqlite3.connect(DB_PATH) as connection:
+        cursor = connection.execute("SELECT text FROM passages WHERE doc_id = ?", (doc_id,))
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else ""
+
+
+def initialize_globals() -> None:
     global model, qdrant_client
-    
-    try:
-        logger.info(f"Loading {MODEL_NAME} with FP16 precision...")
-        model = BGEM3FlagModel(MODEL_NAME, use_fp16=True)
-        logger.info("Model loaded successfully")
-        
-        logger.info(f"Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}...")
-        qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-        logger.info("Qdrant client connected successfully")
-        
-    except Exception as e:
-        logger.error(f"Failed to initialize globals: {e}", exc_info=True)
-        raise
+
+    logger.info("Loading %s with FP16 precision...", MODEL_NAME)
+    model = BGEM3FlagModel(MODEL_NAME, use_fp16=True)
+    logger.info("Connecting to Qdrant at %s:%s", QDRANT_HOST, QDRANT_PORT)
+    qdrant_client = QdrantClient(
+        host=QDRANT_HOST,
+        port=QDRANT_PORT,
+        grpc_port=QDRANT_GRPC_PORT,
+        prefer_grpc=True,
+    )
 
 
+<<<<<<< HEAD
 async def forward_dense_results_to_node_a(
     node_a_lan_host: str,
     node_a_grpc_port: int,
@@ -210,72 +243,66 @@ if __name__ == "__main__":
         Returns:
             RetrievalResponse with doc_ids and scores
         """
+=======
+class DenseRetrievalServicer(retrieval_pb2_grpc.DenseRetrievalServicer):
+    def Retrieve(
+        self,
+        request: retrieval_pb2.QueryRequest,
+        context: grpc.ServicerContext,
+    ) -> retrieval_pb2.RetrievalResponse:
+>>>>>>> eb16f7786a9a2df01f287242cf04903c033f7b3f
         try:
-            query = request.query
-            logger.info(f"Received query: {query[:100]}...")
-            
-            if not query.strip():
-                logger.warning("Received empty query")
-                return retrieval_pb2.RetrievalResponse(doc_ids=[], scores=[])
-            
-            # Encode query
-            logger.debug("Encoding query...")
-            query_embedding = model.encode([query], return_dense=True)
-            query_vector = np.array(query_embedding["dense_vecs"][0], dtype=np.float32)
-            
-            # Search Qdrant
-            logger.debug(f"Searching for top-{TOP_K} matches in '{COLLECTION_NAME}'...")
+            query = request.query.strip()
+            top_k = request.top_k or DEFAULT_TOP_K
+
+            if not query:
+                return retrieval_pb2.RetrievalResponse(documents=[])
+
+            assert model is not None
+            assert qdrant_client is not None
+
+            embedding = model.encode([query], return_dense=True)
+            query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
+
             search_results = qdrant_client.search(
                 collection_name=COLLECTION_NAME,
-                query_vector=query_vector.tolist(),
-                limit=TOP_K
+                query_vector=query_vector,
+                limit=top_k,
+                with_payload=True,
             )
-            
-            # Extract doc_ids and scores
-            doc_ids = []
-            scores = []
-            for result in search_results:
-                doc_id = result.payload.get("doc_id")
-                score = result.score
-                doc_ids.append(doc_id)
-                scores.append(score)
-                logger.debug(f"  Doc: {doc_id}, Score: {score:.4f}")
-            
-            logger.info(f"Retrieved {len(doc_ids)} documents")
-            
-            return retrieval_pb2.RetrievalResponse(
-                doc_ids=doc_ids,
-                scores=scores
-            )
-            
-        except Exception as e:
-            logger.error(f"Error during retrieval: {e}", exc_info=True)
-            context.set_details(str(e))
+
+            documents = []
+            for rank, result in enumerate(search_results, start=1):
+                payload = result.payload or {}
+                doc_id = str(payload.get("doc_id", result.id))
+                documents.append(
+                    retrieval_pb2.RetrievedDocument(
+                        doc_id=doc_id,
+                        text=_load_text(doc_id),
+                        score=float(result.score),
+                        rank=rank,
+                    )
+                )
+
+            return retrieval_pb2.RetrievalResponse(documents=documents)
+        except Exception as exc:
+            logger.exception("Dense retrieval failed: %s", exc)
+            context.set_details(str(exc))
             context.set_code(grpc.StatusCode.INTERNAL)
-            return retrieval_pb2.RetrievalResponse(doc_ids=[], scores=[])
+            return retrieval_pb2.RetrievalResponse(documents=[])
 
 
-def serve():
-    """Start the gRPC server."""
-    logger.info("Initializing server resources...")
+def serve() -> None:
     initialize_globals()
-    
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     retrieval_pb2_grpc.add_DenseRetrievalServicer_to_server(
-        DenseRetrievalServicer(), server
+        DenseRetrievalServicer(),
+        server,
     )
     server.add_insecure_port(f"0.0.0.0:{SERVER_PORT}")
-    
-    logger.info(f"Starting gRPC server on 0.0.0.0:{SERVER_PORT}...")
+    logger.info("Starting gRPC server on 0.0.0.0:%s", SERVER_PORT)
     server.start()
-    logger.info("Server started successfully. Listening for requests...")
-    
-    try:
-        server.wait_for_termination()
-    except KeyboardInterrupt:
-        logger.info("Shutting down server...")
-        server.stop(0)
-        logger.info("Server stopped")
+    server.wait_for_termination()
 
 
 if __name__ == "__main__":
