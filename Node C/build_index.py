@@ -1,9 +1,9 @@
 """
 One-time build script: converts JSONL corpus -> Tantivy disk-backed BM25 index.
 
-Run from nodeC/ directory:
-    python scripts/build_index.py --corpus retrieval/corpus/documents.jsonl \
-                                  --index  retrieval/tantivy_index
+Run from Node C/ directory:
+    python build_index.py --corpus data/documents.jsonl \
+                          --index  data/tantivy_index
 """
 
 import argparse

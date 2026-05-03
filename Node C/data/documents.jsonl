@@ -1,0 +1,3 @@
+{"id": "d1", "text": "Retrieval augmented generation combines retrieval with generation to ground responses."}
+{"id": "d2", "text": "Pipeline parallelism overlaps computation to reduce time-to-first-token latency."}
+{"id": "d3", "text": "BM25 is a sparse retrieval method that scores documents using term frequency and inverse document frequency."}
