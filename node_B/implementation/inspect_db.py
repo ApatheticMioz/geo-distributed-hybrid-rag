@@ -1,6 +1,7 @@
 import sqlite3
+from pathlib import Path
 
-conn = sqlite3.connect('corpus.sqlite')
+conn = sqlite3.connect(str(Path(__file__).resolve().parent / 'corpus.sqlite'))
 cursor = conn.cursor()
 
 # Get table names

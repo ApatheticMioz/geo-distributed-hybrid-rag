@@ -5,6 +5,7 @@ Indexes the corpus into Qdrant Vector Database
 
 import logging
 import sqlite3
+import os
 from pathlib import Path
 from typing import List, Tuple
 
@@ -21,13 +22,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "10.0.0.2")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "msmarco_passages"
 VECTOR_SIZE = 1024
 BATCH_SIZE = 128
 MODEL_NAME = "BAAI/bge-m3"
-DATASET_PATH = Path(__file__).parent.parent / "corpus.sqlite"
+DATASET_PATH = Path(__file__).resolve().parent.parent / "corpus.sqlite"
 
 
 def load_model() -> BGEM3FlagModel:
@@ -130,7 +131,7 @@ def index_corpus(model: BGEM3FlagModel, client: QdrantClient, data: List[Tuple[s
         client.upsert(
             collection_name=COLLECTION_NAME,
             points=points,
-            wait=False  # Tell Python to fire-and-forget, don't wait for the SSD!
+            wait=True
         )
         
         logger.info(f"Indexed batch {batch_end}/{total_docs}")

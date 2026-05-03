@@ -4,6 +4,7 @@ Handles dense retrieval queries using BGE-M3 embeddings and Qdrant
 """
 
 import logging
+import os
 from concurrent import futures
 from typing import Optional
 
@@ -28,8 +29,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "10.0.0.2")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "msmarco_passages"
 TOP_K = 10
 MODEL_NAME = "BAAI/bge-m3"
