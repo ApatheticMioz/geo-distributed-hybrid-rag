@@ -1,4 +1,10 @@
 *.pdf
+*:Zone.Identifier
+*Zone.Identifier
+
+# =====================================================
+# Node B - Retrieval and Vector Database Component
+# =====================================================
 
 # ---------------------------------------------------
 # Python Virtual Environments
@@ -7,6 +13,8 @@
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
 # ---------------------------------------------------
 # Python Cache and Compiled Files
@@ -14,15 +22,32 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---------------------------------------------------
+# Testing and Coverage
+# ---------------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+.hypothesis/
 
 # ---------------------------------------------------
 # Large Databases & Data Files
 # ---------------------------------------------------
-# Ignoring the 3.4GB database
+# Database files (including Qdrant vector database)
 *.sqlite
 *.sqlite3
 *.db
 corpus.sqlite
+qdrant_storage/
+snapshots/
 
 # ---------------------------------------------------
 # Auto-generated Protobuf / gRPC Files
@@ -32,6 +57,47 @@ corpus.sqlite
 implementation/retrieval_pb2.py
 implementation/retrieval_pb2.pyi
 implementation/retrieval_pb2_grpc.py
+
+# ---------------------------------------------------
+# IDE and Editor Settings
+# ---------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+
+# ---------------------------------------------------
+# Environment and Configuration
+# ---------------------------------------------------
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------
+# Logs
+# ---------------------------------------------------
+*.log
+logs/
+
+# ---------------------------------------------------
+# Temporary Files
+# ---------------------------------------------------
+*.tmp
+*.bak
+*.swp
+*~
+.~*
+
+# ---------------------------------------------------
+# Jupyter Notebooks
+# ---------------------------------------------------
+.ipynb_checkpoints
+*.ipynb
 
 # ---------------------------------------------------
 # OS Generated Files

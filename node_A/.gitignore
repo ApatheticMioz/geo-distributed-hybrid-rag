@@ -1,4 +1,10 @@
 *.pdf
+*:Zone.Identifier
+*Zone.Identifier
+
+# =====================================================
+# Node A - LLM and Distributed Search Component
+# =====================================================
 
 # ---------------------------------------------------
 # Python Virtual Environments
@@ -7,6 +13,8 @@
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
 # ---------------------------------------------------
 # Python Cache and Compiled Files
@@ -14,6 +22,21 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---------------------------------------------------
+# Testing and Coverage
+# ---------------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+.hypothesis/
 
 # ---------------------------------------------------
 # Large Databases & Data Files
@@ -25,17 +48,60 @@ __pycache__/
 corpus.sqlite
 
 # ---------------------------------------------------
-# External Models / Heavy Dependencies
+# Machine Learning Models & Weights
 # ---------------------------------------------------
-# Assuming llama3-awq contains heavy model weights or is a cloned submodule.
-# (Remove this if you actually wrote the contents of this directory and need it tracked)
+# LLaMA3-AWQ model weights and artifacts
 llama3-awq/
+*.safetensors
+*.bin
+*.ckpt
+*.pt
+*.pth
 
 # ---------------------------------------------------
-# OS Generated Files & Download Artifacts
+# Generated Protobuf Files (regenerated from proto sources)
 # ---------------------------------------------------
-# Ignores NTFS alternate data streams created when downloading files in Windows/WSL
-*:Zone.Identifier
-*Zone.Identifier
+generated/*_pb2.py
+generated/*_pb2_grpc.py
+
+# ---------------------------------------------------
+# IDE and Editor Settings
+# ---------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+.project
+.pydevproject
+.settings/
+
+# ---------------------------------------------------
+# Environment and Configuration
+# ---------------------------------------------------
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------
+# Logs
+# ---------------------------------------------------
+*.log
+logs/
+
+# ---------------------------------------------------
+# Temporary Files
+# ---------------------------------------------------
+*.tmp
+*.bak
+*.swp
+*~
+.~*
+
+# ---------------------------------------------------
+# Jupyter Notebooks
+# ---------------------------------------------------
+.ipynb_checkpoints
+*.ipynb
 Thumbs.db
