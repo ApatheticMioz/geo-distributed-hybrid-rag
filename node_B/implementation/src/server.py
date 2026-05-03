@@ -207,7 +207,11 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
 
 async def run_async_server() -> None:
     initialize_globals()
-    server = grpc.aio.server()
+    server = grpc.aio.server(options=[
+        ("grpc.http2.min_recv_ping_interval_without_data_ms", 10000),
+        ("grpc.http2.max_pings_without_data", 0),
+        ("grpc.keepalive_permit_without_calls", 1),
+    ])
     warmup_model()
     dispatch_pb2_grpc.add_DenseDispatcherServicer_to_server(DenseDispatcherServicer(), server)
     port = server.add_insecure_port(f"0.0.0.0:{SERVER_PORT}")

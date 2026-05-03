@@ -21,9 +21,9 @@ class NodeBDenseClient:
     def __init__(self, host: str, port: int, node_a_lan_host: str, node_a_grpc_port: int):
         target = f"{host}:{port}"
         options = [
-            ("grpc.keepalive_time_ms", 10_000),
-            ("grpc.keepalive_timeout_ms", 5_000),
-            ("grpc.keepalive_permit_without_calls", True),
+            ("grpc.keepalive_time_ms", 60_000),
+            ("grpc.keepalive_timeout_ms", 10_000),
+            ("grpc.keepalive_permit_without_calls", 1),
             ("grpc.http2.max_pings_without_data", 0),
         ]
         self._channel = grpc.aio.insecure_channel(target, options=options)
