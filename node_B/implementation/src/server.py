@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-QDRANT_HOST = os.environ.get("QDRANT_HOST", "10.0.0.2")
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "10.8.0.2")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "msmarco_passages"
 TOP_K = 10
