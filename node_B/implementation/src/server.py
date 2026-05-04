@@ -233,6 +233,7 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
         request: dispatch_pb2.DenseDispatchRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.DenseDispatchAck:
+        logger.info("[%s] Incoming gRPC request received: query='%s'", request.query_id, request.query_text[:160])
         logger.info(
             "[%s] Dispatch received | query='%s' | node_a=%s:%s | top_k=%d",
             request.query_id,
