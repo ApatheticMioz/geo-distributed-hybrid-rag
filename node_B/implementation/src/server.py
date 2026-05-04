@@ -33,6 +33,9 @@ MODEL_NAME = os.environ.get("BGE_M3_MODEL", "BAAI/bge-m3")
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "127.0.0.1")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 QDRANT_GRPC_PORT = int(os.environ.get("QDRANT_GRPC_PORT", "6334"))
+QDRANT_TIMEOUT_SECONDS = max(1, int(float(os.environ.get("QDRANT_TIMEOUT_SECONDS", "30"))))
+QDRANT_PREFER_GRPC = os.environ.get("QDRANT_PREFER_GRPC", "true").lower() in {"1", "true", "yes"}
+QDRANT_CHECK_COMPATIBILITY = os.environ.get("QDRANT_CHECK_COMPATIBILITY", "false").lower() in {"1", "true", "yes"}
 COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "msmarco_passages")
 SERVER_PORT = int(os.environ.get("NODE_B_GRPC_PORT", "50051"))
 DEFAULT_TOP_K = int(os.environ.get("NODE_B_TOP_K", "10"))
@@ -70,7 +73,15 @@ def initialize_globals() -> None:
         host=QDRANT_HOST,
         port=QDRANT_PORT,
         grpc_port=QDRANT_GRPC_PORT,
-        prefer_grpc=True,
+        prefer_grpc=QDRANT_PREFER_GRPC,
+        timeout=QDRANT_TIMEOUT_SECONDS,
+        check_compatibility=QDRANT_CHECK_COMPATIBILITY,
+    )
+    logger.info(
+        "Qdrant client configured | prefer_grpc=%s | timeout=%.1fs | check_compatibility=%s",
+        QDRANT_PREFER_GRPC,
+        float(QDRANT_TIMEOUT_SECONDS),
+        QDRANT_CHECK_COMPATIBILITY,
     )
 
 
@@ -107,21 +118,27 @@ def _retrieve_documents(query: str, top_k: int, query_id: str) -> tuple[list[coo
     )
 
     try:
+        embed_started = time.perf_counter()
         with torch.inference_mode():
             embedding = model.encode([query], return_dense=True)
         query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
+        t_embed_ms = (time.perf_counter() - embed_started) * 1000.0
 
+        qdrant_started = time.perf_counter()
         search_response = qdrant_client.query_points(
             collection_name=COLLECTION_NAME,
             query=query_vector,
             limit=top_k,
-            with_payload=True,
+            with_payload=["doc_id"],
+            timeout=QDRANT_TIMEOUT_SECONDS,
         )
+        t_qdrant_ms = (time.perf_counter() - qdrant_started) * 1000.0
         search_results = search_response.points
 
         if not search_results:
             logger.warning("[%s] Qdrant returned 0 results", query_id)
 
+        hydrate_started = time.perf_counter()
         documents: list[coordination_pb2.RetrievedDocument] = []
         missing_text = 0
         for rank, result in enumerate(search_results, start=1):
@@ -142,8 +159,31 @@ def _retrieve_documents(query: str, top_k: int, query_id: str) -> tuple[list[coo
         if missing_text:
             logger.warning("[%s] Missing text for %d/%d docs", query_id, missing_text, len(documents))
 
-        return documents, (time.perf_counter() - started) * 1000.0
+        t_hydrate_ms = (time.perf_counter() - hydrate_started) * 1000.0
+        t_total_ms = (time.perf_counter() - started) * 1000.0
+        logger.info(
+            "[%s] Dense timings | embed=%.1fms | qdrant=%.1fms | hydrate=%.1fms | total=%.1fms",
+            query_id,
+            t_embed_ms,
+            t_qdrant_ms,
+            t_hydrate_ms,
+            t_total_ms,
+        )
+
+        return documents, t_total_ms
     except Exception as exc:
+        if isinstance(exc, grpc.RpcError):
+            try:
+                code = exc.code()
+            except Exception:
+                code = None
+            logger.error(
+                "[%s] Dense retrieval gRPC error (code=%s). If this is DEADLINE_EXCEEDED, increase QDRANT_TIMEOUT_SECONDS (currently %.1fs).",
+                query_id,
+                code,
+                float(QDRANT_TIMEOUT_SECONDS),
+            )
+
         logger.exception("[%s] Dense retrieval failed: %s", query_id, exc)
         return [], (time.perf_counter() - started) * 1000.0
 
@@ -235,7 +275,7 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
     ) -> dispatch_pb2.DenseDispatchAck:
         # Log incoming request metadata and caller peer address for diagnostics
         try:
-            peer = await context.peer()
+            peer = context.peer()
         except Exception:
             peer = "<unknown>"
         logger.info("[%s] Incoming gRPC request received from %s: query='%s'", request.query_id, peer, request.query_text[:160])
