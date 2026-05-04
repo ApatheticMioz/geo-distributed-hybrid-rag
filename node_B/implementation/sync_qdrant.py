@@ -55,6 +55,8 @@ WAIT_FOR_UPSERT = os.getenv("WAIT_FOR_UPSERT", "true").lower() in {"1", "true", 
 RECREATE_COLLECTION = os.getenv("RECREATE_COLLECTION", "true").lower() in {"1", "true", "yes"}
 MAX_DOCS = int(os.getenv("MAX_DOCS", "0")) or None
 INCLUDE_WIKIQA = os.getenv("INCLUDE_WIKIQA", "false").lower() in {"1", "true", "yes"}
+START_OFFSET = int(os.getenv("START_OFFSET", "0"))
+ORDER_BY_DOC_ID = os.getenv("ORDER_BY_DOC_ID", "true").lower() in {"1", "true", "yes"}
 
 
 @dataclass(frozen=True)
@@ -92,7 +94,11 @@ def make_hashed_doc_id(prefix: str, text: str) -> str:
     return f"{prefix}_{uid.hex}"
 
 
-def iter_sqlite_passages(db_path: str, id_prefix: Optional[str]) -> Iterator[Tuple[str, str]]:
+def iter_sqlite_passages(
+    db_path: str,
+    id_prefix: Optional[str],
+    start_offset: int = 0
+) -> Iterator[Tuple[str, str]]:
     """
     Stream passages from a local SQLite corpus database.
     """
@@ -105,7 +111,14 @@ def iter_sqlite_passages(db_path: str, id_prefix: Optional[str]) -> Iterator[Tup
 
     conn = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True)
     cursor = conn.cursor()
-    cursor.execute("SELECT doc_id, text FROM passages")
+    query = "SELECT doc_id, text FROM passages"
+    if ORDER_BY_DOC_ID:
+        query += " ORDER BY doc_id"
+    if start_offset > 0:
+        query += " LIMIT -1 OFFSET ?"
+        cursor.execute(query, (start_offset,))
+    else:
+        cursor.execute(query)
 
     while True:
         rows = cursor.fetchmany(10000)
@@ -127,7 +140,7 @@ def iter_msmarco_passages() -> Iterator[Tuple[str, str]]:
     """
     Stream the full MS MARCO passage corpus (8.8M) from local SQLite.
     """
-    return iter_sqlite_passages(SOURCE_MSMARCO_DB_PATH, id_prefix=None)
+    return iter_sqlite_passages(SOURCE_MSMARCO_DB_PATH, id_prefix=None, start_offset=START_OFFSET)
 
 
 def iter_wikiqa_passages() -> Iterator[Tuple[str, str]]:
@@ -274,20 +287,28 @@ def process_dataset(
     if dataset.name == "msmarco_corpus":
         stream = iter_msmarco_passages()
         source_db_path = SOURCE_MSMARCO_DB_PATH
+        resume_offset = START_OFFSET
     elif dataset.name == "wiki_qa":
         stream = iter_wikiqa_passages()
         source_db_path = WIKIQA_DB_PATH
+        resume_offset = 0
     else:
         raise ValueError(f"Unsupported dataset: {dataset.name}")
 
     ensure_qdrant_collection(client, dataset.collection)
-    print(f"[*] Starting ingestion for {dataset.name} -> {dataset.collection}")
+    if resume_offset > 0:
+        print(f"[*] Starting ingestion for {dataset.name} -> {dataset.collection} (resume offset {resume_offset})")
+    else:
+        print(f"[*] Starting ingestion for {dataset.name} -> {dataset.collection}")
 
     batch_ids: List[str] = []
     batch_texts: List[str] = []
     processed = 0
     pbar_total = MAX_DOCS
-    progress = tqdm(total=pbar_total, desc=f"{dataset.name}", unit="passage")
+    if pbar_total:
+        progress = tqdm(total=pbar_total, desc=f"{dataset.name}", unit="passage")
+    else:
+        progress = tqdm(desc=f"{dataset.name}", unit="passage")
 
     for doc_id, text in stream:
         batch_ids.append(doc_id)
