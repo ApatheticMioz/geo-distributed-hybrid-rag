@@ -108,3 +108,5 @@ data/tantivy_index/
 .vscode-settings.json
 launch.json
 settings.json
+
+*:Zone.Identifier
