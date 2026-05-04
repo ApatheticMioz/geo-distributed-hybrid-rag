@@ -41,6 +41,7 @@ NODE_A_GRPC_HOST = os.environ.get("NODE_A_GRPC_HOST", "10.8.0.1")
 
 model: Optional[BGEM3FlagModel] = None
 qdrant_client: Optional[QdrantClient] = None
+active_tasks: set = set()  # Keep task references alive to prevent garbage collection
 
 
 def _load_text(doc_id: str) -> str:
@@ -170,12 +171,12 @@ async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest
     assert model is not None
     assert qdrant_client is not None
 
-    documents, t_dense_ms = _retrieve_documents(query=query, top_k=top_k, query_id=query_id)
-    if not documents:
-        logger.warning("[%s] Dense retrieval produced no documents; skipping forward step", query_id)
-        return
-
     try:
+        documents, t_dense_ms = _retrieve_documents(query=query, top_k=top_k, query_id=query_id)
+        if not documents:
+            logger.warning("[%s] Dense retrieval produced no documents; skipping forward step", query_id)
+            return
+
         logger.info("[%s] Dense retrieval complete in %.1fms (%d docs)", query_id, t_dense_ms, len(documents))
 
         await forward_dense_results_to_node_a(
@@ -186,7 +187,7 @@ async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest
             t_dense_ms=t_dense_ms,
         )
     except Exception as exc:
-        logger.exception("[%s] Dense retrieval failed: %s", query_id, exc)
+        logger.exception("[%s] Dense retrieval task failed: %s", query_id, exc)
 
 
 class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
@@ -201,7 +202,20 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
             request.node_a_lan_host,
             request.node_a_grpc_port,
         )
-        asyncio.create_task(_async_retrieve_and_forward(request))
+        
+        # Create task and store it to keep it alive
+        task = asyncio.create_task(_async_retrieve_and_forward(request))
+        active_tasks.add(task)
+        
+        # Clean up task reference when done
+        def task_cleanup(t):
+            active_tasks.discard(t)
+            if t.cancelled():
+                logger.warning("[%s] Task was cancelled", request.query_id)
+            elif t.exception():
+                logger.error("[%s] Task exception: %s", request.query_id, t.exception())
+        
+        task.add_done_callback(task_cleanup)
         return dispatch_pb2.DenseDispatchAck(query_id=request.query_id, accepted=True)
 
 

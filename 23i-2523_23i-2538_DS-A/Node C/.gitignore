@@ -1,0 +1,115 @@
+*.pdf
+*:Zone.Identifier
+*Zone.Identifier
+
+# =====================================================
+# Node C - Search and Indexing Component (Tantivy)
+# =====================================================
+
+# ---------------------------------------------------
+# Python Virtual Environments
+# ---------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ---------------------------------------------------
+# Python Cache and Compiled Files
+# ---------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---------------------------------------------------
+# Testing and Coverage
+# ---------------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+.hypothesis/
+
+# ---------------------------------------------------
+# Large Search Indexes & Data Files
+# ---------------------------------------------------
+# Tantivy search index artifacts (generated, very large)
+data/tantivy_index/
+tantivy_index/
+*.fast
+*.fieldnorm
+*.idx
+*.pos
+*.store
+*.term
+
+# Document databases
+*.sqlite
+*.sqlite3
+*.db
+corpus.sqlite
+
+# Raw document data (if large)
+data/documents.jsonl
+
+# ---------------------------------------------------
+# Generated Protobuf / gRPC Files (regenerated from proto sources)
+# ---------------------------------------------------
+generated/*_pb2.py
+generated/*_pb2_grpc.py
+
+# ---------------------------------------------------
+# IDE and Editor Settings
+# ---------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+
+# ---------------------------------------------------
+# Environment and Configuration
+# ---------------------------------------------------
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------
+# Logs
+# ---------------------------------------------------
+*.log
+logs/
+
+# ---------------------------------------------------
+# Temporary Files
+# ---------------------------------------------------
+*.tmp
+*.bak
+*.swp
+*~
+.~*
+
+# ---------------------------------------------------
+# Jupyter Notebooks
+# ---------------------------------------------------
+.ipynb_checkpoints
+*.ipynb
+
+# ---------------------------------------------------
+# OS Generated Files
+# ---------------------------------------------------
+.DS_Store
+Thumbs.db
+Thumbs.db

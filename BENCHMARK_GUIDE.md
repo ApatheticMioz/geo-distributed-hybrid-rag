@@ -1,218 +1,236 @@
-# Sequential vs Parallel Benchmark Guide
+# Serial vs Parallel Benchmark Setup
 
 ## Overview
 
-The Sequential version (`Serial/Node C/`) runs the Node C pipeline **strictly sequentially**:
-1. **BM25 sparse retrieval** completes entirely
-2. **Node B dense retrieval** starts only after BM25 finishes
-3. **Node A generation** receives fused results and streams tokens
+This benchmark compares sequential (serial) vs parallel execution of the RAG pipeline on Node C (Edge Orchestrator). The key difference is:
 
-This is the **baseline** ($T_{sequential}$) against which the optimized parallel version is compared.
+- **Serial Baseline**: Executes BM25 → wait → Dense Retrieval → wait → Node A
+- **Parallel Optimized**: Executes BM25 and Dense Retrieval in parallel, overlapping I/O
 
-The Parallel version (`Node C/`) runs both BM25 and Node B concurrently:
-1. **BM25 sparse retrieval** and **Node B dense retrieval** start simultaneously
-2. A 150ms timeout fallback catches cases where dense is too slow
-3. **Node A generation** receives whichever results are available (sparse + optional dense)
+## Architecture
 
-## Key Changes in Serial/Node C/app.py
-
-### 1. Sequential Execution (Lines 71–97)
-
-**Before (Parallel):**
-```python
-bm25_task = asyncio.create_task(...)
-dense_task = asyncio.create_task(...)
-
-sparse_results = await bm25_task
-dense_results = await asyncio.wait_for(dense_task, timeout=0.150)  # Race condition
 ```
-
-**After (Sequential):**
-```python
-# Phase 1: BM25 (wait for completion)
-sparse_results = await asyncio.to_thread(self.bm25.query, query_text, k)
-t_sparse_ms = (time.perf_counter() - t0) * 1000
-
-# Phase 2: Dense (starts AFTER BM25 completes)
-try:
-    dense_results = await self.node_b.retrieve(query_text=query_text, top_k=k)
-except Exception as e:
-    dense_results = None
+Serial Flow:
+  BM25 (wait)
+    ↓
+  Dense Retrieval (wait)
+    ↓
+  Node A gRPC (wait)
+    ↓
+  Tokens
+  
+Parallel Flow:
+  ┌─ BM25
+  └─ Dense Dispatch (fire-and-forget)
+       ↓
+    Node A gRPC (waits for both in flight)
+       ↓
+    Tokens
 ```
-
-### 2. LatencyRecord Tracking
-
-Added `mode` field to differentiate sequential vs parallel runs:
-
-```python
-@dataclass
-class LatencyRecord:
-    query_id: str
-    t_sparse_ms: float
-    t_total_ms: float
-    ttft_ms: float
-    mode: str = "sequential"  # "sequential" or "parallel"
-    timestamp: float = field(default_factory=time.time)
-```
-
-Both parallel and sequential record their `mode` so results can be filtered and compared.
 
 ## Running the Benchmark
 
-### Step 1: Start All Three Nodes
+### Step 1: Ensure Backend Services are Running
 
-**Terminal 1 — Node B (Dense Retrieval):**
-```powershell
-cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\node_B\implementation"
-python -m src.server
-```
-
-**Terminal 2 — Node A (Generation):**
+**Node A (Generation Engine)** - Terminal 1:
 ```powershell
 cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\node_A\implementation"
 python -m src.main
 ```
 
-**Terminal 3 — Sequential Node C (Baseline):**
+**Node B (Dense Retrieval)** - Terminal 2:
 ```powershell
-cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\Serial\Node C"
-python -m uvicorn app:app --host 0.0.0.0 --port 8000
+cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\node_B\implementation"
+python -m src.server
 ```
 
-**Terminal 4 — Parallel Node C (Optimized):**
+### Step 2: Start Serial Gateway (Port 8002)
+
+**Serial Node C** - Terminal 3:
 ```powershell
-cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\Node C"
+cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\serial\Node C"
+
+# Update config.yaml to use port 8002
+# gateway:
+#   host: "0.0.0.0"
+#   port: 8002
+
 python -m uvicorn app:app --host 0.0.0.0 --port 8002
 ```
 
-### Step 2: Run the Benchmark
+### Step 3: Start Parallel Gateway (Port 8001)
 
-Once all nodes are running, open a new terminal:
+**Parallel Node C** - Terminal 4:
+```powershell
+cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3\Node C"
+python -m uvicorn app:app --host 0.0.0.0 --port 8001
+```
+
+### Step 4: Run Benchmark (Terminal 5)
 
 ```powershell
 cd "c:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3"
-
-# Run 100 queries (default)
-python benchmark_parallel_vs_sequential.py \
-    --sequential-url http://localhost:8000 \
-  --parallel-url http://localhost:8002 \
-    --num-queries 100 \
-    --output benchmark_results.json
+python benchmark_serial_vs_parallel.py
 ```
-
-### Step 3: Interpret Results
-
-The benchmark outputs a JSON file with detailed stats:
-
-```json
-{
-  "comparison": {
-    "baseline_ttft_ms": 450.5,
-    "optimized_ttft_ms": 310.2,
-    "reduction_ms": 140.3,
-    "reduction_pct": 31.1
-  },
-  "sequential": {
-    "ttft_mean_ms": 450.5,
-    "ttft_median_ms": 445.2,
-    "ttft_min_ms": 380.1,
-    "ttft_max_ms": 520.3
-  },
-  "parallel": {
-    "ttft_mean_ms": 310.2,
-    "ttft_median_ms": 305.8,
-    "ttft_min_ms": 270.1,
-    "ttft_max_ms": 380.5
-  }
-}
-```
-
-**Key Metric:** `reduction_pct` is your claimed TTFT reduction percentage. In this example, **31.1% reduction**.
-
-## Why Sequential Runs Slower
-
-### Latency Breakdown
-
-**Sequential Timeline:**
-```
-BM25 (50ms) → Dense (120ms) → Node A generation (300ms) = 470ms TTFT
-|______________________________________________|
-              Total wait before first token
-```
-
-**Parallel Timeline:**
-```
-BM25 (50ms) ─┐
-             ├→ Fused retrieval (150ms) → Node A generation (200ms) = 350ms TTFT
-Dense (120ms)┘
-```
-
-By running BM25 and Dense **concurrently**, we overlap their execution time, reducing total latency by ~(50 + 120 - max(50, 120)) / (50 + 120 + 300) = ~25–40% depending on the specific timings.
 
 ## Expected Results
 
-For typical MS MARCO workloads:
-- **Sequential TTFT:** 400–500ms
-- **Parallel TTFT:** 280–350ms
-- **Reduction:** 25–40% (often **30–35%**)
+The benchmark will:
+1. Send 100 MS MARCO queries to the serial version (port 8002)
+2. Measure TTFT and total latency for each query
+3. Send the same 100 queries to the parallel version (port 8001)
+4. Calculate the percentage improvement
 
-If you observe reductions outside this range, investigate:
-- Are all nodes running healthily?
-- Is Node B timing out (150ms limit)?
-- Are there network delays or contention?
+### Example Output
 
-## Logs to Review
-
-After each benchmark run, check the latency logs:
-
-**Sequential runs:**
 ```
-logs/latency_nodeC.jsonl
-```
-(Entries with `"mode": "sequential"`)
+SERIAL RESULTS:
+{
+  "ttft_ms": {
+    "mean": 850.5,
+    "median": 820.3,
+    "min": 750.2,
+    "max": 950.1,
+    "stdev": 45.3,
+    "p95": 920.0,
+    "p99": 945.0
+  },
+  "total_ms": {...},
+  "successful_queries": 100,
+  "failed_queries": 0
+}
 
-**Parallel runs:**
-```
-logs/latency_nodeC.jsonl
-```
-(Entries with `"mode": "parallel"`)
+PARALLEL RESULTS:
+{
+  "ttft_ms": {
+    "mean": 580.2,
+    "median": 560.1,
+    "min": 500.0,
+    "max": 650.3,
+    "stdev": 35.1,
+    "p95": 620.0,
+    "p99": 640.0
+  },
+  "total_ms": {...},
+  "successful_queries": 100,
+  "failed_queries": 0
+}
 
-Both logs write to the same JSONL file, so filter by mode to compare.
+PERFORMANCE IMPROVEMENT
+===
+Serial TTFT (mean):        850.50ms
+Parallel TTFT (mean):      580.20ms
+Absolute improvement:      270.30ms
+Percentage improvement:    31.8%
+
+✓ Parallel is 31.8% faster than Serial baseline
+```
+
+## Configuration Changes
+
+### Serial Node C Config
+
+Update `serial/Node C/config.yaml`:
+```yaml
+gateway:
+  host: "0.0.0.0"
+  port: 8002  # Different port from parallel
+```
+
+### Parallel Node C Config
+
+Keep `Node C/config.yaml`:
+```yaml
+gateway:
+  host: "0.0.0.0"
+  port: 8001  # Standard port
+```
+
+## Key Metrics
+
+- **TTFT (Time to First Token)**: Measures from HTTP request to first token received
+  - Serial: Includes sequential BM25 + Dense + RPC overhead
+  - Parallel: Includes max(BM25, Dense dispatch) + RPC + generation
+
+- **Sparse Retrieval Time (t_sparse_ms)**: BM25 execution time
+  - Serial: Measured in sequential flow
+  - Parallel: Measured but overlapped with dense dispatch
+
+- **P95 / P99**: Tail latencies important for user experience
+  - Shows impact of parallelization on worst-case scenarios
 
 ## Troubleshooting
 
-### Benchmark fails to connect
-- Ensure all 4 nodes are running and listening on their ports
-- Test manually: `curl http://localhost:8000/health` (should return `{"status": "ok", ...}`)
-
-### Sequential runs show zero latency
-- Check if Serial/Node C started correctly
-- Verify `Serial/Node C/logs/latency_nodeC.jsonl` is being written
-
-### Reduction is negative (parallel slower than sequential)
-- This indicates parallelism overhead > benefit (unlikely in practice)
-- Check if Node B is actually running; if not, parallel falls back to sparse-only, which is faster
-- Measure again after restarting all nodes
-
-### High variance in latency
-- Network jitter or other system load
-- Run more queries (e.g., `--num-queries 200`) to smooth out noise
-
-## Recording Results for Your Report
-
-After confirming the benchmark works, run once more with a clean slate:
-
-```powershell
-# Restart all nodes to clear any caches
-# Then:
-python benchmark_parallel_vs_sequential.py \
-    --sequential-url http://localhost:8000 \
-  --parallel-url http://localhost:8002 \
-    --num-queries 100 \
-    --output final_benchmark_results.json
+### Port Already in Use
+If port 8002 is in use:
+```yaml
+# Edit serial/Node C/config.yaml
+gateway:
+  host: "0.0.0.0"
+  port: 8003  # Use different port
 ```
 
-Copy the `reduction_pct` value from the JSON output into your report as evidence of the performance claim.
+Then update `benchmark_serial_vs_parallel.py`:
+```python
+serial_url = "http://localhost:8003/query"
+```
 
-Example report statement:
-> "Our optimized parallel Node C pipeline achieves a **31.1% reduction in TTFT** compared to the sequential baseline (450.5ms vs 310.2ms), as measured across 100 unified MS MARCO queries."
+### Node B / Node A Connection Issues
+
+Check WireGuard connectivity:
+```powershell
+Test-NetConnection -ComputerName 10.8.0.5 -Port 50051
+Test-NetConnection -ComputerName 10.8.0.1 -Port 50052
+```
+
+### Benchmark Timeouts
+
+Increase timeout in benchmark script:
+```python
+async with httpx.AsyncClient(timeout=180.0) as client:  # 3 minutes
+```
+
+## Performance Analysis
+
+### Why is Parallel Faster?
+
+1. **Overlapped I/O**: While Node B computes dense results on background task, Node C can:
+   - Initiate gRPC stream to Node A immediately
+   - Begin streaming generation while dense results are being computed
+
+2. **Reduced Total Wait Time**:
+   - Serial: t_bm25 + t_dense + t_rpc_to_a
+   - Parallel: max(t_bm25, t_dense_dispatch) + t_rpc_to_a
+   - Fire-and-forget ACK returns immediately (~1-2ms vs 100-500ms for full retrieval)
+
+3. **Batch Efficiency**: Node B can queue multiple dispatch requests, amortizing model initialization overhead
+
+## Collecting Multiple Runs
+
+To track variability across multiple runs:
+
+```powershell
+# Run benchmark multiple times
+for ($i=1; $i -le 5; $i++) {
+    Write-Host "Run $i of 5..."
+    python benchmark_serial_vs_parallel.py
+    Start-Sleep -Seconds 30
+}
+```
+
+Results will accumulate in `benchmark_results.json` with timestamps.
+
+## Expected Timeline
+
+- **Benchmark startup**: ~5 seconds
+- **Serial 100 queries**: ~2-3 minutes (includes client-side 200ms delays between queries)
+- **Parallel 100 queries**: ~2-3 minutes (same delay for fair comparison)
+- **Total runtime**: ~5-7 minutes
+
+## Reference: Paper Claims
+
+- Original paper claims: 30-40% reduction in TTFT with parallelization
+- Factors affecting improvement:
+  - Network latency (WireGuard VPN adds ~5-10ms per hop)
+  - Model size (larger models = longer BM25 window is visible)
+  - Query complexity (simple vs complex affects dense retrieval time)
