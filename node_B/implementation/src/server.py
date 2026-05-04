@@ -233,7 +233,12 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
         request: dispatch_pb2.DenseDispatchRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.DenseDispatchAck:
-        logger.info("[%s] Incoming gRPC request received: query='%s'", request.query_id, request.query_text[:160])
+        # Log incoming request metadata and caller peer address for diagnostics
+        try:
+            peer = await context.peer()
+        except Exception:
+            peer = "<unknown>"
+        logger.info("[%s] Incoming gRPC request received from %s: query='%s'", request.query_id, peer, request.query_text[:160])
         logger.info(
             "[%s] Dispatch received | query='%s' | node_a=%s:%s | top_k=%d",
             request.query_id,
@@ -243,9 +248,13 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
             request.top_k or DEFAULT_TOP_K,
         )
         
-        # Create task and store it to keep it alive
-        task = asyncio.create_task(_async_retrieve_and_forward(request))
-        active_tasks.add(task)
+        # Create task and store it to keep it alive. Guard with try/except to log failures.
+        try:
+            task = asyncio.create_task(_async_retrieve_and_forward(request))
+            active_tasks.add(task)
+        except Exception as exc:
+            logger.exception("[%s] Failed to create background task: %s", request.query_id, exc)
+            return dispatch_pb2.DenseDispatchAck(query_id=request.query_id, accepted=False)
         
         # Clean up task reference when done
         def task_cleanup(t):
