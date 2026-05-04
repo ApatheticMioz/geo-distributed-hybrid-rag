@@ -48,13 +48,13 @@ class NodeBDenseClient:
         try:
             response = await self._stub.Dispatch(request)
             logger.info(
-                "Node B dispatch ack for %s -> accepted=%s",
-                query_text[:40],
+                "[%s] node_b_dispatch_ack accepted=%s",
+                query_id,
                 response.accepted,
             )
             return bool(response.accepted)
         except grpc.aio.AioRpcError as e:
-            logger.error(f"Node B dispatch failed: {e.code()} - {e.details()}")
+            logger.error("[%s] node_b_dispatch_failed %s - %s", query_id, e.code(), e.details())
             return False
 
     async def close(self):

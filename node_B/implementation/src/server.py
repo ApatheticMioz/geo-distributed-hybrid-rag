@@ -59,7 +59,13 @@ def initialize_globals() -> None:
 
     logger.info("Loading %s with FP16 precision...", MODEL_NAME)
     model = BGEM3FlagModel(MODEL_NAME, use_fp16=True)
-    logger.info("Connecting to Qdrant at %s:%s", QDRANT_HOST, QDRANT_PORT)
+    logger.info(
+        "Connecting to Qdrant at %s:%s (grpc=%s) | collection=%s",
+        QDRANT_HOST,
+        QDRANT_PORT,
+        QDRANT_GRPC_PORT,
+        COLLECTION_NAME,
+    )
     qdrant_client = QdrantClient(
         host=QDRANT_HOST,
         port=QDRANT_PORT,
@@ -93,6 +99,13 @@ def _retrieve_documents(query: str, top_k: int, query_id: str) -> tuple[list[coo
 
     started = time.perf_counter()
 
+    logger.info(
+        "[%s] Dense retrieval started | top_k=%d | query='%s'",
+        query_id,
+        top_k,
+        query[:160],
+    )
+
     try:
         with torch.inference_mode():
             embedding = model.encode([query], return_dense=True)
@@ -106,18 +119,28 @@ def _retrieve_documents(query: str, top_k: int, query_id: str) -> tuple[list[coo
         )
         search_results = search_response.points
 
+        if not search_results:
+            logger.warning("[%s] Qdrant returned 0 results", query_id)
+
         documents: list[coordination_pb2.RetrievedDocument] = []
+        missing_text = 0
         for rank, result in enumerate(search_results, start=1):
             payload = result.payload or {}
             doc_id = str(payload.get("doc_id", result.id))
+            text = _load_text(doc_id)
+            if not text:
+                missing_text += 1
             documents.append(
                 coordination_pb2.RetrievedDocument(
                     doc_id=doc_id,
-                    text=_load_text(doc_id),
+                    text=text,
                     score=float(result.score),
                     rank=rank,
                 )
             )
+
+        if missing_text:
+            logger.warning("[%s] Missing text for %d/%d docs", query_id, missing_text, len(documents))
 
         return documents, (time.perf_counter() - started) * 1000.0
     except Exception as exc:
@@ -146,6 +169,13 @@ async def forward_dense_results_to_node_a(
     last_error: Exception | None = None
     for target in targets:
         try:
+            logger.info(
+                "[%s] Forwarding %d dense docs to Node A at %s (t_dense=%.1fms)",
+                query_id,
+                len(documents),
+                target,
+                t_dense_ms,
+            )
             async with grpc.aio.insecure_channel(target) as channel:
                 stub = result_forward_pb2_grpc.ResultForwarderStub(channel)
                 await stub.ForwardDenseResults(request, timeout=5.0)
@@ -172,6 +202,13 @@ async def _async_retrieve_and_forward(request: dispatch_pb2.DenseDispatchRequest
     assert qdrant_client is not None
 
     try:
+        logger.info(
+            "[%s] Dispatch accepted | node_a=%s:%s | top_k=%d",
+            query_id,
+            request.node_a_lan_host,
+            request.node_a_grpc_port,
+            top_k,
+        )
         documents, t_dense_ms = _retrieve_documents(query=query, top_k=top_k, query_id=query_id)
         if not documents:
             logger.warning("[%s] Dense retrieval produced no documents; skipping forward step", query_id)
@@ -197,10 +234,12 @@ class DenseDispatcherServicer(dispatch_pb2_grpc.DenseDispatcherServicer):
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.DenseDispatchAck:
         logger.info(
-            "[%s] Dispatch received for Node A %s:%s",
+            "[%s] Dispatch received | query='%s' | node_a=%s:%s | top_k=%d",
             request.query_id,
+            request.query_text[:160],
             request.node_a_lan_host,
             request.node_a_grpc_port,
+            request.top_k or DEFAULT_TOP_K,
         )
         
         # Create task and store it to keep it alive
