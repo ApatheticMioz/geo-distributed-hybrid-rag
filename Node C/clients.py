@@ -46,7 +46,7 @@ class NodeBDenseClient:
             node_a_grpc_port=self._node_a_grpc_port,
         )
         try:
-            response = await self._stub.Dispatch(request)
+            response = await self._stub.Dispatch(request, timeout=15.0)
             logger.info(
                 "[%s] node_b_dispatch_ack accepted=%s",
                 query_id,
@@ -54,7 +54,7 @@ class NodeBDenseClient:
             )
             return bool(response.accepted)
         except grpc.aio.AioRpcError as e:
-            logger.error("[%s] node_b_dispatch_failed %s - %s", query_id, e.code(), e.details())
+            logger.error("[%s] gRPC Error to Node B: %s - %s", query_id, e.code(), e.details())
             return False
 
     async def close(self):
