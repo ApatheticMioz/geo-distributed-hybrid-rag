@@ -1,0 +1,23 @@
+syntax = "proto3";
+package dispatch;
+
+// Node C sends this to Node B.
+// Includes Node A's physical LAN address so Node B can forward its dense results
+// directly to Node A over the home LAN.
+message DenseDispatchRequest {
+  string query_id         = 1;
+  string query_text       = 2;
+  int32  top_k            = 3;
+  string node_a_lan_host  = 4;   // Physical LAN IP (e.g. 192.168.1.100)
+  int32  node_a_grpc_port = 5;
+}
+
+// Node B immediately ACKs. Dense computation happens asynchronously on Node B.
+message DenseDispatchAck {
+  string query_id = 1;
+  bool   accepted = 2;
+}
+
+service DenseDispatcher {
+  rpc Dispatch (DenseDispatchRequest) returns (DenseDispatchAck);
+}

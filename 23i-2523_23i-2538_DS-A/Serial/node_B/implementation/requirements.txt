@@ -1,0 +1,22 @@
+# PyTorch CUDA 11.8 Index URL (Required for GTX 1660 Ti / Turing Architecture)
+--extra-index-url https://download.pytorch.org/whl/cu118
+
+# Core ML and Embedding Dependencies
+torch==2.2.2+cu118
+FlagEmbedding>=1.2.9
+
+# Vector Database Client
+qdrant-client>=1.9.0
+
+# gRPC and Protobuf for Node Communication
+grpcio>=1.63.0
+grpcio-tools>=1.63.0
+protobuf>=4.25.0
+
+# Data Handlers (Pinned below 2.0.0 to prevent breaking changes in ML ecosystem)
+numpy<2.0.0
+
+# Transformers compatibility for torch 2.2.2
+transformers<4.40.0
+peft<=0.10.0
+sentence-transformers<=2.7.0
