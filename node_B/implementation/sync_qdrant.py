@@ -1,26 +1,26 @@
 """
-WikiQA Dataset Sync to Qdrant Vector Database
+MS MARCO (and optional WikiQA) Sync to Qdrant Vector Database
 
 This script:
-1. Loads the WikiQA dataset from HuggingFace
-2. Extracts unique sentences and stores them in Node A's SQLite database
-3. Loads a BGE-M3 embedding model on GPU (Node A's RTX 3080)
-4. Connects to Node B's Qdrant instance and creates a collection
-5. Encodes sentences in batches and upserts them to Qdrant
+1. Streams the MS MARCO passage corpus from a local SQLite database
+2. Stores passages in a local SQLite corpus database
+3. Loads a BGE-M3 embedding model
+4. Connects to Qdrant and ensures collections exist
+5. Encodes passages in batches and upserts them to Qdrant
 
 Requirements:
-- FlagEmbedding, qdrant-client, datasets (pip install datasets if missing)
-- Node A: GPU with CUDA 12.1+ support (RTX 3080 recommended)
-- Node B: Qdrant service running at QDRANT_HOST:QDRANT_PORT
+- FlagEmbedding, qdrant-client
+- Qdrant service running at QDRANT_HOST:QDRANT_PORT
 """
 
+import os
 import sqlite3
 import uuid
-from typing import List, Set
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterator, List, Optional, Tuple
 
 import torch
-from datasets import load_dataset
 from FlagEmbedding import BGEM3FlagModel
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -31,73 +31,129 @@ from tqdm import tqdm
 # ============================================================================
 
 # Qdrant Vector Database Configuration (Node B)
-QDRANT_HOST = "10.8.0.5"
-QDRANT_PORT = 6333
+QDRANT_HOST = os.getenv("QDRANT_HOST", "10.0.0.2")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 
 # SQLite Database Configuration (Node A - text hydration)
 # Update this path if running from a different location
-CORPUS_DB_PATH = str(Path(__file__).resolve().parent / "corpus.sqlite")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CORPUS_DB_PATH = os.getenv(
+    "CORPUS_DB_PATH",
+    str(Path(__file__).resolve().parent / "corpus.sqlite")
+)
+SOURCE_MSMARCO_DB_PATH = os.getenv(
+    "SOURCE_MSMARCO_DB_PATH",
+    str(PROJECT_ROOT / "node_A" / "implementation" / "corpus.sqlite")
+)
+WIKIQA_DB_PATH = os.getenv("WIKIQA_DB_PATH", "")
 
 # Embedding Model Configuration
-EMBEDDING_MODEL = "BAAI/bge-m3"
-BATCH_SIZE = 128
-COLLECTION_NAME = "wikiqa_passages"
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "128"))
 VECTOR_SIZE = 1024  # BGE-M3 dense vector size
+WAIT_FOR_UPSERT = os.getenv("WAIT_FOR_UPSERT", "true").lower() in {"1", "true", "yes"}
+RECREATE_COLLECTION = os.getenv("RECREATE_COLLECTION", "true").lower() in {"1", "true", "yes"}
+MAX_DOCS = int(os.getenv("MAX_DOCS", "0")) or None
+INCLUDE_WIKIQA = os.getenv("INCLUDE_WIKIQA", "false").lower() in {"1", "true", "yes"}
+
+
+@dataclass(frozen=True)
+class DatasetConfig:
+    name: str
+    split: str
+    collection: str
+    id_prefix: str
+
+
+MSMARCO_CONFIG = DatasetConfig(
+    name="msmarco_corpus",
+    split="corpus",
+    collection="msmarco_passages",
+    id_prefix="msmarco"
+)
+WIKIQA_CONFIG = DatasetConfig(
+    name="wiki_qa",
+    split="train",
+    collection="wikiqa_passages",
+    id_prefix="wikiqa"
+)
+DATASETS = [MSMARCO_CONFIG] + ([WIKIQA_CONFIG] if INCLUDE_WIKIQA else [])
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
 
-def load_and_extract_sentences() -> tuple[List[str], List[str]]:
+def make_hashed_doc_id(prefix: str, text: str) -> str:
     """
-    Load WikiQA dataset and extract unique answer passages from the train split.
-    
-    WikiQA dataset contains question-answer pairs. We extract unique answers
-    as our passage corpus for retrieval.
-    
-    Returns:
-        Tuple of (doc_ids, passages) - parallel lists where doc_ids[i] 
-        corresponds to passages[i]
+    Generate a deterministic doc_id from text content.
     """
-    print("[*] Loading WikiQA dataset from HuggingFace...")
-    dataset = load_dataset("wiki_qa")
-    
-    unique_passages: Set[str] = set()
-    print("[*] Extracting unique answer passages from train split...")
-    print(f"    Dataset has {len(dataset['train'])} examples")
-    
-    for example in dataset["train"]:
-        # WikiQA has 'answer' field with passage text
-        answer = example.get("answer", "").strip()
-        if answer:  # Only add non-empty answers
-            unique_passages.add(answer)
-    
-    # Create deterministic doc_ids
-    passages_list = sorted(list(unique_passages))
-    doc_ids = [f"wikiqa_{i}" for i in range(len(passages_list))]
-    
-    print(f"[✓] Extracted {len(doc_ids)} unique answer passages from WikiQA")
-    return doc_ids, passages_list
+    uid = uuid.uuid5(uuid.NAMESPACE_DNS, f"{prefix}:{text}")
+    return f"{prefix}_{uid.hex}"
 
 
-def hydrate_sqlite_db(doc_ids: List[str], sentences: List[str]) -> None:
+def iter_sqlite_passages(db_path: str, id_prefix: Optional[str]) -> Iterator[Tuple[str, str]]:
     """
-    Insert doc_id and sentence pairs into the local SQLite database.
-    Uses INSERT OR IGNORE to skip duplicates.
+    Stream passages from a local SQLite corpus database.
+    """
+    if not db_path:
+        raise ValueError("SQLite source path is required")
+
+    source_path = Path(db_path)
+    if not source_path.exists():
+        raise FileNotFoundError(f"SQLite source not found: {source_path}")
+
+    conn = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True)
+    cursor = conn.cursor()
+    cursor.execute("SELECT doc_id, text FROM passages")
+
+    while True:
+        rows = cursor.fetchmany(10000)
+        if not rows:
+            break
+        for doc_id, text in rows:
+            if text is None:
+                continue
+            cleaned = str(text).strip()
+            if not cleaned:
+                continue
+            final_id = f"{id_prefix}_{doc_id}" if id_prefix else str(doc_id)
+            yield final_id, cleaned
+
+    conn.close()
+
+
+def iter_msmarco_passages() -> Iterator[Tuple[str, str]]:
+    """
+    Stream the full MS MARCO passage corpus (8.8M) from local SQLite.
+    """
+    return iter_sqlite_passages(SOURCE_MSMARCO_DB_PATH, id_prefix=None)
+
+
+def iter_wikiqa_passages() -> Iterator[Tuple[str, str]]:
+    """
+    Stream WikiQA passages from a local SQLite database.
+    """
+    if not WIKIQA_DB_PATH:
+        raise ValueError("WIKIQA_DB_PATH must be set when INCLUDE_WIKIQA is enabled")
+    return iter_sqlite_passages(WIKIQA_DB_PATH, id_prefix="wikiqa")
+
+
+def open_sqlite_db() -> sqlite3.Connection:
+    """
+    Open or create the SQLite database and ensure the schema exists.
     """
     db_path = Path(CORPUS_DB_PATH)
-    
     if not db_path.exists():
         print(f"[!] Warning: Database not found at {db_path}")
         print(f"[*] Creating new database at {db_path}...")
         db_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     print(f"[*] Connecting to SQLite database: {db_path}")
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA synchronous = OFF")
+    conn.execute("PRAGMA journal_mode = MEMORY")
     cursor = conn.cursor()
-    
-    # Ensure the passages table exists with the correct schema
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS passages (
             doc_id TEXT PRIMARY KEY,
@@ -105,42 +161,57 @@ def hydrate_sqlite_db(doc_ids: List[str], sentences: List[str]) -> None:
         )
     """)
     conn.commit()
-    
-    # Prepare batch insertion
-    pairs = list(zip(doc_ids, sentences))
-    batch_size = 100000
-    
-    print(f"[*] Inserting {len(pairs)} passages into SQLite database...")
-    for i in tqdm(range(0, len(pairs), batch_size), desc="SQLite Insert"):
-        batch = pairs[i : i + batch_size]
-        cursor.executemany(
-            "INSERT OR IGNORE INTO passages (doc_id, text) VALUES (?, ?)",
-            batch
-        )
-        conn.commit()
-    
-    conn.close()
-    print(f"[✓] SQLite database updated with {len(pairs)} passages")
+    return conn
 
 
-def create_qdrant_collection(client: QdrantClient) -> None:
+def same_path(path_a: str, path_b: str) -> bool:
     """
-    Create or recreate the Qdrant collection for WikiQA passages.
+    Compare two filesystem paths for equality after resolving.
     """
     try:
-        # Try to delete existing collection to start fresh
-        client.delete_collection(COLLECTION_NAME)
-        print(f"[*] Deleted existing collection '{COLLECTION_NAME}'")
+        return Path(path_a).resolve() == Path(path_b).resolve()
+    except FileNotFoundError:
+        return False
+
+
+def insert_passages(conn: sqlite3.Connection, pairs: List[Tuple[str, str]]) -> None:
+    """
+    Insert doc_id and text pairs into the SQLite database.
+    """
+    if not pairs:
+        return
+    cursor = conn.cursor()
+    cursor.executemany(
+        "INSERT OR IGNORE INTO passages (doc_id, text) VALUES (?, ?)",
+        pairs
+    )
+    conn.commit()
+
+
+def ensure_qdrant_collection(client: QdrantClient, collection_name: str) -> None:
+    """
+    Create or recreate a Qdrant collection for passage vectors.
+    """
+    if RECREATE_COLLECTION:
+        try:
+            client.delete_collection(collection_name)
+            print(f"[*] Deleted existing collection '{collection_name}'")
+        except Exception:
+            pass
+
+    try:
+        client.get_collection(collection_name)
+        print(f"[*] Collection '{collection_name}' already exists")
+        return
     except Exception:
-        pass  # Collection doesn't exist, which is fine
-    
-    # Create new collection with specified vector parameters
-    print(f"[*] Creating Qdrant collection '{COLLECTION_NAME}'...")
+        pass
+
+    print(f"[*] Creating Qdrant collection '{collection_name}'...")
     client.create_collection(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection_name,
         vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
     )
-    print(f"[✓] Collection '{COLLECTION_NAME}' created successfully")
+    print(f"[✓] Collection '{collection_name}' created successfully")
 
 
 def generate_deterministic_id(doc_id: str) -> int:
@@ -153,67 +224,107 @@ def generate_deterministic_id(doc_id: str) -> int:
     return int(uid.int & 0xFFFFFFFFFFFFFFFF)
 
 
-def encode_and_upsert_batches(
+def encode_and_upsert_batch(
     client: QdrantClient,
+    collection_name: str,
     doc_ids: List[str],
     sentences: List[str],
     model: BGEM3FlagModel
 ) -> None:
     """
-    Encode sentences in batches and upsert to Qdrant.
+    Encode a batch of sentences and upsert into Qdrant.
     """
-    print(f"[*] Starting batch encoding and upsert to Qdrant...")
-    print(f"    Batch size: {BATCH_SIZE}, Total sentences: {len(sentences)}")
-    
-    total_batches = (len(sentences) + BATCH_SIZE - 1) // BATCH_SIZE
-    
-    for batch_idx in tqdm(range(total_batches), desc="Encoding & Upserting"):
-        start = batch_idx * BATCH_SIZE
-        end = min(start + BATCH_SIZE, len(sentences))
-        
-        batch_docs = sentences[start:end]
-        batch_ids = doc_ids[start:end]
-        
-        # Encode batch using BGE-M3 model
-        # Return only dense vectors (not sparse or colbert vectors)
-        embeddings = model.encode(
-            batch_docs,
-            return_dense=True,
-            return_sparse=False,
-            return_colbert_vecs=False
-        )["dense_vecs"]
-        
-        # Verify embedding dimension
-        if embeddings.shape[1] != VECTOR_SIZE:
-            print(f"[!] Warning: Expected vector size {VECTOR_SIZE}, got {embeddings.shape[1]}")
-        
-        # Create PointStruct objects with deterministic IDs
-        # Payload is empty to save memory on Node B
-        points = [
-            PointStruct(
-                id=generate_deterministic_id(doc_id),
-                vector=embedding.tolist()
-            )
-            for doc_id, embedding in zip(batch_ids, embeddings)
-        ]
-        
-        # Upsert to Qdrant
-        client.upsert(
-            collection_name=COLLECTION_NAME,
-            points=points
+    if not sentences:
+        return
+
+    embeddings = model.encode(
+        sentences,
+        return_dense=True,
+        return_sparse=False,
+        return_colbert_vecs=False
+    )["dense_vecs"]
+
+    if embeddings.shape[1] != VECTOR_SIZE:
+        print(f"[!] Warning: Expected vector size {VECTOR_SIZE}, got {embeddings.shape[1]}")
+
+    points = [
+        PointStruct(
+            id=generate_deterministic_id(doc_id),
+            vector=embedding.tolist()
         )
-    
-    # Verify collection size
-    collection_info = client.get_collection(COLLECTION_NAME)
-    print(f"[✓] Upsert complete. Collection now contains {collection_info.points_count} vectors")
+        for doc_id, embedding in zip(doc_ids, embeddings)
+    ]
+
+    client.upsert(
+        collection_name=collection_name,
+        points=points,
+        wait=WAIT_FOR_UPSERT
+    )
+
+
+def process_dataset(
+    client: QdrantClient,
+    conn: sqlite3.Connection,
+    model: BGEM3FlagModel,
+    dataset: DatasetConfig
+) -> None:
+    """
+    Stream passages for a dataset, store in SQLite, and upsert embeddings.
+    """
+    if dataset.name == "msmarco_corpus":
+        stream = iter_msmarco_passages()
+        source_db_path = SOURCE_MSMARCO_DB_PATH
+    elif dataset.name == "wiki_qa":
+        stream = iter_wikiqa_passages()
+        source_db_path = WIKIQA_DB_PATH
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset.name}")
+
+    ensure_qdrant_collection(client, dataset.collection)
+    print(f"[*] Starting ingestion for {dataset.name} -> {dataset.collection}")
+
+    batch_ids: List[str] = []
+    batch_texts: List[str] = []
+    processed = 0
+    pbar_total = MAX_DOCS
+    progress = tqdm(total=pbar_total, desc=f"{dataset.name}", unit="passage")
+
+    for doc_id, text in stream:
+        batch_ids.append(doc_id)
+        batch_texts.append(text)
+        processed += 1
+
+        if len(batch_texts) >= BATCH_SIZE:
+            if not same_path(source_db_path, CORPUS_DB_PATH):
+                insert_passages(conn, list(zip(batch_ids, batch_texts)))
+            encode_and_upsert_batch(client, dataset.collection, batch_ids, batch_texts, model)
+            progress.update(len(batch_texts))
+            batch_ids.clear()
+            batch_texts.clear()
+
+        if MAX_DOCS and processed >= MAX_DOCS:
+            break
+
+    if batch_texts:
+        if not same_path(source_db_path, CORPUS_DB_PATH):
+            insert_passages(conn, list(zip(batch_ids, batch_texts)))
+        encode_and_upsert_batch(client, dataset.collection, batch_ids, batch_texts, model)
+        progress.update(len(batch_texts))
+
+    progress.close()
+    collection_info = client.get_collection(dataset.collection)
+    print(
+        f"[✓] {dataset.name} upsert complete. "
+        f"Collection now contains {collection_info.points_count} vectors"
+    )
 
 
 def main():
     """
-    Main execution flow for WikiQA sync to Qdrant.
+    Main execution flow for MS MARCO (and optional WikiQA) sync to Qdrant.
     """
     print("=" * 80)
-    print("WikiQA Dataset Sync to Qdrant - Starting")
+    print("Dataset Sync to Qdrant - Starting")
     print("=" * 80)
     
     # Check CUDA availability
@@ -226,25 +337,15 @@ def main():
     
     print()
     
-    # Step 1: Load and extract sentences
-    doc_ids, sentences = load_and_extract_sentences()
-    
+    # Step 1: Initialize embedding model
+    print(f"[*] Loading embedding model '{EMBEDDING_MODEL}'...")
+    print("    This may take 1-2 minutes on the first run...")
+    model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=torch.cuda.is_available())
+    print("[✓] Embedding model loaded successfully")
+
     print()
-    
-    # Step 2: Hydrate SQLite database (Node A)
-    hydrate_sqlite_db(doc_ids, sentences)
-    
-    print()
-    
-    # Step 3: Initialize embedding model
-    print(f"[*] Loading embedding model '{EMBEDDING_MODEL}' on GPU...")
-    print(f"    This may take 1-2 minutes on the first run...")
-    model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=True)
-    print(f"[✓] Embedding model loaded successfully")
-    
-    print()
-    
-    # Step 4: Connect to Qdrant (Node B)
+
+    # Step 2: Connect to Qdrant (Node B)
     print(f"[*] Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}...")
     try:
         client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
@@ -257,21 +358,25 @@ def main():
     
     print()
     
-    # Step 5: Create Qdrant collection
-    create_qdrant_collection(client)
-    
     print()
-    
-    # Step 6: Encode and upsert in batches
-    encode_and_upsert_batches(client, doc_ids, sentences, model)
-    
+
+    # Step 3: Open SQLite database
+    conn = open_sqlite_db()
+
     print()
+
+    # Step 4: Ingest datasets
+    for dataset in DATASETS:
+        process_dataset(client, conn, model, dataset)
+        print()
+
+    conn.close()
+
     print("=" * 80)
-    print("WikiQA Sync Complete!")
+    print("Dataset Sync Complete!")
     print("=" * 80)
-    print(f"Summary:")
-    print(f"  - Sentences ingested: {len(sentences)}")
-    print(f"  - Qdrant collection: {COLLECTION_NAME}")
+    print("Summary:")
+    print(f"  - Datasets ingested: {', '.join(d.name for d in DATASETS)}")
     print(f"  - SQLite database: {CORPUS_DB_PATH}")
     print()
 
