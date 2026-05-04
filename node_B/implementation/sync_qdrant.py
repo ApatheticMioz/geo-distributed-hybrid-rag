@@ -15,6 +15,7 @@ Requirements:
 
 import os
 import sqlite3
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,8 +32,11 @@ from tqdm import tqdm
 # ============================================================================
 
 # Qdrant Vector Database Configuration (Node B)
-QDRANT_HOST = os.getenv("QDRANT_HOST", "10.0.0.2")
+QDRANT_HOST = os.getenv("QDRANT_HOST", "127.0.0.1")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+QDRANT_TIMEOUT_SECONDS = float(os.getenv("QDRANT_TIMEOUT_SECONDS", "30"))
+QDRANT_CONNECT_RETRIES = int(os.getenv("QDRANT_CONNECT_RETRIES", "5"))
+QDRANT_CONNECT_BACKOFF_SECONDS = float(os.getenv("QDRANT_CONNECT_BACKOFF_SECONDS", "5"))
 
 # SQLite Database Configuration (Node A - text hydration)
 # Update this path if running from a different location
@@ -45,7 +49,12 @@ SOURCE_MSMARCO_DB_PATH = os.getenv(
     "SOURCE_MSMARCO_DB_PATH",
     str(PROJECT_ROOT / "node_A" / "implementation" / "corpus.sqlite")
 )
-WIKIQA_DB_PATH = os.getenv("WIKIQA_DB_PATH", "")
+WIKIQA_DB_PATH = os.getenv(
+    "WIKIQA_DB_PATH",
+    str(PROJECT_ROOT / "node_A" / "implementation" / "wikiqa.sqlite")
+)
+WIKIQA_DOC_ID_PREFIX = os.getenv("WIKIQA_DOC_ID_PREFIX", "wikiqa")
+AUTO_FETCH_WIKIQA = os.getenv("AUTO_FETCH_WIKIQA", "true").lower() in {"1", "true", "yes"}
 
 # Embedding Model Configuration
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
@@ -57,6 +66,8 @@ MAX_DOCS = int(os.getenv("MAX_DOCS", "0")) or None
 INCLUDE_WIKIQA = os.getenv("INCLUDE_WIKIQA", "false").lower() in {"1", "true", "yes"}
 START_OFFSET = int(os.getenv("START_OFFSET", "0"))
 ORDER_BY_DOC_ID = os.getenv("ORDER_BY_DOC_ID", "true").lower() in {"1", "true", "yes"}
+PROCESS_MSMARCO = os.getenv("PROCESS_MSMARCO", "true").lower() in {"1", "true", "yes"}
+PROCESS_WIKIQA = os.getenv("PROCESS_WIKIQA", "").lower() in {"1", "true", "yes"}
 
 
 @dataclass(frozen=True)
@@ -79,7 +90,11 @@ WIKIQA_CONFIG = DatasetConfig(
     collection="wikiqa_passages",
     id_prefix="wikiqa"
 )
-DATASETS = [MSMARCO_CONFIG] + ([WIKIQA_CONFIG] if INCLUDE_WIKIQA else [])
+DATASETS = []
+if PROCESS_MSMARCO:
+    DATASETS.append(MSMARCO_CONFIG)
+if PROCESS_WIKIQA or INCLUDE_WIKIQA:
+    DATASETS.append(WIKIQA_CONFIG)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -92,6 +107,19 @@ def make_hashed_doc_id(prefix: str, text: str) -> str:
     """
     uid = uuid.uuid5(uuid.NAMESPACE_DNS, f"{prefix}:{text}")
     return f"{prefix}_{uid.hex}"
+
+
+def apply_id_prefix(doc_id: str, prefix: Optional[str]) -> str:
+    """
+    Prefix doc_id only when it is not already prefixed.
+    """
+    if not prefix:
+        return str(doc_id)
+    doc_id_str = str(doc_id)
+    prefix_token = f"{prefix}_"
+    if doc_id_str.startswith(prefix_token):
+        return doc_id_str
+    return f"{prefix_token}{doc_id_str}"
 
 
 def iter_sqlite_passages(
@@ -130,7 +158,7 @@ def iter_sqlite_passages(
             cleaned = str(text).strip()
             if not cleaned:
                 continue
-            final_id = f"{id_prefix}_{doc_id}" if id_prefix else str(doc_id)
+            final_id = apply_id_prefix(doc_id, id_prefix)
             yield final_id, cleaned
 
     conn.close()
@@ -149,7 +177,7 @@ def iter_wikiqa_passages() -> Iterator[Tuple[str, str]]:
     """
     if not WIKIQA_DB_PATH:
         raise ValueError("WIKIQA_DB_PATH must be set when INCLUDE_WIKIQA is enabled")
-    return iter_sqlite_passages(WIKIQA_DB_PATH, id_prefix="wikiqa")
+    return iter_sqlite_passages(WIKIQA_DB_PATH, id_prefix=WIKIQA_DOC_ID_PREFIX)
 
 
 def open_sqlite_db() -> sqlite3.Connection:
@@ -175,6 +203,59 @@ def open_sqlite_db() -> sqlite3.Connection:
     """)
     conn.commit()
     return conn
+
+
+def build_wikiqa_sqlite(db_path: str) -> None:
+    """
+    Fetch WikiQA from HuggingFace and write unique answers into SQLite.
+    """
+    from datasets import load_dataset
+
+    target_path = Path(db_path)
+    if target_path.exists():
+        return
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[*] Building WikiQA SQLite at {target_path}")
+
+    dataset = load_dataset("wiki_qa", split="train")
+    unique_answers = set()
+    for example in dataset:
+        answer = example.get("answer", "")
+        if not answer:
+            continue
+        text = str(answer).strip()
+        if text:
+            unique_answers.add(text)
+
+    sorted_answers = sorted(unique_answers)
+    conn = sqlite3.connect(str(target_path))
+    conn.execute("PRAGMA synchronous = OFF")
+    conn.execute("PRAGMA journal_mode = MEMORY")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS passages (
+            doc_id TEXT PRIMARY KEY,
+            text TEXT
+        )
+    """)
+    conn.commit()
+
+    batch = []
+    batch_size = 100000
+    for idx, text in enumerate(sorted_answers):
+        batch.append((str(idx), text))
+        if len(batch) >= batch_size:
+            cursor.executemany("INSERT OR IGNORE INTO passages (doc_id, text) VALUES (?, ?)", batch)
+            conn.commit()
+            batch.clear()
+
+    if batch:
+        cursor.executemany("INSERT OR IGNORE INTO passages (doc_id, text) VALUES (?, ?)", batch)
+        conn.commit()
+
+    conn.close()
+    print(f"[✓] WikiQA SQLite ready with {len(sorted_answers)} passages")
 
 
 def same_path(path_a: str, path_b: str) -> bool:
@@ -225,6 +306,29 @@ def ensure_qdrant_collection(client: QdrantClient, collection_name: str) -> None
         vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
     )
     print(f"[✓] Collection '{collection_name}' created successfully")
+
+
+def connect_qdrant() -> QdrantClient:
+    """
+    Connect to Qdrant with retries.
+    """
+    last_error: Optional[Exception] = None
+    for attempt in range(1, QDRANT_CONNECT_RETRIES + 1):
+        try:
+            client = QdrantClient(
+                host=QDRANT_HOST,
+                port=QDRANT_PORT,
+                timeout=QDRANT_TIMEOUT_SECONDS
+            )
+            client.get_collections()
+            return client
+        except Exception as exc:
+            last_error = exc
+            print(f"[!] Qdrant connection attempt {attempt} failed: {exc}")
+            if attempt < QDRANT_CONNECT_RETRIES:
+                time.sleep(QDRANT_CONNECT_BACKOFF_SECONDS)
+
+    raise RuntimeError(f"Failed to connect to Qdrant after {QDRANT_CONNECT_RETRIES} attempts") from last_error
 
 
 def generate_deterministic_id(doc_id: str) -> int:
@@ -366,25 +470,28 @@ def main():
 
     print()
 
-    # Step 2: Connect to Qdrant (Node B)
-    print(f"[*] Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}...")
-    try:
-        client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-        client.get_collections()  # Test connection
-        print(f"[✓] Connected to Qdrant successfully")
-    except Exception as e:
-        print(f"[!] Error connecting to Qdrant: {e}")
-        print(f"[!] Please ensure Qdrant is running at {QDRANT_HOST}:{QDRANT_PORT}")
-        raise
-    
-    print()
-    
-    print()
-
-    # Step 3: Open SQLite database
+    # Step 2: Open SQLite database
     conn = open_sqlite_db()
 
     print()
+
+    # Step 2.1: Ensure WikiQA SQLite exists if needed
+    if INCLUDE_WIKIQA:
+        wikiqa_path = Path(WIKIQA_DB_PATH)
+        if not wikiqa_path.exists():
+            if AUTO_FETCH_WIKIQA:
+                build_wikiqa_sqlite(str(wikiqa_path))
+            else:
+                raise FileNotFoundError(
+                    f"WikiQA SQLite not found at {wikiqa_path}. Set WIKIQA_DB_PATH or enable AUTO_FETCH_WIKIQA."
+                )
+
+    print()
+
+    # Step 3: Connect to Qdrant (Node B)
+    print(f"[*] Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}...")
+    client = connect_qdrant()
+    print("[✓] Connected to Qdrant successfully")
 
     # Step 4: Ingest datasets
     for dataset in DATASETS:
