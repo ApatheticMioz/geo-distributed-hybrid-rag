@@ -367,7 +367,8 @@ def encode_and_upsert_batch(
     points = [
         PointStruct(
             id=generate_deterministic_id(doc_id),
-            vector=embedding.tolist()
+            vector=embedding.tolist(),
+            payload={"doc_id": doc_id},
         )
         for doc_id, embedding in zip(doc_ids, embeddings)
     ]

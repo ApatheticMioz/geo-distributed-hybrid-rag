@@ -209,9 +209,8 @@ async def lifespan(app: FastAPI):
 
     bm25_index = TantivyBM25Index(cfg["corpus"]["tantivy_index_path"])
     
-    # As per prompt IP requirements:
-    node_b_host = "10.8.0.5"
-    node_b_port = 50051
+    node_b_host = cfg["node_b"]["host"]
+    node_b_port = cfg["node_b"]["port"]
     node_a_lan_host = cfg["node_a"]["lan_host"]
     node_a_grpc_port = cfg["node_a"]["grpc_port"]
     node_b = NodeBDenseClient(node_b_host, node_b_port, node_a_lan_host, node_a_grpc_port)

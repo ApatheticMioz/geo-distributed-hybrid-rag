@@ -149,12 +149,11 @@ async def lifespan(app: FastAPI):
 
     bm25_index = TantivyBM25Index(cfg["corpus"]["tantivy_index_path"])
     
-    # As per prompt IP requirements:
-    node_b_host = "10.8.0.5"
-    node_b_port = 50051
+    node_b_host = cfg["node_b"]["host"]
+    node_b_port = cfg["node_b"]["port"]
     node_b = NodeBDenseClient(node_b_host, node_b_port)
 
-    node_a_url = "http://10.8.0.1:8001/generate"
+    node_a_url = f"http://{cfg['node_a']['grpc_host']}:8001/generate"
 
     _orchestrator = PipelineOrchestrator(
         bm25_index=bm25_index,
