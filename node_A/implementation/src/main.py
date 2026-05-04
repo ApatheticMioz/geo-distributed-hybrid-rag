@@ -215,17 +215,32 @@ class GenerationOrchestratorServicer(coordination_pb2_grpc.GenerationOrchestrato
                 ]
                 
                 logger.info(
-                    f"[{query_id}] Received sparse context: {len(sparse_docs)} docs, "
-                    f"node_b_failed={node_b_failed}"
+                    "[%s] sparse_received docs=%d t_sparse_ms=%.1f node_b_failed=%s",
+                    query_id,
+                    len(sparse_docs),
+                    t_sparse_ms,
+                    node_b_failed,
                 )
                 
                 if node_b_failed:
                     dense_doc_ids = []
+                    logger.info("[%s] dense_wait_skipped node_b_failed=true", query_id)
                 else:
+                    wait_start = time.perf_counter()
                     dense_doc_ids = await _wait_for_dense_docs(
                         query_id,
                         timeout_s=config.T_THRESHOLD_MS / 1000.0,
                     ) or []
+                    wait_ms = (time.perf_counter() - wait_start) * 1000
+                    if dense_doc_ids:
+                        logger.info(
+                            "[%s] dense_received docs=%d wait_ms=%.1f",
+                            query_id,
+                            len(dense_doc_ids),
+                            wait_ms,
+                        )
+                    else:
+                        logger.info("[%s] dense_wait_timeout wait_ms=%.1f", query_id, wait_ms)
 
                 # Merge with any dense docs received from Node B
                 fused = reciprocal_rank_fusion(
@@ -243,7 +258,7 @@ class GenerationOrchestratorServicer(coordination_pb2_grpc.GenerationOrchestrato
                 
                 # Start token generation
                 t_gen_start = time.perf_counter()
-                logger.info(f"[{query_id}] Starting token generation...")
+                logger.info("[%s] generation_start context_docs=%d", query_id, len(top_docs))
                 
                 try:
                     from vllm import SamplingParams
@@ -294,7 +309,12 @@ class GenerationOrchestratorServicer(coordination_pb2_grpc.GenerationOrchestrato
                         ttft_ms=0,
                     )
                     await context.write(final_token)
-                    logger.info(f"[{query_id}] Generation complete: {tokens_sent} tokens, TTFT={t_ttft_ms:.1f}ms")
+                    logger.info(
+                        "[%s] generation_complete tokens=%d ttft_ms=%.1f",
+                        query_id,
+                        tokens_sent,
+                        t_ttft_ms,
+                    )
                     
                 except Exception as e:
                     logger.error(f"[{query_id}] Error in generation stream: {e}", exc_info=True)
@@ -318,7 +338,10 @@ class ResultForwarderServicer(result_forward_pb2_grpc.ResultForwarderServicer):
         t_dense_ms = request.t_dense_ms
         
         logger.info(
-            f"[{query_id}] Received {len(request.docs)} dense results from Node B ({t_dense_ms:.1f}ms)"
+            "[%s] dense_forward_received docs=%d t_dense_ms=%.1f",
+            query_id,
+            len(request.docs),
+            t_dense_ms,
         )
         
         # Extract dense doc IDs (in order by rank)

@@ -94,7 +94,7 @@ class PipelineOrchestrator:
 
         t0 = t_request_start if t_request_start is not None else time.perf_counter()
 
-        logger.info(f"[{query_id}] Pipeline start ({normalized_mode}) | '{query_text[:60]}'")
+        logger.info(f"[{query_id}] pipeline_start mode={normalized_mode} query='{query_text[:60]}'")
 
         async def dense_retrieve() -> bool:
             if delay_seconds > 0:
@@ -107,16 +107,18 @@ class PipelineOrchestrator:
         if normalized_mode == "sequential":
             sparse_results = await asyncio.to_thread(self.bm25.query, query_text, k)
             t_sparse_ms = (time.perf_counter() - t0) * 1000
-            logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
+            logger.info(f"[{query_id}] bm25_done t_sparse_ms={t_sparse_ms:.1f} docs={len(sparse_results)}")
 
             dense_start = time.perf_counter()
             try:
-                node_b_dispatch_failed = not bool(await dense_retrieve())
+                accepted = await dense_retrieve()
+                node_b_dispatch_failed = not bool(accepted)
+                logger.info(f"[{query_id}] node_b_dispatch_ack accepted={bool(accepted)}")
             except Exception as exc:
-                logger.error(f"[{query_id}] Dense retrieval failed: {exc}", exc_info=True)
+                logger.error(f"[{query_id}] node_b_dispatch_error {exc}", exc_info=True)
                 node_b_dispatch_failed = True
             dense_ms = (time.perf_counter() - dense_start) * 1000
-            logger.info(f"[{query_id}] Node B dispatch complete: {dense_ms:.1f} ms")
+            logger.info(f"[{query_id}] node_b_dispatch_complete t_dispatch_ms={dense_ms:.1f}")
         elif normalized_mode == "parallel":
             bm25_task = asyncio.create_task(
                 asyncio.to_thread(self.bm25.query, query_text, k),
@@ -126,14 +128,17 @@ class PipelineOrchestrator:
 
             sparse_results = await bm25_task
             t_sparse_ms = (time.perf_counter() - t0) * 1000
-            logger.info(f"[{query_id}] BM25 done: {t_sparse_ms:.1f} ms | {len(sparse_results)} docs")
+            logger.info(f"[{query_id}] bm25_done t_sparse_ms={t_sparse_ms:.1f} docs={len(sparse_results)}")
 
             node_b_dispatch_failed = False
             if dense_task.done():
                 try:
-                    node_b_dispatch_failed = not bool(await dense_task)
-                except Exception:
+                    accepted = await dense_task
+                    node_b_dispatch_failed = not bool(accepted)
+                    logger.info(f"[{query_id}] node_b_dispatch_ack accepted={bool(accepted)}")
+                except Exception as exc:
                     node_b_dispatch_failed = True
+                    logger.error(f"[{query_id}] node_b_dispatch_error {exc}", exc_info=True)
         else:
             raise ValueError(f"Unsupported query mode: {mode}")
 
@@ -151,6 +156,8 @@ class PipelineOrchestrator:
         first_token = True
         ttft_ms_recorded = None
 
+        logger.info(f"[{query_id}] sparse_context_ready docs={len(sparse_docs)} node_b_failed={node_b_dispatch_failed}")
+
         async def request_iterator():
             yield coordination_pb2.SparseContextRequest(
                 query_id=query_id,
@@ -161,6 +168,7 @@ class PipelineOrchestrator:
             )
 
         target = f"{self.node_a_grpc_host}:{self.node_a_grpc_port}"
+        logger.info(f"[{query_id}] node_a_stream_start target={target}")
         async with grpc.aio.insecure_channel(target) as channel:
             stub = coordination_pb2_grpc.GenerationOrchestratorStub(channel)
             try:
