@@ -54,7 +54,7 @@ class NodeBDenseClient:
             )
             return bool(response.accepted)
         except grpc.aio.AioRpcError as e:
-            logger.error("[%s] gRPC Error to Node B: %s - %s", query_id, e.code(), e.details())
+            logger.exception("[%s] gRPC Error to Node B: %s - %s", query_id, e.code(), e.details())
             return False
 
     async def close(self):
