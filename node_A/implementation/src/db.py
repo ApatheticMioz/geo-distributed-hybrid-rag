@@ -22,7 +22,7 @@ async def get_document_texts(doc_ids: list[str]) -> str:
 
     db_path = Path(DB_PATH).resolve()
     placeholders = ", ".join("?" for _ in normalized_doc_ids)
-    query = f"SELECT doc_id, text FROM passages WHERE CAST(doc_id AS TEXT) IN ({placeholders})"
+    query = f"SELECT doc_id, text FROM passages WHERE doc_id IN ({placeholders})"
 
     logger.debug("Hydrating docs from %s with query=%s vars=%s", db_path, query, normalized_doc_ids)
 
