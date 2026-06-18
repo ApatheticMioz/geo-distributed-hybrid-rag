@@ -10,3 +10,5 @@ llmcompressor
 numpy
 httpx
 aiosqlite
+pyairports
+pycountry

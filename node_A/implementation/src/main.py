@@ -17,8 +17,13 @@ from . import config
 from .db import get_document_texts
 
 # vLLM imports disabled — running in mock mode to avoid GPU OOM
-from vllm.engine.async_llm_engine import AsyncLLMEngine
-from vllm.engine.arg_utils import AsyncEngineArgs
+# These imports are guarded so the server starts without loading the AWQ model.
+try:
+    from vllm.engine.async_llm_engine import AsyncLLMEngine
+    from vllm.engine.arg_utils import AsyncEngineArgs
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
 
 # Import gRPC stubs
 sys.path.insert(0, str(Path(__file__).parent.parent / "generated"))
@@ -42,9 +47,19 @@ grpc_task_owner: str | None = None
 # LLM Engine
 # ============================================================================
 
+MOCK_MODE = False  # Set to False to load the real AWQ model
+
 def create_engine():
-    """Initialize the live vLLM engine."""
+    """Initialize the vLLM engine (or skip in mock mode)."""
     global engine
+    if MOCK_MODE:
+        logger.warning("MOCK MODE: Skipping vLLM/AWQ model loading. Responses will be simulated.")
+        engine = None
+        return
+    if not VLLM_AVAILABLE:
+        logger.warning("vLLM not available. Running in mock mode.")
+        engine = None
+        return
     logger.info(f"Loading vLLM engine from {config.MODEL_PATH}...")
     
     engine_args = AsyncEngineArgs(
@@ -108,9 +123,21 @@ async def generate(request: Request):
 
 
 async def _llm_stream_generator(prompt: str):
-    """Yield text chunks from the vLLM async engine."""
-    if engine is None:
-        yield "[error] vLLM engine is not initialized."
+    """Yield text chunks from the vLLM async engine (or mock response)."""
+    if MOCK_MODE or engine is None:
+        logger.info("MOCK MODE: Returning simulated response.")
+        mock_response = (
+            "[MOCK RESPONSE] This is a simulated response from Node A. "
+            "The AWQ model was not loaded (mock mode is active). "
+            "In production, this would contain the LLM-generated answer based on the provided context.\n"
+            f"Query processed at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Context length: {len(prompt)} characters"
+        )
+        for chunk in mock_response:
+            yield chunk
+            if chunk == '\n':
+                continue
+            await asyncio.sleep(0.01)
         return
 
     try:
@@ -178,6 +205,9 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 # Extract pre-fused doc IDs from Node B
                 fused_doc_ids = [doc.doc_id for doc in request.fused_docs]
 
+                # ADD THIS LINE:
+                logger.info(f"🚨 DEBUG - IDs FROM NODE B: {fused_doc_ids}")
+
                 logger.info(
                     "[%s] fused_docs_received docs=%d t_sparse=%.1fms t_dense=%.1fms",
                     query_id,
@@ -187,15 +217,6 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 )
 
                 # Hydrate text from local SQLite (proves database hydration works)
-                top_docs = fused_doc_ids[:5]
-                context_text = await get_document_texts(top_docs)
-
-                logger.info(
-                    "[%s] hydrated %d docs from corpus.sqlite (context_len=%d chars)",
-                    query_id, len(top_docs), len(context_text),
-                )
-
-                # Hydrate text from local SQLite
                 top_docs = fused_doc_ids[:5]
                 context_text = await get_document_texts(top_docs)
 
