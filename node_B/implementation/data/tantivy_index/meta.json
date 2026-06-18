@@ -5,43 +5,8 @@
   },
   "segments": [
     {
-      "segment_id": "f095368e-a7c5-4937-a7be-036c4fd28df5",
-      "max_doc": 43,
-      "deletes": null
-    },
-    {
-      "segment_id": "b2cc4ab3-6c74-4ca2-bc90-34e24defe843",
-      "max_doc": 1,
-      "deletes": null
-    },
-    {
-      "segment_id": "6cd490c0-85a0-4c33-860c-3529fcf385f8",
-      "max_doc": 1,
-      "deletes": null
-    },
-    {
-      "segment_id": "471a50db-cd41-458b-84d5-2076cadc7b85",
-      "max_doc": 1,
-      "deletes": null
-    },
-    {
-      "segment_id": "9a8dec0d-61c6-4c00-b25d-2cfc5f51158e",
-      "max_doc": 1,
-      "deletes": null
-    },
-    {
-      "segment_id": "6199a0a4-7922-4e31-bec9-e520e786bcf9",
-      "max_doc": 1,
-      "deletes": null
-    },
-    {
-      "segment_id": "d35a440d-a943-4855-92bf-1afc5d02809d",
-      "max_doc": 1,
-      "deletes": null
-    },
-    {
-      "segment_id": "c0d7153c-b05d-4a83-b832-52ffc56da03a",
-      "max_doc": 1,
+      "segment_id": "0aa175cc-b14a-4906-bcd1-aad9706cc480",
+      "max_doc": 5000,
       "deletes": null
     }
   ],
@@ -53,7 +18,7 @@
         "indexing": {
           "record": "position",
           "fieldnorms": true,
-          "tokenizer": "default"
+          "tokenizer": "raw"
         },
         "stored": true,
         "fast": false
@@ -66,12 +31,12 @@
         "indexing": {
           "record": "position",
           "fieldnorms": true,
-          "tokenizer": "default"
+          "tokenizer": "en_stem"
         },
         "stored": true,
         "fast": false
       }
     }
   ],
-  "opstamp": 58
+  "opstamp": 5008
 }
