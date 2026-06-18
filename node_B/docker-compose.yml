@@ -1,0 +1,24 @@
+# Qdrant Vector Database for Node B
+# Spin up with: docker compose up -d
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_node_b
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    # Healthcheck commented out because 'curl' is not in the base image.
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:6333/collections || exit 1"]
+    #   interval: 5s
+    #   timeout: 3s
+    #   retries: 10
+
+volumes:
+  qdrant_data:
+    driver: local

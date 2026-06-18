@@ -13,6 +13,9 @@ grpcio>=1.63.0
 grpcio-tools>=1.63.0
 protobuf>=4.25.0
 
+# Disk-backed BM25 via Tantivy (Rust) — moved from Node C
+tantivy>=0.26.0,<0.27
+
 # Data Handlers (Pinned below 2.0.0 to prevent breaking changes in ML ecosystem)
 numpy<2.0.0
 
@@ -24,3 +27,9 @@ sentence-transformers<=2.7.0
 # For WikiQA dataset ingestion and syncing to Qdrant
 datasets>=2.14.0
 tqdm>=4.66.0
+
+# Web framework for gateway
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+httpx>=0.27.0
+pyyaml==6.0.1

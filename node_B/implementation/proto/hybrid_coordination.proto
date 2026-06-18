@@ -1,0 +1,32 @@
+syntax = "proto3";
+package coordination;
+
+// Fused document reference (after RRF on Node B).
+// Node A will hydrate the full text from its local SQLite corpus.
+message FusedDocument {
+  string doc_id = 1;
+  float  rrf_score = 2;
+  int32  rank    = 3;
+}
+
+// Node B sends this to Node A on the bidirectional stream.
+message HybridContextRequest {
+  string              query_id     = 1;
+  string              query_text   = 2;
+  repeated FusedDocument fused_docs = 3;
+  double              t_sparse_ms  = 4;
+  double              t_dense_ms   = 5;
+  double              t_fusion_ms  = 6;
+}
+
+// Node A streams tokens back to Node B as they are generated.
+message GenerationToken {
+  string query_id  = 1;
+  string token     = 2;
+  bool   is_final  = 3;
+  double ttft_ms   = 4;
+}
+
+service GenerationOrchestrator {
+  rpc GenerateStream (stream HybridContextRequest) returns (stream GenerationToken);
+}
