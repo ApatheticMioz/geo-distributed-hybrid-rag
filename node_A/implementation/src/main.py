@@ -6,6 +6,7 @@ import uuid
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict
+from xml.parsers.expat import model
 
 import grpc
 from fastapi import FastAPI, Request, HTTPException
@@ -16,8 +17,8 @@ from . import config
 from .db import get_document_texts
 
 # vLLM imports disabled — running in mock mode to avoid GPU OOM
-# from vllm.engine.async_llm_engine import AsyncLLMEngine
-# from vllm.engine.arg_utils import AsyncEngineArgs
+from vllm.engine.async_llm_engine import AsyncLLMEngine
+from vllm.engine.arg_utils import AsyncEngineArgs
 
 # Import gRPC stubs
 sys.path.insert(0, str(Path(__file__).parent.parent / "generated"))
@@ -42,11 +43,19 @@ grpc_task_owner: str | None = None
 # ============================================================================
 
 def create_engine():
-    """Mock engine initialization — vLLM skipped to avoid GPU OOM."""
+    """Initialize the live vLLM engine."""
     global engine
-    engine = None  # No real LLM loaded
-    logger.info("MOCK MODE: vLLM engine skipped (GPU OOM prevention)")
-
+    logger.info(f"Loading vLLM engine from {config.MODEL_PATH}...")
+    
+    engine_args = AsyncEngineArgs(
+        model=config.MODEL_PATH,
+        quantization="awq",
+        enforce_eager=True,  # Conserves VRAM as per your paper
+        gpu_memory_utilization=0.90,
+        max_model_len=4096
+    )
+    engine = AsyncLLMEngine.from_engine_args(engine_args)
+    logger.info("vLLM engine loaded successfully.")
 
 # ============================================================================
 # FastAPI Lifespan
@@ -186,26 +195,38 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                     query_id, len(top_docs), len(context_text),
                 )
 
-                # Build mock response — proves the full pipeline works without GPU
-                mock_response = (
-                    f"MOCK SUCCESS: Hydrated text for doc IDs: {', '.join(top_docs)}. "
-                    f"Context preview: {context_text[:200]}..."
+                # Hydrate text from local SQLite
+                top_docs = fused_doc_ids[:5]
+                context_text = await get_document_texts(top_docs)
+
+                logger.info(
+                    "[%s] hydrated %d docs from corpus.sqlite (context_len=%d chars)",
+                    query_id, len(top_docs), len(context_text),
                 )
 
-                # Split mock response into "token" chunks and stream them back
-                chunk_size = 20
-                for i in range(0, len(mock_response), chunk_size):
-                    chunk = mock_response[i:i + chunk_size]
-                    if chunk:
-                        token_msg = hybrid_coordination_pb2.GenerationToken(
-                            query_id=query_id,
-                            token=chunk,
-                            is_final=False,
-                            ttft_ms=0.0,
-                        )
-                        await context.write(token_msg)
-                        tokens_sent += 1
-                        await asyncio.sleep(0)
+                # Build the actual prompt
+                system_instruction = "You are a helpful assistant. Use the provided context to answer the user's question."
+                prompt = f"System:\n{system_instruction}\n\nContext:\n{context_text}\n\nUser Query:\n{query_text}\n\nAssistant:"
+
+                # Stream the real tokens back via gRPC
+                start_time = time.time()
+                first_token = True
+
+                async for chunk in _llm_stream_generator(prompt):
+                    if first_token:
+                        ttft_ms = (time.time() - start_time) * 1000
+                        first_token = False
+                    else:
+                        ttft_ms = 0.0
+
+                    token_msg = hybrid_coordination_pb2.GenerationToken(
+                        query_id=query_id,
+                        token=chunk,
+                        is_final=False,
+                        ttft_ms=ttft_ms,
+                    )
+                    await context.write(token_msg)
+                    tokens_sent += 1
 
                 # Send final token
                 final_token = hybrid_coordination_pb2.GenerationToken(
@@ -215,14 +236,10 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                     ttft_ms=0.0,
                 )
                 await context.write(final_token)
-                logger.info(
-                    "[%s] mock generation complete tokens=%d",
-                    query_id,
-                    tokens_sent,
-                )
-
-                break  # Process only the first request (single query per stream)
-
+                
+                logger.info("[%s] live generation complete tokens=%d", query_id, tokens_sent)
+                break  # Process only the first request
+            
         except Exception as e:
             logger.error("[%s] GenerateStream error: %s", query_id, e, exc_info=True)
             raise
