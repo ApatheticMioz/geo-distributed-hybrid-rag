@@ -27,22 +27,24 @@ roughly 538 passages per second on an RTX 3090. The system runs on two LAN machi
 (WireGuard): a gateway node (embedding, dense+sparse retrieval, fusion) on an Intel i7-10750H
 laptop with GTX 1660~Ti, and a generation node (document lookup, vLLM) on an RTX 3090 host. An
 earlier three-node version placed a third, low-power laptop (Intel CPU, 16~GB RAM) at the network
-edge as entry point and sparse-retrieval engine, across a metropolitan-fiber link treated as the
-WAN leg.
+edge as entry point and sparse-retrieval engine, across a city-wide link treated as the WAN leg.
 
 \section{A Failed Hypothesis That Points at a Real Gap}
 The original design hypothesized a 30--40\% TTFT (time-to-first-token) reduction by running
-edge-side sparse retrieval in parallel with transit of the query toward the LAN nodes:
+edge-side sparse retrieval in parallel with transit of the query toward the other nodes:
 $T_{\mathrm{retrieval}} = \max(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$.
-Two things undid this. First, the ``WAN'' was not much of one: the edge laptop sat at a home
-across the city on metropolitan fiber, and our benchmarks put the round trip at only 5--15~ms
-(~20~ms with WireGuard and protocol overhead) --- there was almost no transit latency to hide.
-Second, and more fundamentally, parallel execution can save at most
-$\min(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$, and our 100-query logs from
-the three-node run show sparse retrieval took just 0.6--10~ms --- too cheap to be worth
-distributing --- while the split made the dense branch pay the extra 20~ms plus coordination
-overhead. When the edge laptop then failed outright, we consolidated its duties into the gateway,
-and the two-node system worked fine.
+Our instrumented three-node runs showed nothing like it. The surviving 100-query log records
+sparse retrieval at 0.6--10~ms against TTFT of 51--227~ms: the stage we chose to distribute was
+one to two orders of magnitude cheaper than the pipeline it was meant to accelerate. Since
+parallel overlap can save at most
+$\min(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$, no link latency could have
+delivered the target --- a short WAN leg offered little to hide, and a long one would only have
+slowed the dense branch. A provenance caveat: the exact physical placement during those logged
+runs (all devices on one LAN, or the edge laptop across town) can no longer be reconstructed, so
+we treat the 5--15~ms round-trip in our mid-evaluation report as descriptive rather than tied to
+this log --- and the new campaign will record placement and network metadata with every
+measurement. When the edge laptop then failed, we consolidated its duties into the gateway, and
+the two-node system worked fine.
 
 That failure motivates this proposal: placement by intuition silently costs performance, the
 stages worth distributing are the \emph{expensive} ones (dense retrieval, document handling,
