@@ -1,21 +1,22 @@
 \documentclass[10pt]{article}
-\usepackage[margin=2.05cm]{geometry}
+\usepackage[margin=2.0cm]{geometry}
 \usepackage{multicol}
 \usepackage[compact]{titlesec}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
-\setlength{\parskip}{1pt}
-\titlespacing{\section}{0pt}{*1}{*0.4}
+\setlength{\parskip}{0.5pt}
+\setlength{\multicolsep}{3pt}
+\titlespacing{\section}{0pt}{*0.8}{*0.3}
 \setlist[itemize]{nosep, leftmargin=1.3em}
 
-\title{\textbf{Elastic Topology Management for Hybrid Retrieval-Augmented Generation:\\ A Measurement Study across Edge, LAN, and WAN}}
+\title{\textbf{Measuring and Modeling Stage Placement in Hybrid Retrieval-Augmented Generation across Edge, LAN, and WAN}}
 \author{M. Abdullah Ali \and M. Abdullah Aamir\\
 \small Department of Data Science, FAST-NUCES, Islamabad \quad---\quad Proposed supervisor: Dr.~Adil Majeed}
 \date{September 14, 2026}
 
 \begin{document}
 \maketitle
-\vspace{-7mm}
+\vspace{-8.5mm}
 
 \section{Background and Current State}
 We have built and deployed a working \emph{hybrid} Retrieval-Augmented Generation (RAG) system:
@@ -41,19 +42,21 @@ parallel overlap can save at most
 $\min(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$, no link latency could have
 delivered the target --- a short WAN leg offered little to hide, and a long one would only have
 slowed the dense branch. One caveat: we can no longer reconstruct where the machines physically
-were during those logged runs (all on one LAN, or the edge laptop across town), so we treat the
-5--15~ms round-trip in our mid-evaluation report as a descriptive figure, not one tied to this
-log --- and the new campaign will record placement and network metadata with every
-measurement. The three-node setup itself ended for operational reasons, not hardware: the edge
-laptop belonged to a groupmate who was often unavailable, so we consolidated its duties into the
-gateway and the two-node system worked fine.
+were during those logged runs, so we treat the 5--15~ms round-trip from our mid-evaluation report
+as descriptive, not tied to this log; the new campaign will record placement and network metadata
+with every measurement. The three-node setup
+itself ended for operational reasons, not hardware: the edge laptop belonged to a groupmate who was
+often unavailable, so we consolidated its duties into the gateway and the two-node system worked
+fine.
 
 That failure motivates this proposal: placement by intuition silently costs performance, the
 stages worth distributing are the \emph{expensive} ones (dense retrieval, document handling,
-generation --- not sparse lookup), and topology change is a normal event in real deployments ---
-yet the literature, as far as we can find, cannot answer: \emph{where should each stage of a hybrid
-RAG pipeline run, under which network conditions, and what exactly do we lose when the topology
-degrades?}
+generation --- not sparse lookup), and topology change is a normal event in real deployments.
+Splitting is often not a choice: large models need GPUs most machines do not have, data-residency
+rules can force retrieval and generation onto different hosts, and cost pushes work toward
+whatever hardware exists. Yet the literature, as far as we can find, cannot
+answer: \emph{where should each stage of a hybrid RAG pipeline run, under which network
+conditions, and what exactly do we lose when the topology degrades?}
 
 \section{The Gap in the Literature}
 DNN partitioning between device and cloud is well studied at the \emph{layer} level
@@ -71,15 +74,16 @@ consolidate) appears entirely unmeasured for RAG.
 
 \section{Research Questions}
 \begin{itemize}
-  \item \textbf{RQ1 (Placement).} Which node placement for each pipeline stage minimizes TTFT and
-  end-to-end latency under a given network regime (RTT, bandwidth), and where does the best
-  placement change?
+  \item \textbf{RQ1 (Placement).} Which placement for each stage minimizes TTFT and end-to-end
+  latency under a given network regime (RTT, bandwidth), and where does the best placement
+  change?
   \item \textbf{RQ2 (Degradation).} When a node drops out --- hardware failure or simple
   unavailability (our real three-to-two consolidation) --- what is the cost in latency and
   retrieval quality, and how fast can the system adapt?
   \item \textbf{RQ3 (Policy).} Can a simple analytical cost model --- per-stage compute times,
-  payload sizes, network terms --- predict the best placement well enough to drive decisions
-  without the full experiment matrix?
+  payload sizes, network terms --- predict the best placement within a stated tolerance (e.g.\
+  TTFT within 15\% of measured), and can the running system use it to pick placement per network
+  regime without the full experiment matrix?
 \end{itemize}
 
 \section{Method}
@@ -87,8 +91,9 @@ consolidate) appears entirely unmeasured for RAG.
 low-power laptop) over WireGuard; the full 8.84M-passage index is already in place.
 \textbf{Instrumentation.} We will extend the existing per-stage timing logs into a structured
 benchmark harness (per-stage milliseconds, TTFT, decode throughput, true stream end-to-end) and add
-retrieval-quality evaluation against MS MARCO qrels (recall@$k$), which the system does not yet
-measure; the sparse index will be scaled from a small test index to the full corpus.
+retrieval-quality evaluation against MS MARCO qrels (recall@$k$) plus an answer-level check
+(exact match), so topology-induced damage shows up in generated answers and not only in retrieval;
+the sparse index will be scaled from a small test index to the full corpus.
 \textbf{Network control.} Per-link netem sweeps of delay and bandwidth (e.g.\ 0/10/40/80~ms RTT)
 make the WAN regime reproducible; key configurations are re-validated over the genuine WAN link to
 the edge laptop. \textbf{Placement matrix.} Stage-to-node assignment becomes a configuration switch
@@ -96,25 +101,31 @@ the edge laptop. \textbf{Placement matrix.} Stage-to-node assignment becomes a c
 vs.\ LAN), reconstructing the archived three-node code paths. \textbf{Campaign.} A factorial sweep
 over placement $\times$ network regime $\times$ retrieval depth with repeats and percentile
 statistics; a degradation experiment kills nodes mid-load to measure failover cost; the RQ3 cost
-model is fit on half the configurations and validated on the held-out half.
+model is fit on half the configurations, validated on the held-out half, and then run live, letting
+the model pick placement per regime against the fixed ones. \textbf{Limitations.} Three machines,
+one per capability tier: results characterize this class of testbed, not a fleet; netem regimes
+bound generality.
 
 \section{Expected Contributions}
 (1) To our knowledge, the first factorial measurement of stage-to-node placement for hybrid RAG on
 commodity
 heterogeneous hardware under controlled WAN regimes; (2) a measurement of what topology
-degradation actually costs, grounded in our own three-to-two-node consolidation; (3) a validated
-cost-model-based placement policy; (4) an open, reproducible testbed with all artifacts.
+degradation actually costs, grounded in our own three-to-two-node consolidation; (3) a cost-model
+placement policy, validated on held-out configurations and exercised live; (4) an open,
+reproducible testbed with all artifacts.
 
 \section{Timeline and Target Venues}
 Weeks 1--2: harness, full-corpus sparse index, quality evaluation. Week 3: placement matrix and
 network emulation. Weeks 4--5: campaigns, cost model, analysis. Weeks 6--8: writing, internal
-review, submission. We target Q1 journals with rolling submission: \emph{Future Generation Computer
+review, submission. If time runs short we cut in order: live policy validation, extra network
+regimes --- never the degradation study or the quality metrics. We target Q1 journals with rolling
+submission: \emph{Future Generation Computer
 Systems}, \emph{Computer Networks}, or \emph{IEEE Transactions on Cloud Computing} (all currently
 Q1 in SCImago/JCR rankings). A conference extension (e.g.\ IEEE ICDCS 2027, call expected around
 December 2026) remains possible for the policy contribution.
 
 \begin{multicols}{2}
-\begin{thebibliography}{9}\footnotesize
+\begin{thebibliography}{9}\scriptsize
 \bibitem{neurosurgeon} Y.~Kang et al., ``Neurosurgeon: Collaborative Intelligence Between the Cloud
 and Mobile Edge,'' \emph{Proc.\ ASPLOS}, 2017.
 \bibitem{pipeedge} Y.~Hu et al., ``PipeEdge: Pipeline Parallelism for Large-Scale Model Inference on
