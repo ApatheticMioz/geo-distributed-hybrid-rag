@@ -23,8 +23,9 @@ sparse keyword retrieval (BM25 via Tantivy), dense semantic retrieval (BGE-M3 em
 in Qdrant), reciprocal-rank fusion, and LLM generation (Llama-3-8B-Instruct, AWQ 4-bit, served by
 vLLM~\cite{vllm,bgem3}). The corpus is the full MS MARCO passage collection~\cite{msmarco}:
 \textbf{8{,}841{,}823 passages} embedded at 1024 dimensions, HNSW-indexed in Qdrant, ingested at
-roughly 538 passages per second on an RTX 3090. The system runs on two LAN machines over gRPC
-(WireGuard): a gateway node (embedding, dense+sparse retrieval, fusion) on an Intel i7-10750H
+roughly 538 passages per second on an RTX 3090. The system is deployed on two LAN machines
+connected over gRPC (WireGuard): a gateway node (embedding, dense+sparse retrieval, fusion) on an
+Intel i7-10750H
 laptop with GTX 1660~Ti, and a generation node (document lookup, vLLM) on an RTX 3090 host. An
 earlier three-node version placed a third, low-power laptop (Intel CPU, 16~GB RAM) at the network
 edge as entry point and sparse-retrieval engine, across a city-wide link treated as the WAN leg.
@@ -57,9 +58,9 @@ degrades?}
 DNN partitioning between device and cloud is well studied at the \emph{layer} level
 (Neurosurgeon~\cite{neurosurgeon}, PipeEdge~\cite{pipeedge}); LLM serving splits model \emph{phases}
 across machines (Splitwise~\cite{splitwise}). For RAG specifically, existing work optimizes KV
-caching of retrieved knowledge (RAGCache~\cite{ragcache}, TurboRAG~\cite{turborag}), serving
-configuration on a \emph{single} server (RAGO~\cite{rago}, METIS~\cite{metis}), index placement on
-one device (EdgeRAG~\cite{edgerag}, VectorLiteRAG~\cite{vectorliterag}), or data distribution
+caching of retrieved knowledge (RAGCache~\cite{ragcache}, TurboRAG~\cite{turborag}),
+serving-system optimization (RAGO~\cite{rago}, METIS~\cite{metis}), index management on a single
+host (EdgeRAG~\cite{edgerag}, VectorLiteRAG~\cite{vectorliterag}), or data distribution
 across edge/cloud tiers (EACO-RAG~\cite{eacorag}, DGRAG~\cite{dgrag}). We could not find a
 measurement study and placement policy for \emph{which pipeline stage runs on which machine} in a
 multi-node hybrid RAG deployment: the five stages (sparse, dense, fusion, hydration, generation)
@@ -97,7 +98,8 @@ statistics; a degradation experiment kills nodes mid-load to measure failover co
 model is fit on half the configurations and validated on the held-out half.
 
 \section{Expected Contributions}
-(1) The first factorial measurement of stage-to-node placement for hybrid RAG on commodity
+(1) To our knowledge, the first factorial measurement of stage-to-node placement for hybrid RAG on
+commodity
 heterogeneous hardware under controlled WAN regimes; (2) a quantified characterization of topology
 degradation, grounded in a real failure event; (3) a validated cost-model-based placement policy;
 (4) an open, reproducible testbed with all artifacts.
