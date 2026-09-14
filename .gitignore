@@ -22,3 +22,8 @@ wstunnel*
 Thumbs.db
 .vscode/
 .idea/
+
+# LaTeX build artifacts
+proposal/*.aux
+proposal/*.log
+proposal/*.out
