@@ -44,8 +44,9 @@ slowed the dense branch. One caveat: we can no longer reconstruct where the mach
 were during those logged runs (all on one LAN, or the edge laptop across town), so we treat the
 5--15~ms round-trip in our mid-evaluation report as a descriptive figure, not one tied to this
 log --- and the new campaign will record placement and network metadata with every
-measurement. When the edge laptop then failed, we consolidated its duties into the gateway, and
-the two-node system worked fine.
+measurement. The three-node setup itself ended for operational reasons, not hardware: the edge
+laptop belonged to a groupmate who was often unavailable, so we consolidated its duties into the
+gateway and the two-node system worked fine.
 
 That failure motivates this proposal: placement by intuition silently costs performance, the
 stages worth distributing are the \emph{expensive} ones (dense retrieval, document handling,
@@ -65,17 +66,17 @@ across edge/cloud tiers (EACO-RAG~\cite{eacorag}, DGRAG~\cite{dgrag}). We could 
 measurement study and placement policy for \emph{which pipeline stage runs on which machine} in a
 multi-node hybrid RAG deployment: the five stages (sparse, dense, fusion, hydration, generation)
 can each sit on a different node, and the right answer changes with RTT, bandwidth, and node
-capability. Topology failure (what happens to latency and answer quality when a node drops out and
-roles consolidate) appears entirely unmeasured for RAG.
+capability. Node loss (what happens to latency and answer quality when a node drops out and roles
+consolidate) appears entirely unmeasured for RAG.
 
 \section{Research Questions}
 \begin{itemize}
   \item \textbf{RQ1 (Placement).} Which node placement for each pipeline stage minimizes TTFT and
   end-to-end latency under a given network regime (RTT, bandwidth), and where does the best
   placement change?
-  \item \textbf{RQ2 (Degradation).} When a node fails and its roles consolidate (our real
-  three-to-two-node event), what is the cost in latency and retrieval quality, and how fast can the
-  system adapt?
+  \item \textbf{RQ2 (Degradation).} When a node drops out --- hardware failure or simple
+  unavailability (our real three-to-two consolidation) --- what is the cost in latency and
+  retrieval quality, and how fast can the system adapt?
   \item \textbf{RQ3 (Policy).} Can a simple analytical cost model --- per-stage compute times,
   payload sizes, network terms --- predict the best placement well enough to drive decisions
   without the full experiment matrix?
@@ -101,8 +102,8 @@ model is fit on half the configurations and validated on the held-out half.
 (1) To our knowledge, the first factorial measurement of stage-to-node placement for hybrid RAG on
 commodity
 heterogeneous hardware under controlled WAN regimes; (2) a measurement of what topology
-degradation actually costs, grounded in a real failure; (3) a validated cost-model-based placement
-policy; (4) an open, reproducible testbed with all artifacts.
+degradation actually costs, grounded in our own three-to-two-node consolidation; (3) a validated
+cost-model-based placement policy; (4) an open, reproducible testbed with all artifacts.
 
 \section{Timeline and Target Venues}
 Weeks 1--2: harness, full-corpus sparse index, quality evaluation. Week 3: placement matrix and
