@@ -40,10 +40,10 @@ one to two orders of magnitude cheaper than the pipeline it was meant to acceler
 parallel overlap can save at most
 $\min(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$, no link latency could have
 delivered the target --- a short WAN leg offered little to hide, and a long one would only have
-slowed the dense branch. A provenance caveat: the exact physical placement during those logged
-runs (all devices on one LAN, or the edge laptop across town) can no longer be reconstructed, so
-we treat the 5--15~ms round-trip in our mid-evaluation report as descriptive rather than tied to
-this log --- and the new campaign will record placement and network metadata with every
+slowed the dense branch. One caveat: we can no longer reconstruct where the machines physically
+were during those logged runs (all on one LAN, or the edge laptop across town), so we treat the
+5--15~ms round-trip in our mid-evaluation report as a descriptive figure, not one tied to this
+log --- and the new campaign will record placement and network metadata with every
 measurement. When the edge laptop then failed, we consolidated its duties into the gateway, and
 the two-node system worked fine.
 
@@ -100,9 +100,9 @@ model is fit on half the configurations and validated on the held-out half.
 \section{Expected Contributions}
 (1) To our knowledge, the first factorial measurement of stage-to-node placement for hybrid RAG on
 commodity
-heterogeneous hardware under controlled WAN regimes; (2) a quantified characterization of topology
-degradation, grounded in a real failure event; (3) a validated cost-model-based placement policy;
-(4) an open, reproducible testbed with all artifacts.
+heterogeneous hardware under controlled WAN regimes; (2) a measurement of what topology
+degradation actually costs, grounded in a real failure; (3) a validated cost-model-based placement
+policy; (4) an open, reproducible testbed with all artifacts.
 
 \section{Timeline and Target Venues}
 Weeks 1--2: harness, full-corpus sparse index, quality evaluation. Week 3: placement matrix and
