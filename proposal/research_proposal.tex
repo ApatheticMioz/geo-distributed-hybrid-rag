@@ -16,7 +16,7 @@
 
 \begin{document}
 \maketitle
-\vspace{-8.5mm}
+\vspace{-9mm}
 
 \section{Background and Current State}
 We have built and deployed a working \emph{hybrid} Retrieval-Augmented Generation (RAG) system:
@@ -94,9 +94,10 @@ benchmark harness (per-stage milliseconds, TTFT, decode throughput, true stream 
 retrieval-quality evaluation against MS MARCO qrels (recall@$k$) plus an answer-level check
 (exact match), so topology-induced damage shows up in generated answers and not only in retrieval;
 the sparse index will be scaled from a small test index to the full corpus.
-\textbf{Network control.} Per-link netem sweeps of delay and bandwidth (e.g.\ 0/10/40/80~ms RTT)
-make the WAN regime reproducible; key configurations are re-validated over the genuine WAN link to
-the edge laptop. \textbf{Placement matrix.} Stage-to-node assignment becomes a configuration switch
+\textbf{Network control.} Today the only delay knob is an application-level header; we will add
+kernel-level per-link shaping (Linux netem on each WireGuard interface: delay and bandwidth,
+0/10/40/80~ms RTT) so regimes shape every hop, and re-validate key configurations over the genuine
+WAN link. \textbf{Placement matrix.} Stage-to-node assignment becomes a configuration switch
 (fusion on gateway vs.\ generator; hydration local vs.\ remote; sparse retrieval at the edge
 vs.\ LAN), reconstructing the archived three-node code paths. \textbf{Campaign.} A factorial sweep
 over placement $\times$ network regime $\times$ retrieval depth with repeats and percentile
