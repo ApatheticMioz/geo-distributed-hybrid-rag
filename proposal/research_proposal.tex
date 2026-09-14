@@ -1,0 +1,135 @@
+\documentclass[10pt]{article}
+\usepackage[margin=2.15cm]{geometry}
+\usepackage{multicol}
+\usepackage[compact]{titlesec}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parskip}{2pt}
+\titlespacing{\section}{0pt}{*1.2}{*0.6}
+
+\title{\textbf{Elastic Topology Management for Hybrid Retrieval-Augmented Generation:\\ A Measurement Study across Edge, LAN, and WAN}}
+\author{M. Abdullah Ali \and M. Abdullah Aamir\\
+\small Department of Data Science, FAST-NUCES \quad---\quad Proposed supervisor: [to be confirmed]}
+\date{September 14, 2026}
+
+\begin{document}
+\maketitle
+\vspace{-6mm}
+
+\section{Background and Current State}
+We have built and deployed a working \emph{hybrid} Retrieval-Augmented Generation (RAG) system:
+sparse keyword retrieval (BM25 via Tantivy), dense semantic retrieval (BGE-M3 embeddings searched
+in Qdrant), reciprocal-rank fusion, and LLM generation (Llama-3-8B-Instruct, AWQ 4-bit, served by
+vLLM~\cite{vllm,bgem3}). The corpus is the full MS MARCO passage collection~\cite{msmarco}:
+\textbf{8{,}841{,}823 passages} embedded at 1024 dimensions, HNSW-indexed in Qdrant, ingested at
+roughly 538 passages per second on an RTX 3090. The system runs on two LAN machines over gRPC
+(WireGuard): a gateway node (embedding, dense+sparse retrieval, fusion) on an Intel i7-10750H
+laptop with GTX 1660~Ti, and a generation node (document lookup, vLLM) on an RTX 3090 host. An
+earlier three-node version placed a third, low-power laptop (Intel CPU, 16~GB RAM) at the network
+edge as entry point and sparse-retrieval engine across a WAN link.
+
+\section{A Failed Hypothesis That Points at a Real Gap}
+The original design hypothesized a 30--40\% TTFT (time-to-first-token) reduction by running
+edge-side sparse retrieval in parallel with WAN transit of the query toward the LAN:
+$T_{\mathrm{retrieval}} = \max(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$.
+Measurements did not bear this out. On our campus LAN the round-trip time is only 5--15~ms, so the
+latency we hoped to hide was small next to retrieval and generation costs, and the third node added
+coordination overhead. When the edge laptop failed, we consolidated its duties into the gateway,
+and the two-node system worked fine.
+
+That failure motivates this proposal. We learned that a fixed placement choice can silently cost
+performance, and that topology change (node loss, consolidation) is a normal event in real
+deployments --- yet neither we nor, as far as we can find, the literature can answer the natural
+questions: \emph{where should each stage of a hybrid RAG pipeline run, under which network
+conditions, and what exactly do we lose when the topology degrades?}
+
+\section{The Gap in the Literature}
+DNN partitioning between device and cloud is well studied at the \emph{layer} level
+(Neurosurgeon~\cite{neurosurgeon}, PipeEdge~\cite{pipeedge}); LLM serving splits model \emph{phases}
+across machines (Splitwise~\cite{splitwise}). For RAG specifically, existing work optimizes KV
+caching of retrieved knowledge (RAGCache~\cite{ragcache}, TurboRAG~\cite{turborag}), serving
+configuration on a \emph{single} server (RAGO~\cite{rago}, METIS~\cite{metis}), index placement on
+one device (EdgeRAG~\cite{edgerag}, VectorLiteRAG~\cite{vectorliterag}), or data distribution
+across edge/cloud tiers (EACO-RAG~\cite{eacorag}, DGRAG~\cite{dgrag}). We could not find a
+measurement study and placement policy for \emph{which pipeline stage runs on which machine} in a
+multi-node hybrid RAG deployment --- sparse retrieval, dense retrieval, fusion, document hydration,
+and generation can each sit on a different node, and the right answer plausibly changes with RTT,
+bandwidth, and node capability. Topology failure (what happens to latency and answer quality when a
+node drops out and roles consolidate) appears entirely unmeasured for RAG.
+
+\section{Research Questions}
+\begin{itemize}
+  \item \textbf{RQ1 (Placement).} Which node placement for each pipeline stage minimizes TTFT and
+  end-to-end latency under a given network regime (RTT, bandwidth), and where does the best
+  placement change?
+  \item \textbf{RQ2 (Degradation).} When a node fails and its roles consolidate (our real
+  three-to-two-node event), what is the cost in latency and retrieval quality, and how fast can the
+  system adapt?
+  \item \textbf{RQ3 (Policy).} Can a simple analytical cost model --- per-stage compute times,
+  payload sizes, network terms --- predict the best placement well enough to drive decisions
+  without the full experiment matrix?
+\end{itemize}
+
+\section{Method}
+\textbf{Testbed.} The existing heterogeneous nodes (RTX 3090 host, GTX 1660~Ti laptop, revived
+low-power laptop) over WireGuard; the full 8.84M-passage index is already in place.
+\textbf{Instrumentation.} We will extend the existing per-stage timing logs into a structured
+benchmark harness (per-stage milliseconds, TTFT, decode throughput, true stream end-to-end) and add
+retrieval-quality evaluation against MS MARCO qrels (recall@$k$), which the system does not yet
+measure; the sparse index will be scaled from a small test index to the full corpus.
+\textbf{Network control.} Per-link netem sweeps of delay and bandwidth (e.g.\ 0/10/40/80~ms RTT)
+make the WAN regime reproducible; key configurations are re-validated over the genuine WAN link to
+the edge laptop. \textbf{Placement matrix.} Stage-to-node assignment becomes a configuration switch
+(fusion on gateway vs.\ generator; hydration local vs.\ remote; sparse retrieval at the edge
+vs.\ LAN), reconstructing the archived three-node code paths. \textbf{Campaign.} A factorial sweep
+over placement $\times$ network regime $\times$ retrieval depth with repeats and percentile
+statistics; a degradation experiment kills nodes mid-load to measure failover cost; the RQ3 cost
+model is fit on half the configurations and validated on the held-out half.
+
+\section{Expected Contributions}
+(1) The first factorial measurement of stage-to-node placement for hybrid RAG on commodity
+heterogeneous hardware under controlled WAN regimes; (2) a quantified characterization of topology
+degradation, grounded in a real failure event; (3) a validated cost-model-based placement policy;
+(4) an open, reproducible testbed with all artifacts.
+
+\section{Timeline and Target Venues}
+Weeks 1--2: harness, full-corpus sparse index, quality evaluation. Week 3: placement matrix and
+network emulation. Weeks 4--5: campaigns, cost model, analysis. Weeks 6--8: writing, internal
+review, submission. We target Q1 journals with rolling submission: \emph{Future Generation Computer
+Systems}, \emph{Computer Networks}, or \emph{IEEE Transactions on Cloud Computing} (all currently
+Q1 in SCImago/JCR rankings). A conference extension (e.g.\ IEEE ICDCS 2027, call expected around
+December 2026) remains possible for the policy contribution.
+
+\begin{multicols}{2}
+\begin{thebibliography}{9}\footnotesize
+\bibitem{neurosurgeon} Y.~Kang et al., ``Neurosurgeon: Collaborative Intelligence Between the Cloud
+and Mobile Edge,'' \emph{Proc.\ ASPLOS}, 2017.
+\bibitem{pipeedge} Y.~Hu et al., ``PipeEdge: Pipeline Parallelism for Large-Scale Model Inference on
+Heterogeneous Edge Devices,'' \emph{Proc.\ DSD}, 2022.
+\bibitem{splitwise} P.~Patel et al., ``Splitwise: Efficient Generative LLM Inference Using Phase
+Splitting,'' \emph{Proc.\ ISCA}, 2024.
+\bibitem{ragcache} C.~Jin et al., ``RAGCache: Efficient Knowledge Caching for Retrieval-Augmented
+Generation,'' arXiv:2404.12457, 2024.
+\bibitem{turborag} S.~Lu et al., ``TurboRAG: Accelerating Retrieval-Augmented Generation with
+Precomputed KV Caches for Chunked Text,'' \emph{Proc.\ EMNLP}, 2025.
+\bibitem{rago} W.~Jiang et al., ``RAGO: Systematic Performance Optimization for Retrieval-Augmented
+Generation Serving,'' \emph{Proc.\ ASPLOS}, 2025.
+\bibitem{metis} S.~Ray et al., ``METIS: Fast Quality-Aware RAG Systems with Configuration
+Adaptation,'' arXiv:2412.10543, 2025.
+\bibitem{edgerag} K.~Seemakhupt, S.~Liu, and S.~Khan, ``EdgeRAG: Online-Indexed RAG for Edge
+Devices,'' arXiv:2412.21023, 2024.
+\bibitem{vectorliterag} J.~Kim and D.~Mahajan, ``VectorLiteRAG: Latency-Aware and Fine-Grained
+Resource Partitioning for Efficient RAG,'' arXiv:2504.08930, 2025.
+\bibitem{eacorag} J.~Li et al., ``EACO-RAG: Towards Distributed Tiered LLM Deployment Using
+Edge-Assisted and Collaborative RAG with Adaptive Knowledge Update,'' arXiv:2410.20299, 2024.
+\bibitem{dgrag} W.~Zhou, Y.~Yan, and Q.~Yang, ``DGRAG: Distributed Graph-based Retrieval-Augmented
+Generation in Edge-Cloud Systems,'' arXiv:2505.19847, 2025.
+\bibitem{msmarco} P.~Bajaj et al., ``MS MARCO: A Human Generated MAchine Reading COmprehension
+Dataset,'' arXiv:1611.09268, 2016.
+\bibitem{bgem3} J.~Chen et al., ``M3-Embedding: Multi-Linguality, Multi-Functionality,
+Multi-Granularity Text Embeddings Through Self-Knowledge Distillation,'' arXiv:2402.03216, 2024.
+\bibitem{vllm} W.~Kwon et al., ``Efficient Memory Management for Large Language Model Serving with
+PagedAttention,'' \emph{Proc.\ SOSP}, 2023.
+\end{thebibliography}
+\end{multicols}
+
+\end{document}
