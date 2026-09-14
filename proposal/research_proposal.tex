@@ -1,10 +1,12 @@
 \documentclass[10pt]{article}
-\usepackage[margin=2.15cm]{geometry}
+\usepackage[margin=2.05cm]{geometry}
 \usepackage{multicol}
 \usepackage[compact]{titlesec}
+\usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
-\setlength{\parskip}{2pt}
-\titlespacing{\section}{0pt}{*1.2}{*0.6}
+\setlength{\parskip}{1pt}
+\titlespacing{\section}{0pt}{*1}{*0.4}
+\setlist[itemize]{nosep, leftmargin=1.3em}
 
 \title{\textbf{Elastic Topology Management for Hybrid Retrieval-Augmented Generation:\\ A Measurement Study across Edge, LAN, and WAN}}
 \author{M. Abdullah Ali \and M. Abdullah Aamir\\
@@ -13,7 +15,7 @@
 
 \begin{document}
 \maketitle
-\vspace{-6mm}
+\vspace{-7mm}
 
 \section{Background and Current State}
 We have built and deployed a working \emph{hybrid} Retrieval-Augmented Generation (RAG) system:
@@ -25,22 +27,29 @@ roughly 538 passages per second on an RTX 3090. The system runs on two LAN machi
 (WireGuard): a gateway node (embedding, dense+sparse retrieval, fusion) on an Intel i7-10750H
 laptop with GTX 1660~Ti, and a generation node (document lookup, vLLM) on an RTX 3090 host. An
 earlier three-node version placed a third, low-power laptop (Intel CPU, 16~GB RAM) at the network
-edge as entry point and sparse-retrieval engine across a WAN link.
+edge as entry point and sparse-retrieval engine, across a metropolitan-fiber link treated as the
+WAN leg.
 
 \section{A Failed Hypothesis That Points at a Real Gap}
 The original design hypothesized a 30--40\% TTFT (time-to-first-token) reduction by running
-edge-side sparse retrieval in parallel with WAN transit of the query toward the LAN:
+edge-side sparse retrieval in parallel with transit of the query toward the LAN nodes:
 $T_{\mathrm{retrieval}} = \max(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$.
-Measurements did not bear this out. On our campus LAN the round-trip time is only 5--15~ms, so the
-latency we hoped to hide was small next to retrieval and generation costs, and the third node added
-coordination overhead. When the edge laptop failed, we consolidated its duties into the gateway,
+Two things undid this. First, the ``WAN'' was not much of one: the edge laptop sat at a home
+across the city on metropolitan fiber, and our benchmarks put the round trip at only 5--15~ms
+(~20~ms with WireGuard and protocol overhead) --- there was almost no transit latency to hide.
+Second, and more fundamentally, parallel execution can save at most
+$\min(T_{\mathrm{sparse}},\; T_{\mathrm{WAN}} + T_{\mathrm{dense}})$, and our 100-query logs from
+the three-node run show sparse retrieval took just 0.6--10~ms --- too cheap to be worth
+distributing --- while the split made the dense branch pay the extra 20~ms plus coordination
+overhead. When the edge laptop then failed outright, we consolidated its duties into the gateway,
 and the two-node system worked fine.
 
-That failure motivates this proposal. We learned that a fixed placement choice can silently cost
-performance, and that topology change (node loss, consolidation) is a normal event in real
-deployments --- yet neither we nor, as far as we can find, the literature can answer the natural
-questions: \emph{where should each stage of a hybrid RAG pipeline run, under which network
-conditions, and what exactly do we lose when the topology degrades?}
+That failure motivates this proposal: placement by intuition silently costs performance, the
+stages worth distributing are the \emph{expensive} ones (dense retrieval, document handling,
+generation --- not sparse lookup), and topology change is a normal event in real deployments ---
+yet the literature, as far as we can find, cannot answer: \emph{where should each stage of a hybrid
+RAG pipeline run, under which network conditions, and what exactly do we lose when the topology
+degrades?}
 
 \section{The Gap in the Literature}
 DNN partitioning between device and cloud is well studied at the \emph{layer} level
@@ -51,10 +60,10 @@ configuration on a \emph{single} server (RAGO~\cite{rago}, METIS~\cite{metis}), 
 one device (EdgeRAG~\cite{edgerag}, VectorLiteRAG~\cite{vectorliterag}), or data distribution
 across edge/cloud tiers (EACO-RAG~\cite{eacorag}, DGRAG~\cite{dgrag}). We could not find a
 measurement study and placement policy for \emph{which pipeline stage runs on which machine} in a
-multi-node hybrid RAG deployment --- sparse retrieval, dense retrieval, fusion, document hydration,
-and generation can each sit on a different node, and the right answer plausibly changes with RTT,
-bandwidth, and node capability. Topology failure (what happens to latency and answer quality when a
-node drops out and roles consolidate) appears entirely unmeasured for RAG.
+multi-node hybrid RAG deployment: the five stages (sparse, dense, fusion, hydration, generation)
+can each sit on a different node, and the right answer changes with RTT, bandwidth, and node
+capability. Topology failure (what happens to latency and answer quality when a node drops out and
+roles consolidate) appears entirely unmeasured for RAG.
 
 \section{Research Questions}
 \begin{itemize}
