@@ -34,3 +34,8 @@ proposal/*.out
 **/tantivy_index*/
 **/*.sqlite*
 **/*.snapshot*
+
+# Models
+llama3-awq
+**/llama3-awq/
+*.log
