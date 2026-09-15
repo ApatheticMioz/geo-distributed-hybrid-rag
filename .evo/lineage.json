@@ -1,0 +1,19 @@
+{
+  "version": "2026.1",
+  "rootId": "baseline",
+  "currentHeadId": "baseline",
+  "nodes": [
+    {
+      "id": "baseline",
+      "parentId": null,
+      "hypothesis": "Initial baseline configuration",
+      "filesModified": [],
+      "metrics": {
+        "fitness": 0,
+        "status": "accepted"
+      },
+      "timestamp": "2026-09-14T14:48:09.323Z"
+    }
+  ],
+  "updatedAt": "2026-09-14T14:48:09.325Z"
+}

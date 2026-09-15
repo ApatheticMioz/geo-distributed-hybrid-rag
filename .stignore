@@ -1,0 +1,7 @@
+(?d)**/qdrant_storage
+(?d)**/snapshots
+(?d)**/tantivy_index*
+(?d)**/*.sqlite*
+(?d)**/*.snapshot*
+(?d)**/__pycache__
+(?d)**/.venv

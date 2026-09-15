@@ -27,3 +27,10 @@ Thumbs.db
 proposal/*.aux
 proposal/*.log
 proposal/*.out
+
+# Large Datasets and Vector Stores
+**/qdrant_storage/
+**/snapshots/
+**/tantivy_index*/
+**/*.sqlite*
+**/*.snapshot*
