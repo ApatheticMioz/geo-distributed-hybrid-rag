@@ -217,12 +217,14 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 )
 
                 # Hydrate text from local SQLite (proves database hydration works)
+                t_hyd_start = time.perf_counter()
                 top_docs = fused_doc_ids[:5]
                 context_text = await get_document_texts(top_docs)
+                t_hydration_ms = (time.perf_counter() - t_hyd_start) * 1000.0
 
                 logger.info(
-                    "[%s] hydrated %d docs from corpus.sqlite (context_len=%d chars)",
-                    query_id, len(top_docs), len(context_text),
+                    "[%s] hydrated %d docs from corpus.sqlite in %.2f ms (context_len=%d chars)",
+                    query_id, len(top_docs), t_hydration_ms, len(context_text),
                 )
 
                 # Build the actual prompt
@@ -230,12 +232,13 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 prompt = f"System:\n{system_instruction}\n\nContext:\n{context_text}\n\nUser Query:\n{query_text}\n\nAssistant:"
 
                 # Stream the real tokens back via gRPC
-                start_time = time.time()
+                start_time = time.perf_counter()
                 first_token = True
+                ttft_ms = 0.0
 
                 async for chunk in _llm_stream_generator(prompt):
                     if first_token:
-                        ttft_ms = (time.time() - start_time) * 1000
+                        ttft_ms = (time.perf_counter() - start_time) * 1000.0
                         first_token = False
                     else:
                         ttft_ms = 0.0
@@ -249,6 +252,10 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                     await context.write(token_msg)
                     tokens_sent += 1
 
+                total_gen_ms = (time.perf_counter() - start_time) * 1000.0
+                decode_ms = max(total_gen_ms - ttft_ms, 0.001)
+                tps = (tokens_sent - 1) / (decode_ms / 1000.0) if tokens_sent > 1 else 0.0
+
                 # Send final token
                 final_token = hybrid_coordination_pb2.GenerationToken(
                     query_id=query_id,
@@ -258,7 +265,10 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 )
                 await context.write(final_token)
                 
-                logger.info("[%s] live generation complete tokens=%d", query_id, tokens_sent)
+                logger.info(
+                    "[%s] live generation complete tokens=%d ttft=%.1fms decode=%.1fms throughput=%.1f tps",
+                    query_id, tokens_sent, ttft_ms, decode_ms, tps,
+                )
                 break  # Process only the first request
             
         except Exception as e:
