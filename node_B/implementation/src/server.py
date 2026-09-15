@@ -83,7 +83,7 @@ def initialize_globals() -> None:
 
     # Load BGE-M3 embedding model
     logger.info("Loading %s with FP16 precision...", MODEL_NAME)
-    model = BGEM3FlagModel(MODEL_NAME, use_fp16=True)
+    model = BGEM3FlagModel(MODEL_NAME, use_fp16=torch.cuda.is_available())
     logger.info("BGE-M3 model loaded")
 
     # Connect to Qdrant
