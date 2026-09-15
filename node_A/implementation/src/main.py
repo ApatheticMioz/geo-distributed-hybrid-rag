@@ -1,4 +1,5 @@
 import os
+os.environ["FLASHINFER_DISABLE_VERSION_CHECK"] = "1"
 os.environ["VLLM_USE_V1"] = "0"
 import asyncio
 import logging
