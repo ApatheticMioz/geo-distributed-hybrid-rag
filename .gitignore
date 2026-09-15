@@ -39,3 +39,7 @@ proposal/*.out
 llama3-awq
 **/llama3-awq/
 *.log
+
+# Runtime benchmark logs
+*.jsonl
+**/benchmarks/*.jsonl
