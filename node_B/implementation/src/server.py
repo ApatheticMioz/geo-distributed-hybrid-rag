@@ -190,10 +190,10 @@ def _sparse_retrieve(query: str, top_k: int, query_id: str) -> tuple[list[str], 
 
 async def _hybrid_retrieve(
     query: str, top_k: int, query_id: str
-) -> tuple[list[str], float, float]:
+) -> tuple[list[str], float, float, float]:
     """
     Run dense + sparse retrieval concurrently, then fuse with RRF.
-    Returns (fused_doc_ids, t_dense_ms, t_sparse_ms).
+    Returns (fused_doc_ids, t_dense_ms, t_sparse_ms, t_fusion_ms).
     """
     # Run both retrieval methods concurrently in separate threads
     dense_future = asyncio.to_thread(_dense_retrieve, query, top_k, query_id)
@@ -212,7 +212,7 @@ async def _hybrid_retrieve(
         "[%s] Hybrid complete: sparse=%.1fms dense=%.1fms fusion=%.1fms fused_docs=%d",
         query_id, t_sparse_ms, t_dense_ms, t_fusion_ms, len(fused_ids),
     )
-    return fused_ids, t_dense_ms, t_sparse_ms
+    return fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms
 
 
 # ============================================================================
@@ -325,7 +325,7 @@ async def query_endpoint(
         await asyncio.sleep(delay_seconds)
 
     # Step 1: Hybrid retrieval
-    fused_ids, t_dense_ms, t_sparse_ms = await _hybrid_retrieve(
+    fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms = await _hybrid_retrieve(
         query=query_text, top_k=k, query_id=query_id,
     )
 
@@ -346,23 +346,135 @@ async def query_endpoint(
     )
 
     first_token = True
+    ttft_recorded = 0.0
 
     async def token_stream():
-        nonlocal first_token
+        nonlocal first_token, ttft_recorded
         while True:
             token = await token_queue.get()
             if token is None:  # Sentinel
                 break
             if first_token:
-                ttft_ms = (time.perf_counter() - t0) * 1000
-                logger.info("[%s] First token in %.1f ms", query_id, ttft_ms)
+                ttft_recorded = (time.perf_counter() - t0) * 1000
+                logger.info("[%s] First token in %.1f ms", query_id, ttft_recorded)
                 first_token = False
             yield token
 
-    t_total_ms = (time.perf_counter() - t0) * 1000
-    logger.info("[%s] Pipeline complete: %.1f ms", query_id, t_total_ms)
+    headers = {
+        "X-Query-Id": query_id,
+        "X-Sparse-Time-Ms": f"{t_sparse_ms:.2f}",
+        "X-Dense-Time-Ms": f"{t_dense_ms:.2f}",
+        "X-Fusion-Time-Ms": f"{t_fusion_ms:.2f}",
+        "X-Fused-Docs-Count": str(len(fused_ids)),
+        "X-Fused-Doc-Ids": ",".join(fused_ids[:10]),
+        "X-Simulated-WAN-Ms": str(int(delay_seconds * 1000)),
+    }
 
-    return StreamingResponse(token_stream(), media_type="text/plain")
+    t_total_ms = (time.perf_counter() - t0) * 1000
+    logger.info("[%s] Pipeline headers ready: %.1f ms", query_id, t_total_ms)
+
+    return StreamingResponse(token_stream(), media_type="text/plain", headers=headers)
+
+
+class BenchmarkResponse(BaseModel):
+    query_id: str
+    query: str
+    top_k: int
+    timings: dict[str, float]
+    fused_doc_ids: list[str]
+    token_count: int
+    decode_tps: float
+    answer_preview: str
+
+
+@app.post("/query/benchmark", response_model=BenchmarkResponse)
+async def benchmark_endpoint(
+    req: QueryRequest,
+    simulate_wan_delay_ms: int | None = Header(default=None, alias="X-Simulate-WAN-Delay"),
+):
+    """
+    Synchronous benchmark endpoint that returns complete structured metrics,
+    token counts, and decode throughput as JSON for automated evaluation.
+    """
+    query_id = str(uuid.uuid4())[:8]
+    k = req.top_k or DEFAULT_TOP_K
+    query_text = req.query.strip()
+    delay_seconds = max(simulate_wan_delay_ms or 0, 0) / 1000.0
+
+    t0 = time.perf_counter()
+    logger.info("[%s] Benchmark query start | query='%s'", query_id, query_text[:60])
+
+    if delay_seconds > 0:
+        logger.info("[%s] Simulating WAN delay: %.0f ms", query_id, delay_seconds * 1000)
+        await asyncio.sleep(delay_seconds)
+
+    fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms = await _hybrid_retrieve(
+        query=query_text, top_k=k, query_id=query_id,
+    )
+
+    token_queue = await stream_to_node_a(
+        query_id=query_id,
+        query_text=query_text,
+        fused_doc_ids=fused_ids,
+        t_sparse_ms=t_sparse_ms,
+        t_dense_ms=t_dense_ms,
+    )
+
+    first_token_time = None
+    tokens = []
+    while True:
+        token = await token_queue.get()
+        if token is None:
+            break
+        if first_token_time is None:
+            first_token_time = time.perf_counter()
+        tokens.append(token)
+
+    t_end = time.perf_counter()
+    ttft_ms = (first_token_time - t0) * 1000.0 if first_token_time else (t_end - t0) * 1000.0
+    total_ms = (t_end - t0) * 1000.0
+    decode_ms = (t_end - first_token_time) * 1000.0 if first_token_time else 0.0
+    token_count = len(tokens)
+    tps = (token_count - 1) / (decode_ms / 1000.0) if (decode_ms > 0 and token_count > 1) else 0.0
+
+    answer = "".join(tokens)
+    preview = answer[:120].replace("\n", " ") + "..." if len(answer) > 120 else answer
+
+    timings = {
+        "sparse_ms": round(t_sparse_ms, 2),
+        "dense_ms": round(t_dense_ms, 2),
+        "fusion_ms": round(t_fusion_ms, 2),
+        "ttft_ms": round(ttft_ms, 2),
+        "decode_ms": round(decode_ms, 2),
+        "total_ms": round(total_ms, 2),
+        "simulated_wan_ms": round(delay_seconds * 1000, 2),
+    }
+
+    # Append to local telemetry.jsonl for persistent logging
+    os.makedirs("benchmarks", exist_ok=True)
+    with open("benchmarks/telemetry.jsonl", "a", encoding="utf-8") as f_log:
+        import json
+        f_log.write(json.dumps({
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "query_id": query_id,
+            "query": query_text,
+            "top_k": k,
+            "timings": timings,
+            "fused_docs": fused_ids[:10],
+            "token_count": token_count,
+            "decode_tps": round(tps, 2),
+        }) + "\n")
+
+    return BenchmarkResponse(
+        query_id=query_id,
+        query=query_text,
+        top_k=k,
+        timings=timings,
+        fused_doc_ids=fused_ids[:10],
+        token_count=token_count,
+        decode_tps=round(tps, 2),
+        answer_preview=preview,
+    )
 
 
 @app.get("/health")
