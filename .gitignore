@@ -43,3 +43,9 @@ llama3-awq
 # Runtime benchmark logs
 *.jsonl
 **/benchmarks/*.jsonl
+
+/.evo
+.evo/
+/evo
+.evo
+**/evo_state

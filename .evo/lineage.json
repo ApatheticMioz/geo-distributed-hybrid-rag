@@ -1,7 +1,7 @@
 {
   "version": "2026.1",
   "rootId": "baseline",
-  "currentHeadId": "cand_1789583895864_3xtc",
+  "currentHeadId": "cand_1789595229489_63uw",
   "nodes": [
     {
       "id": "baseline",
@@ -101,7 +101,275 @@
       },
       "timestamp": "2026-09-16T18:38:15.882Z",
       "updatedAt": "2026-09-16T18:38:46.832Z"
+    },
+    {
+      "id": "cand_1789584209317_2hly",
+      "parentId": "cand_1789583895864_3xtc",
+      "hypothesis": "Add pluggable generation backend: config.GENERATION_BACKEND (\"external\"|\"vllm\", default \"external\"), EXTERNAL_ENDPOINT, EXTERNAL_MODEL. In main.py, add an external branch to the token-stream path using the openai python pkg (OpenAI-compatible chat.completions, stream=True) with messages mirroring existing prompt semantics (system: answer strictly from provided context; user: query + numbered hydrated passages), reusing config temperature/max_tokens, feeding tokens into the same gRPC token-stream path. Fail-fast: connection/HTTP errors propagate, no retries/fallback/masking. Constraint: backend==\"external\" must NOT initialize vLLM or touch GPU (engine init only for \"vllm\").",
+      "filesModified": [
+        "node_A/implementation/src/config.py",
+        "node_A/implementation/src/main.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789584209317_2hly",
+        "snapshotCount": 2,
+        "evalCommand": "cd /home/apath/Work/PDC/Project/node_A/implementation && .venv/bin/python -m py_compile src/config.py src/main.py && .venv/bin/python scripts/smoke_backend.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T18:43:29.335Z",
+      "updatedAt": "2026-09-16T18:46:37.419Z"
+    },
+    {
+      "id": "cand_1789585222448_3npx",
+      "parentId": "cand_1789584209317_2hly",
+      "hypothesis": "Parameterize Node B /query and /query/benchmark with mode (hybrid|sparse|dense) and rrf_k (int, default 60); 'sparse' skips dense leg, 'dense' skips sparse leg, 'hybrid' runs both; return per-leg ranked doc-id arrays (sparse_doc_ids, dense_doc_ids, fused_doc_ids) in the response; wire rrf_k into reciprocal_rank_fusion. Add benchmarks/run_eval.py CLI driver. Default (hybrid, k=60) behavior stays identical to today.",
+      "filesModified": [
+        "node_B/implementation/src/server.py",
+        "node_B/implementation/src/fusion.py",
+        "benchmarks/run_eval.py"
+      ],
+      "metrics": {
+        "fitness": null,
+        "status": "pending",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789585222448_3npx",
+        "snapshotCount": 2
+      },
+      "timestamp": "2026-09-16T19:00:22.468Z"
+    },
+    {
+      "id": "cand_1789590827603_3du7",
+      "parentId": "cand_1789584209317_2hly",
+      "hypothesis": "Escaping the 18 Lucene special characters (+ - ! ( ) { } [ ] ^ \" ~ * ? : / \\ and apostrophe) in the query string before tantivy parse_query will eliminate the 500 errors on queries containing specials (e.g. the apostrophe in \"paula deen's\") while leaving normal-query results unchanged.",
+      "filesModified": [
+        "node_B/implementation/src/bm25_retriever.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789590827603_3du7",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 -m py_compile node_B/implementation/src/bm25_retriever.py && echo \"PY_COMPILE_OK\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T20:33:47.617Z",
+      "updatedAt": "2026-09-16T20:40:43.832Z"
+    },
+    {
+      "id": "cand_1789591827752_9apt",
+      "parentId": "cand_1789590827603_3du7",
+      "hypothesis": "Adding a retrieval_only bool (default false) to QueryRequest and branching /query/benchmark to skip stream_to_node_a when set will make quality runs return per-mode rankings + retrieval timings with zeroed generation metrics (no gRPC to Node A), and wiring --retrieval-only in run_eval.py will let the eval driver exercise that fast path.",
+      "filesModified": [
+        "node_B/implementation/src/server.py",
+        "benchmarks/run_eval.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789591827752_9apt",
+        "snapshotCount": 2,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 -m py_compile node_B/implementation/src/server.py benchmarks/run_eval.py && python3 _verify_retrieval_only.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T20:50:27.768Z",
+      "updatedAt": "2026-09-16T20:52:06.756Z"
+    },
+    {
+      "id": "cand_1789592964354_ro8a",
+      "parentId": "cand_1789591827752_9apt",
+      "hypothesis": "Building eval/ (pure MRR/nDCG/Recall metrics + compute_metrics CLI + pytest fixtures) will yield a fully-passing pytest suite (all synthetic-fixture tests green) and a working offline pipeline that scores run_eval JSONL against TREC qrels, reporting {key: {n_queries, mrr, mrr@10, ndcg@10, recall@100, recall@1000}}.",
+      "filesModified": [
+        "eval/__init__.py",
+        "eval/metrics.py",
+        "eval/compute_metrics.py",
+        "eval/test_metrics.py"
+      ],
+      "metrics": {
+        "fitness": 100,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789592964354_ro8a",
+        "snapshotCount": 0,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 -m pytest eval/test_metrics.py -q",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 25,
+          "testsPassed": 25,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T21:09:24.359Z",
+      "updatedAt": "2026-09-16T21:16:50.592Z"
+    },
+    {
+      "id": "cand_1789593526545_labv",
+      "parentId": "cand_1789592964354_ro8a",
+      "hypothesis": "Adding scripts/netem/{apply,clear,show,validate}.sh (set -euo pipefail, usage(), no sudo, one-way netem shaping on eth4 egress) will make `bash -n` pass on all four scripts and `tc` presence verifiable, because they are self-contained POSIX-bash wrappers around tc netem with numeric arg validation and a trap-based cleanup in validate.sh.",
+      "filesModified": [
+        "scripts/netem/apply.sh",
+        "scripts/netem/clear.sh",
+        "scripts/netem/show.sh",
+        "scripts/netem/validate.sh"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789593526545_labv",
+        "snapshotCount": 0,
+        "evalCommand": "cd /home/apath/Work/PDC/Project/scripts/netem && bash -n apply.sh && bash -n clear.sh && bash -n show.sh && bash -n validate.sh && echo ALL_SYNTAX_OK",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T21:18:46.550Z",
+      "updatedAt": "2026-09-16T21:20:02.191Z"
+    },
+    {
+      "id": "cand_1789593696842_uq1v",
+      "parentId": "cand_1789593526545_labv",
+      "hypothesis": "Fixing validate.sh ping parsing (time= only, one value per ping) and verdict math (|delta - RTT_MS| <= 0.2*RTT_MS) will make 'validate.sh 50' as root end with an honest PASS and delta ≈ 50±10ms, because the old 'time[= ]+' pattern also matched the stats line 'time 0ms' (injecting zeros that skewed medians) and 'ad - d <= tol' accepted any delta below expected.",
+      "filesModified": [
+        "scripts/netem/validate.sh"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789593696842_uq1v",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project/scripts/netem && bash -n validate.sh && echo SYNTAX_OK",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T21:21:36.853Z",
+      "updatedAt": "2026-09-16T21:22:31.572Z"
+    },
+    {
+      "id": "cand_1789594179862_9qfp",
+      "parentId": "cand_1789593696842_uq1v",
+      "hypothesis": "Extract the 50 hardcoded queries from run_benchmark.py into benchmarks/queries50.txt and add a stdlib-only benchmarks/campaign.py factorial runner (netem-validated RTT x loss configs, 2 warmups + N full-generation /query/benchmark POSTs, per-request JSONL, per-config p50/p95 TTFT/total summary) so the P0/P2 placement campaign runs end-to-end. Verified by py_compile + a 2-query p2/rtt=50/loss=0/repeats=1 micro smoke against the live gateway.",
+      "filesModified": [
+        "benchmarks/queries50.txt",
+        "benchmarks/campaign.py",
+        "benchmarks/run_benchmark.py"
+      ],
+      "metrics": {
+        "fitness": null,
+        "status": "pending",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789594179862_9qfp",
+        "snapshotCount": 1
+      },
+      "timestamp": "2026-09-16T21:29:39.873Z"
+    },
+    {
+      "id": "cand_1789595229489_63uw",
+      "parentId": "cand_1789593696842_uq1v",
+      "hypothesis": "Add a stdlib-only factorial campaign runner (benchmarks/campaign.py) that sweeps topology x rtt x loss x mode x repeat x query, applies netem per (rtt,loss) regime, and emits p50/p95 TTFT + total-latency summaries (JSONL/CSV/JSON); extract the 50-query set to benchmarks/queries50.txt and make run_benchmark.py load from it. Verified by py_compile on both files plus a --dry-run execution.",
+      "filesModified": [
+        "benchmarks/run_benchmark.py",
+        "benchmarks/campaign.py",
+        "benchmarks/queries50.txt"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789595229489_63uw",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 -m py_compile benchmarks/campaign.py benchmarks/run_benchmark.py && python3 benchmarks/campaign.py --dry-run --queries benchmarks/queries50.txt --repeats 1 --topologies P2 --rtt-tiers 50 --loss-tiers 0 && echo \"VERIFY_OK\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T21:47:09.490Z",
+      "updatedAt": "2026-09-16T21:53:44.428Z"
+    },
+    {
+      "id": "cand_1789596087236_k7um",
+      "parentId": "cand_1789595229489_63uw",
+      "hypothesis": "Adding is_sparse_hint to HybridContextRequest and sphp_hit/sphp_overlap/wasted_prefill_ms to GenerationToken in both nodes' hybrid_coordination.proto, regenerating stubs, and implementing the two-stage SPHP flow (speculative prefill on hint, overlap>=0.5 hit drains buffer / miss cancels and streams fresh, single-shot stays direct) in Node A's GenerateStream will enable SPHP while keeping the standard single-message path intact; verified by py_compile of node_A/implementation/src/main.py.",
+      "filesModified": [
+        "node_A/implementation/proto/hybrid_coordination.proto",
+        "node_B/implementation/proto/hybrid_coordination.proto",
+        "node_A/implementation/src/main.py",
+        "node_A/implementation/generated/hybrid_coordination_pb2.py",
+        "node_A/implementation/generated/hybrid_coordination_pb2_grpc.py",
+        "node_B/implementation/generated/hybrid_coordination_pb2.py",
+        "node_B/implementation/generated/hybrid_coordination_pb2_grpc.py"
+      ],
+      "metrics": {
+        "fitness": null,
+        "status": "pending",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789596087236_k7um",
+        "snapshotCount": 7
+      },
+      "timestamp": "2026-09-16T22:01:27.237Z"
     }
   ],
-  "updatedAt": "2026-09-16T18:38:46.838Z"
+  "updatedAt": "2026-09-16T22:01:27.238Z"
 }

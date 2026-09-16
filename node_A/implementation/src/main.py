@@ -272,14 +272,21 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
     """
     Implements bidirectional stream for Node B -> Node A coordination.
 
-    Receives pre-fused document list from Node B, hydrates text from SQLite,
-    feeds context to vLLM, and streams generated tokens back.
+    Receives pre-fused document list from Node B (or provisional sparse hint in SPHP mode),
+    hydrates text from SQLite, feeds context to LLM, and streams generated tokens back.
     """
 
     async def GenerateStream(self, request_iterator, context):
-        """Mock generation: hydrates text from SQLite and yields dummy tokens."""
+        """Streams LLM tokens, supporting SPHP progressive prefill and reconciliation."""
         query_id = None
         tokens_sent = 0
+        spec_task = None
+        spec_queue = None
+        spec_start = 0.0
+        provisional_docs = []
+        sphp_hit = False
+        sphp_overlap = 0.0
+        wasted_prefill_ms = 0.0
 
         try:
             async for request in request_iterator:
@@ -288,74 +295,153 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 t_sparse_ms = request.t_sparse_ms
                 t_dense_ms = request.t_dense_ms
 
-                # Extract pre-fused doc IDs from Node B
+                if request.is_sparse_hint:
+                    # Message 1: SPHP Sparse Hint
+                    provisional_docs = [doc.doc_id for doc in request.fused_docs]
+                    spec_start = time.perf_counter()
+                    logger.info("[%s] SPHP sparse_hint received: %d docs (t_sparse=%.1fms)",
+                                query_id, len(provisional_docs), t_sparse_ms)
+
+                    # Hydrate provisional context
+                    top_sparse = provisional_docs[:5]
+                    sparse_context = await get_document_texts(top_sparse)
+                    system_instruction = "You are a helpful assistant. Use the provided context to answer the user's question."
+                    sparse_prompt = f"System:\n{system_instruction}\n\nContext:\n{sparse_context}\n\nUser Query:\n{query_text}\n\nAssistant:"
+
+                    spec_queue = asyncio.Queue()
+
+                    async def _spec_worker(p, c, q):
+                        try:
+                            async for chunk in _llm_stream_generator(p, c, q):
+                                await spec_queue.put(("chunk", chunk))
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as exc:
+                            await spec_queue.put(("error", exc))
+                        finally:
+                            await spec_queue.put(("done", None))
+
+                    spec_task = asyncio.create_task(_spec_worker(sparse_prompt, sparse_context, query_text))
+                    continue
+
+                # Message 2 (or single message): Final fused context
                 fused_doc_ids = [doc.doc_id for doc in request.fused_docs]
-
-                logger.info(
-                    "[%s] fused_docs_received docs=%d t_sparse=%.1fms t_dense=%.1fms",
-                    query_id,
-                    len(fused_doc_ids),
-                    t_sparse_ms,
-                    t_dense_ms,
-                )
-
-                # Hydrate text from local SQLite (proves database hydration works)
-                t_hyd_start = time.perf_counter()
                 top_docs = fused_doc_ids[:5]
-                context_text = await get_document_texts(top_docs)
-                t_hydration_ms = (time.perf_counter() - t_hyd_start) * 1000.0
 
-                logger.info(
-                    "[%s] hydrated %d docs from corpus.sqlite in %.2f ms (context_len=%d chars)",
-                    query_id, len(top_docs), t_hydration_ms, len(context_text),
-                )
+                if spec_task is not None and not spec_task.done():
+                    # Reconcile SPHP speculative prefill with final fused docs
+                    intersection = set(provisional_docs[:5]) & set(top_docs)
+                    sphp_overlap = len(intersection) / max(len(top_docs), 1)
 
-                # Build the actual prompt
-                system_instruction = "You are a helpful assistant. Use the provided context to answer the user's question."
-                prompt = f"System:\n{system_instruction}\n\nContext:\n{context_text}\n\nUser Query:\n{query_text}\n\nAssistant:"
+                    if sphp_overlap >= 0.5:
+                        sphp_hit = True
+                        logger.info("[%s] SPHP HIT! overlap=%.2f (matched %d/5 docs)",
+                                    query_id, sphp_overlap, len(intersection))
+                    else:
+                        sphp_hit = False
+                        wasted_prefill_ms = (time.perf_counter() - spec_start) * 1000.0
+                        spec_task.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await spec_task
+                        spec_task = None
+                        spec_queue = None
+                        logger.info("[%s] SPHP MISS! overlap=%.2f. Aborted prefill after %.1fms",
+                                    query_id, sphp_overlap, wasted_prefill_ms)
+                elif spec_task is not None and spec_task.done():
+                    intersection = set(provisional_docs[:5]) & set(top_docs)
+                    sphp_overlap = len(intersection) / max(len(top_docs), 1)
+                    if sphp_overlap >= 0.5:
+                        sphp_hit = True
+                    else:
+                        sphp_hit = False
+                        wasted_prefill_ms = (time.perf_counter() - spec_start) * 1000.0
+                        spec_task = None
+                        spec_queue = None
 
-                # Stream the real tokens back via gRPC
                 start_time = time.perf_counter()
                 first_token = True
                 ttft_ms = 0.0
 
-                async for chunk in _llm_stream_generator(prompt, context_text, query_text):
-                    if first_token:
-                        ttft_ms = (time.perf_counter() - start_time) * 1000.0
-                        first_token = False
-                    else:
-                        ttft_ms = 0.0
+                if sphp_hit and spec_queue is not None:
+                    # Stream tokens out of speculative queue
+                    while True:
+                        msg_type, val = await spec_queue.get()
+                        if msg_type == "done":
+                            break
+                        if msg_type == "error":
+                            logger.error("[%s] Error in speculative LLM stream: %s", query_id, val)
+                            break
+                        if first_token:
+                            ttft_ms = (time.perf_counter() - start_time) * 1000.0
+                            first_token = False
+                        else:
+                            ttft_ms = 0.0
 
-                    token_msg = hybrid_coordination_pb2.GenerationToken(
-                        query_id=query_id,
-                        token=chunk,
-                        is_final=False,
-                        ttft_ms=ttft_ms,
-                    )
-                    await context.write(token_msg)
-                    tokens_sent += 1
+                        token_msg = hybrid_coordination_pb2.GenerationToken(
+                            query_id=query_id,
+                            token=val,
+                            is_final=False,
+                            ttft_ms=ttft_ms,
+                            sphp_hit=True,
+                            sphp_overlap=sphp_overlap,
+                            wasted_prefill_ms=0.0,
+                        )
+                        await context.write(token_msg)
+                        tokens_sent += 1
+                else:
+                    # Direct generation with final fused context
+                    t_hyd_start = time.perf_counter()
+                    context_text = await get_document_texts(top_docs)
+                    t_hydration_ms = (time.perf_counter() - t_hyd_start) * 1000.0
+
+                    system_instruction = "You are a helpful assistant. Use the provided context to answer the user's question."
+                    prompt = f"System:\n{system_instruction}\n\nContext:\n{context_text}\n\nUser Query:\n{query_text}\n\nAssistant:"
+
+                    async for chunk in _llm_stream_generator(prompt, context_text, query_text):
+                        if first_token:
+                            ttft_ms = (time.perf_counter() - start_time) * 1000.0
+                            first_token = False
+                        else:
+                            ttft_ms = 0.0
+
+                        token_msg = hybrid_coordination_pb2.GenerationToken(
+                            query_id=query_id,
+                            token=chunk,
+                            is_final=False,
+                            ttft_ms=ttft_ms,
+                            sphp_hit=sphp_hit,
+                            sphp_overlap=sphp_overlap,
+                            wasted_prefill_ms=wasted_prefill_ms,
+                        )
+                        await context.write(token_msg)
+                        tokens_sent += 1
 
                 total_gen_ms = (time.perf_counter() - start_time) * 1000.0
                 decode_ms = max(total_gen_ms - ttft_ms, 0.001)
                 tps = (tokens_sent - 1) / (decode_ms / 1000.0) if tokens_sent > 1 else 0.0
 
-                # Send final token
+                # Send final sentinel token
                 final_token = hybrid_coordination_pb2.GenerationToken(
                     query_id=query_id,
                     token="",
                     is_final=True,
                     ttft_ms=0.0,
+                    sphp_hit=sphp_hit,
+                    sphp_overlap=sphp_overlap,
+                    wasted_prefill_ms=wasted_prefill_ms,
                 )
                 await context.write(final_token)
-                
+
                 logger.info(
-                    "[%s] live generation complete tokens=%d ttft=%.1fms decode=%.1fms throughput=%.1f tps",
-                    query_id, tokens_sent, ttft_ms, decode_ms, tps,
+                    "[%s] live generation complete tokens=%d ttft=%.1fms decode=%.1fms throughput=%.1f tps sphp_hit=%s overlap=%.2f",
+                    query_id, tokens_sent, ttft_ms, decode_ms, tps, sphp_hit, sphp_overlap,
                 )
-                break  # Process only the first request
-            
+                break  # Process only the first request sequence
+
         except Exception as e:
             logger.error("[%s] GenerateStream error: %s", query_id, e, exc_info=True)
+            if spec_task and not spec_task.done():
+                spec_task.cancel()
             raise
 
 

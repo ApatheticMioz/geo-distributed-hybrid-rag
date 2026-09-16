@@ -5,7 +5,7 @@ import warnings
 
 import hybrid_coordination_pb2 as hybrid__coordination__pb2
 
-GRPC_GENERATED_VERSION = '1.80.0'
+GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class GenerationOrchestratorStub(object):
+class GenerationOrchestratorStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -41,7 +41,7 @@ class GenerationOrchestratorStub(object):
                 _registered_method=True)
 
 
-class GenerationOrchestratorServicer(object):
+class GenerationOrchestratorServicer:
     """Missing associated documentation comment in .proto file."""
 
     def GenerateStream(self, request_iterator, context):
@@ -66,7 +66,7 @@ def add_GenerationOrchestratorServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class GenerationOrchestrator(object):
+class GenerationOrchestrator:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
