@@ -15,6 +15,24 @@ import tantivy
 
 logger = logging.getLogger(__name__)
 
+# Lucene/Tantivy special characters that must be escaped in a query string
+# before it is handed to tantivy's parse_query. An unescaped special (most
+# notably the apostrophe, e.g. "paula deen's") makes parse_query raise and the
+# /query endpoint return a 500. Escaping each as a literal keeps the query
+# parseable while preserving the intended term.
+_LUCENE_SPECIALS = set('+-!(){}[]^"~*?:/\\\'')
+
+
+def _escape_lucene(query_text: str) -> str:
+    """
+    Escape Lucene special characters so parse_query treats them as literals.
+
+    Each character in ``_LUCENE_SPECIALS`` is prefixed with a backslash, which
+    is Lucene's escape character. Normal (non-special) characters pass through
+    unchanged, so ordinary queries are unaffected.
+    """
+    return ''.join('\\' + ch if ch in _LUCENE_SPECIALS else ch for ch in query_text)
+
 
 class BM25Retriever:
     """
@@ -46,7 +64,11 @@ class BM25Retriever:
         """
         t_start = time.perf_counter()
 
-        query = self._index.parse_query(query_text, default_field_names=["body"])
+        # Escape Lucene specials before parsing so queries containing them
+        # (e.g. an apostrophe) don't make parse_query raise a 500.
+        query = self._index.parse_query(
+            _escape_lucene(query_text), default_field_names=["body"]
+        )
         search_result = self._searcher.search(query, top_k)
         results_list = search_result.hits if hasattr(search_result, 'hits') else search_result
 
