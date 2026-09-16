@@ -49,10 +49,20 @@ grpc_task_owner: str | None = None
 # ============================================================================
 
 def create_engine():
-    """Initialize the vLLM engine (or skip in mock mode)."""
+    """Initialize the vLLM engine only for the "vllm" backend (or skip in mock mode).
+
+    The "external" backend never initializes vLLM and never touches the GPU.
+    """
     global engine
     if config.MOCK_MODE:
         logger.warning("MOCK MODE: Skipping vLLM/AWQ model loading. Responses will be simulated.")
+        engine = None
+        return
+    if config.GENERATION_BACKEND != "vllm":
+        logger.info(
+            "Generation backend is '%s'; skipping vLLM engine init (no GPU).",
+            config.GENERATION_BACKEND,
+        )
         engine = None
         return
     if not VLLM_AVAILABLE:
@@ -118,16 +128,93 @@ async def generate(request: Request):
     )
     prompt = f"System:\n{system_instruction}\n\nContext:\n{context_text}\n\nUser Query:\n{query}\n\nAssistant:"
 
-    return StreamingResponse(_llm_stream_generator(prompt), media_type="text/plain")
+    return StreamingResponse(_llm_stream_generator(prompt, context_text, query), media_type="text/plain")
 
 
-async def _llm_stream_generator(prompt: str):
-    """Yield text chunks from the vLLM async engine (or mock response)."""
-    if config.MOCK_MODE or engine is None:
+async def _external_stream_generator(context_text: str, query: str):
+    """Stream text chunks from an external OpenAI-compatible endpoint.
+
+    Uses the `openai` python package against `config.EXTERNAL_ENDPOINT` with
+    `stream=True`. Messages mirror the existing prompt semantics:
+      - system: answer strictly from the provided context
+      - user:   the query plus the numbered, hydrated passages
+
+    Sampling reuses the existing config (temperature / max_tokens).
+
+    Fail-fast: connection/HTTP errors propagate as exceptions. We never
+    synthesize tokens, and there are no retries, fallbacks, or masking.
+    """
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(base_url=config.EXTERNAL_ENDPOINT, api_key="not-needed")
+
+    # Number the hydrated passages so the model can cite them.
+    passages = [p.strip() for p in context_text.split("\n\n") if p.strip()]
+    numbered = "\n\n".join(f"[{i}] {p}" for i, p in enumerate(passages, 1))
+
+    system_msg = (
+        "You are a helpful assistant. Answer strictly from the provided context. "
+        "Do not use any knowledge outside the context. If the answer is not in the "
+        "context, say so."
+    )
+    user_msg = f"Query: {query}\n\nContext:\n{numbered}"
+
+    stream = await client.chat.completions.create(
+        model=config.EXTERNAL_MODEL,
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        temperature=config.TEMPERATURE,
+        max_tokens=config.MAX_TOKENS,
+        stream=True,
+    )
+
+    async for event in stream:
+        if event.choices:
+            delta = event.choices[0].delta
+            if delta and delta.content:
+                yield delta.content
+                await asyncio.sleep(0)
+
+
+async def _llm_stream_generator(prompt: str, context_text: str = "", query: str = ""):
+    """Yield text chunks from the active generation backend (or mock response).
+
+    Backends:
+      - "external": OpenAI-compatible endpoint via the `openai` package.
+      - "vllm":     in-process vLLM async engine.
+    """
+    if config.MOCK_MODE:
         logger.info("MOCK MODE: Returning simulated response.")
         mock_response = (
             "[MOCK RESPONSE] This is a simulated response from Node A. "
             "The AWQ model was not loaded (mock mode is active). "
+            "In production, this would contain the LLM-generated answer based on the provided context.\n"
+            f"Query processed at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Context length: {len(prompt)} characters"
+        )
+        for chunk in mock_response:
+            yield chunk
+            if chunk == '\n':
+                continue
+            await asyncio.sleep(0.01)
+        return
+
+    if config.GENERATION_BACKEND == "external":
+        # External OpenAI-compatible endpoint. Fail-fast: any connection/HTTP
+        # error propagates to the caller; we never synthesize tokens.
+        async for chunk in _external_stream_generator(context_text, query):
+            yield chunk
+            await asyncio.sleep(0)
+        return
+
+    # vLLM in-process engine branch.
+    if engine is None:
+        logger.info("vLLM engine unavailable; returning simulated response.")
+        mock_response = (
+            "[MOCK RESPONSE] This is a simulated response from Node A. "
+            "The AWQ model was not loaded (vLLM unavailable). "
             "In production, this would contain the LLM-generated answer based on the provided context.\n"
             f"Query processed at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"Context length: {len(prompt)} characters"
@@ -232,7 +319,7 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 first_token = True
                 ttft_ms = 0.0
 
-                async for chunk in _llm_stream_generator(prompt):
+                async for chunk in _llm_stream_generator(prompt, context_text, query_text):
                     if first_token:
                         ttft_ms = (time.perf_counter() - start_time) * 1000.0
                         first_token = False
