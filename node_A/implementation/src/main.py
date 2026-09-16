@@ -331,7 +331,7 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                 if spec_task is not None and not spec_task.done():
                     # Reconcile SPHP speculative prefill with final fused docs
                     intersection = set(provisional_docs[:5]) & set(top_docs)
-                    sphp_overlap = len(intersection) / max(len(top_docs), 1)
+                    sphp_overlap = len(intersection) / 5.0
 
                     if sphp_overlap >= 0.5:
                         sphp_hit = True
@@ -349,7 +349,7 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
                                     query_id, sphp_overlap, wasted_prefill_ms)
                 elif spec_task is not None and spec_task.done():
                     intersection = set(provisional_docs[:5]) & set(top_docs)
-                    sphp_overlap = len(intersection) / max(len(top_docs), 1)
+                    sphp_overlap = len(intersection) / 5.0
                     if sphp_overlap >= 0.5:
                         sphp_hit = True
                     else:
