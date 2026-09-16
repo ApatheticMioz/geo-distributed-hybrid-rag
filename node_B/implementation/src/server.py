@@ -381,6 +381,10 @@ class QueryRequest(BaseModel):
     mode: str = "hybrid"
     # RRF constant k, wired into reciprocal_rank_fusion. Default 60.
     rrf_k: int = RRF_K
+    # Retrieval-only fast path: when true, /query/benchmark skips the Node A
+    # gRPC generation entirely and returns per-mode rankings + retrieval
+    # timings with zeroed generation metrics (no gRPC call). Default false.
+    retrieval_only: bool = False
 
 
 @app.post("/query")
@@ -509,6 +513,41 @@ async def benchmark_endpoint(
         query=query_text, top_k=k, query_id=query_id,
         mode=mode, rrf_k=rrf_k,
     )
+
+    if req.retrieval_only:
+        # Retrieval-only fast path: skip the Node A gRPC generation entirely.
+        # No stream_to_node_a call, no token consumption. Generation metrics
+        # are zeroed; the response carries per-mode rankings + retrieval
+        # timings only.
+        t_end = time.perf_counter()
+        total_ms = (t_end - t0) * 1000.0
+        timings = {
+            "sparse_ms": round(t_sparse_ms, 2),
+            "dense_ms": round(t_dense_ms, 2),
+            "fusion_ms": round(t_fusion_ms, 2),
+            "ttft_ms": 0,
+            "decode_ms": 0,
+            "total_ms": round(total_ms, 2),
+            "simulated_wan_ms": round(delay_seconds * 1000, 2),
+        }
+        logger.info(
+            "[%s] Retrieval-only complete: sparse=%.1fms dense=%.1fms fusion=%.1fms total=%.1fms (no generation)",
+            query_id, t_sparse_ms, t_dense_ms, t_fusion_ms, total_ms,
+        )
+        return BenchmarkResponse(
+            query_id=query_id,
+            query=query_text,
+            top_k=k,
+            mode=mode,
+            rrf_k=rrf_k,
+            timings=timings,
+            fused_doc_ids=fused_ids,
+            sparse_doc_ids=sparse_ids,
+            dense_doc_ids=dense_ids,
+            token_count=0,
+            decode_tps=0,
+            answer_preview="",
+        )
 
     token_queue = await stream_to_node_a(
         query_id=query_id,
