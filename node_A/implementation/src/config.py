@@ -17,6 +17,11 @@ RRF_K: int = 60
 MAX_TOKENS: int = 512
 TEMPERATURE: float = 0.2
 
+# Generation backend: "external" (OpenAI-compatible endpoint) or "vllm" (in-process engine)
+GENERATION_BACKEND: str = "external"
+EXTERNAL_ENDPOINT: str = "http://127.0.0.1:18020/v1"
+EXTERNAL_MODEL: str = "qwen3.8-27b"
+
 # Mode
 MOCK_MODE: bool = False  # True: skip vLLM/AWQ model loading, return simulated responses
 
