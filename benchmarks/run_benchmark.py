@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import json
@@ -8,58 +9,24 @@ from typing import List, Dict, Any
 
 GATEWAY_URL = "http://10.8.0.2:8000/query/benchmark"
 
-QUERIES_50 = [
-    "what is the difference between weather and climate",
-    "causes of the french revolution summary",
-    "how does a transformer neural network work",
-    "symptoms of acute appendicitis and diagnosis",
-    "what is reciprocal rank fusion in information retrieval",
-    "capital and largest city of australia",
-    "how does photosynthesis produce glucose and oxygen",
-    "history of the apollo space program",
-    "difference between tcp and udp protocols",
-    "how does quantum key distribution work",
-    "what is the function of the human hippocampus",
-    "definition of market equilibrium in microeconomics",
-    "how does crispr cas9 gene editing work",
-    "causes of high blood pressure and prevention",
-    "what is the speed of light in vacuum",
-    "how does cellular respiration generate atp",
-    "what were the main causes of world war 1",
-    "explanation of newtons three laws of motion",
-    "how do solar cells convert light into electricity",
-    "what is the role of ribosomes in protein synthesis",
-    "key differences between mitosis and meiosis",
-    "what is the theory of plate tectonics",
-    "how does public key cryptography work",
-    "what is the central dogma of molecular biology",
-    "explanation of supply and demand curves",
-    "how does magnetic resonance imaging work",
-    "what causes ocean tides on earth",
-    "what is the function of the nephron in the kidney",
-    "explanation of the greenhouse effect",
-    "what is the difference between supervised and unsupervised learning",
-    "how do vaccines generate immunity",
-    "what are the properties of electromagnetic waves",
-    "how does an internal combustion engine work",
-    "what is the structure and function of hemoglobin",
-    "how does the internet domain name system dns work",
-    "what are the primary stages of the water cycle",
-    "what is the role of insulin in glucose metabolism",
-    "how do black holes form according to general relativity",
-    "what is the mechanism of action of penicillin",
-    "what are the fundamental forces of physics",
-    "how does the central nervous system process pain",
-    "what were the main outcomes of the industrial revolution",
-    "how does nuclear fission generate electricity",
-    "what is the function of the myelin sheath in neurons",
-    "what are the differences between rna and dna",
-    "how does optical fiber transmit data",
-    "what is the purpose of fiscal policy in macroeconomics",
-    "how does the human ear process sound waves",
-    "what are the principles of natural selection",
-    "how does dynamic random access memory dram operate"
-]
+# The 50-query benchmark set lives in a plain-text file (one query per line)
+# so it can be shared with the factorial campaign runner (campaign.py) and
+# edited without touching Python source.
+QUERIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "queries50.txt")
+
+
+def load_queries(path: str = QUERIES_FILE) -> List[str]:
+    """Load the benchmark query set from a one-query-per-line text file."""
+    queries: List[str] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if line.strip():
+                queries.append(line)
+    return queries
+
+
+QUERIES_50 = load_queries()
 
 def run_query(query: str, top_k: int = 10, wan_delay_ms: int = 0) -> Dict[str, Any]:
     payload = json.dumps({"query": query, "top_k": top_k}).encode("utf-8")
