@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import sys
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -58,6 +59,8 @@ COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "msmarco_passages")
 SERVER_PORT = int(os.environ.get("NODE_B_GRPC_PORT", "50051"))
 DEFAULT_TOP_K = int(os.environ.get("NODE_B_TOP_K", "10"))
 RRF_K = int(os.environ.get("RRF_K", "60"))
+# Number of fused documents sent to Node A (truncation cap on the fused list)
+TOP_K_DOCS = int(os.environ.get("NODE_B_TOP_K_DOCS", "5"))
 NODE_A_GRPC_HOST = os.environ.get("NODE_A_GRPC_HOST", "10.8.0.1")
 NODE_A_GRPC_PORT = int(os.environ.get("NODE_A_GRPC_PORT", "50052"))
 
@@ -72,6 +75,9 @@ model = None
 qdrant_client: Optional[QdrantClient] = None
 bm25_retriever: Optional[BM25Retriever] = None
 active_tasks: set = set()
+# Serializes BGE-M3 model.encode across concurrent requests (encoder is not
+# thread-safe; concurrent benchmark requests must not race on it).
+_encode_lock = threading.Lock()
 
 
 # ============================================================================
@@ -140,7 +146,9 @@ def _dense_retrieve(query: str, top_k: int, query_id: str) -> tuple[list[str], f
 
     started = time.perf_counter()
 
-    with torch.inference_mode():
+    # Serialize concurrent encodes: BGE-M3's model.encode is not thread-safe,
+    # and this runs in a worker thread per request (asyncio.to_thread).
+    with _encode_lock, torch.inference_mode():
         embedding = model.encode([query], return_dense=True)
     query_vector = np.asarray(embedding["dense_vecs"][0], dtype=np.float32).tolist()
 
@@ -225,6 +233,7 @@ async def stream_to_node_a(
     fused_doc_ids: list[str],
     t_sparse_ms: float,
     t_dense_ms: float,
+    t_fusion_ms: float,
 ) -> asyncio.Queue:
     """
     Open bidirectional gRPC stream to Node A, send fused context,
@@ -237,14 +246,19 @@ async def stream_to_node_a(
         async with grpc.aio.insecure_channel(target) as channel:
             stub = hybrid_coordination_pb2_grpc.GenerationOrchestratorStub(channel)
 
-            # Build the fused document list
+            # Build the fused document list (truncated to TOP_K_DOCS)
+            if len(fused_doc_ids) > TOP_K_DOCS:
+                logger.debug(
+                    "[%s] Truncating fused docs to top %d (dropped %d)",
+                    query_id, TOP_K_DOCS, len(fused_doc_ids) - TOP_K_DOCS,
+                )
             fused_docs = [
                 hybrid_coordination_pb2.FusedDocument(
                     doc_id=doc_id,
                     rrf_score=0.0,  # Score already baked into rank order
                     rank=rank,
                 )
-                for rank, doc_id in enumerate(fused_doc_ids[:5], start=1)
+                for rank, doc_id in enumerate(fused_doc_ids[:TOP_K_DOCS], start=1)
             ]
 
             request = hybrid_coordination_pb2.HybridContextRequest(
@@ -253,7 +267,7 @@ async def stream_to_node_a(
                 fused_docs=fused_docs,
                 t_sparse_ms=t_sparse_ms,
                 t_dense_ms=t_dense_ms,
-                t_fusion_ms=0.0,
+                t_fusion_ms=t_fusion_ms,
             )
 
             async def request_iterator():
@@ -343,6 +357,7 @@ async def query_endpoint(
         fused_doc_ids=fused_ids,
         t_sparse_ms=t_sparse_ms,
         t_dense_ms=t_dense_ms,
+        t_fusion_ms=t_fusion_ms,
     )
 
     first_token = True
@@ -418,6 +433,7 @@ async def benchmark_endpoint(
         fused_doc_ids=fused_ids,
         t_sparse_ms=t_sparse_ms,
         t_dense_ms=t_dense_ms,
+        t_fusion_ms=t_fusion_ms,
     )
 
     first_token_time = None
