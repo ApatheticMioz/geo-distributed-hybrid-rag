@@ -197,30 +197,92 @@ def _sparse_retrieve(query: str, top_k: int, query_id: str) -> tuple[list[str], 
 
 
 async def _hybrid_retrieve(
-    query: str, top_k: int, query_id: str
-) -> tuple[list[str], float, float, float]:
+    query: str,
+    top_k: int,
+    query_id: str,
+    mode: str = "hybrid",
+    rrf_k: int = RRF_K,
+) -> tuple[list[str], list[str], list[str], list[str], float, float, float]:
     """
-    Run dense + sparse retrieval concurrently, then fuse with RRF.
-    Returns (fused_doc_ids, t_dense_ms, t_sparse_ms, t_fusion_ms).
-    """
-    # Run both retrieval methods concurrently in separate threads
-    dense_future = asyncio.to_thread(_dense_retrieve, query, top_k, query_id)
-    sparse_future = asyncio.to_thread(_sparse_retrieve, query, top_k, query_id)
+    Run retrieval per the requested mode, then (for hybrid) fuse with RRF.
 
-    (dense_ids, t_dense_ms), (sparse_ids, t_sparse_ms) = await asyncio.gather(
-        dense_future, sparse_future,
+    mode:
+      - 'hybrid': run sparse + dense concurrently, fuse with RRF.
+      - 'sparse': run only the sparse (BM25) leg; dense leg skipped (0.0 ms).
+      - 'dense':  run only the dense (BGE-M3) leg; sparse leg skipped (0.0 ms).
+
+    Returns (final_ids, sparse_ids, dense_ids, fused_ids,
+             t_dense_ms, t_sparse_ms, t_fusion_ms).
+      - final_ids: the ranking sent to Node A (fused for hybrid, the single
+        active leg's list for sparse/dense).
+      - fused_ids: the RRF-fused list; only populated in hybrid mode,
+        otherwise empty.
+      - Skipped legs report 0.0 ms and an empty doc-id list.
+    """
+    run_dense = mode in ("hybrid", "dense")
+    run_sparse = mode in ("hybrid", "sparse")
+
+    dense_future = (
+        asyncio.to_thread(_dense_retrieve, query, top_k, query_id)
+        if run_dense else None
+    )
+    sparse_future = (
+        asyncio.to_thread(_sparse_retrieve, query, top_k, query_id)
+        if run_sparse else None
     )
 
-    # RRF fusion
-    fusion_start = time.perf_counter()
-    fused_ids = reciprocal_rank_fusion(sparse_ids, dense_ids if dense_ids else None, RRF_K)
-    t_fusion_ms = (time.perf_counter() - fusion_start) * 1000.0
+    if dense_future is not None and sparse_future is not None:
+        (dense_ids, t_dense_ms), (sparse_ids, t_sparse_ms) = await asyncio.gather(
+            dense_future, sparse_future,
+        )
+    elif dense_future is not None:
+        dense_ids, t_dense_ms = await dense_future
+        sparse_ids, t_sparse_ms = [], 0.0
+    elif sparse_future is not None:
+        sparse_ids, t_sparse_ms = await sparse_future
+        dense_ids, t_dense_ms = [], 0.0
+    else:
+        dense_ids, t_dense_ms = [], 0.0
+        sparse_ids, t_sparse_ms = [], 0.0
+
+    # RRF fusion (only meaningful when both legs ran)
+    if mode == "hybrid":
+        fusion_start = time.perf_counter()
+        fused_ids = reciprocal_rank_fusion(
+            sparse_ids, dense_ids if dense_ids else None, rrf_k
+        )
+        final_ids = fused_ids
+        t_fusion_ms = (time.perf_counter() - fusion_start) * 1000.0
+    else:
+        # Single-leg mode: the active leg's ranking is the final ranking;
+        # there is no RRF-fused list to report and no fusion time.
+        fused_ids = []
+        final_ids = list(sparse_ids) if mode == "sparse" else list(dense_ids)
+        t_fusion_ms = 0.0
 
     logger.info(
-        "[%s] Hybrid complete: sparse=%.1fms dense=%.1fms fusion=%.1fms fused_docs=%d",
-        query_id, t_sparse_ms, t_dense_ms, t_fusion_ms, len(fused_ids),
+        "[%s] %s complete: sparse=%.1fms dense=%.1fms fusion=%.1fms final_docs=%d",
+        query_id, mode, t_sparse_ms, t_dense_ms, t_fusion_ms, len(final_ids),
     )
-    return fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms
+    return final_ids, sparse_ids, dense_ids, fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms
+
+
+def _resolve_mode_and_k(req: "QueryRequest") -> tuple[str, int]:
+    """
+    Normalize the requested retrieval mode and RRF constant from a request.
+
+    mode is validated against {'hybrid','sparse','dense'} (case-insensitive);
+    an invalid value raises HTTPException(400). rrf_k falls back to the
+    module-level RRF_K when unset or non-positive.
+    """
+    mode = (req.mode or "hybrid").strip().lower()
+    if mode not in ("hybrid", "sparse", "dense"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid mode '{req.mode}'. Must be one of: hybrid, sparse, dense.",
+        )
+    rrf_k = req.rrf_k if (req.rrf_k is not None and req.rrf_k > 0) else RRF_K
+    return mode, rrf_k
 
 
 # ============================================================================
@@ -314,6 +376,11 @@ app = FastAPI(
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 10
+    # Retrieval mode: 'hybrid' (both legs + RRF), 'sparse' (BM25 only),
+    # 'dense' (BGE-M3 only). Default 'hybrid' preserves prior behavior.
+    mode: str = "hybrid"
+    # RRF constant k, wired into reciprocal_rank_fusion. Default 60.
+    rrf_k: int = RRF_K
 
 
 @app.post("/query")
@@ -329,32 +396,36 @@ async def query_endpoint(
     query_id = str(uuid.uuid4())[:8]
     k = req.top_k or DEFAULT_TOP_K
     query_text = req.query.strip()
+    mode, rrf_k = _resolve_mode_and_k(req)
     delay_seconds = max(simulate_wan_delay_ms or 0, 0) / 1000.0
 
     t0 = time.perf_counter()
-    logger.info("[%s] Pipeline start | query='%s'", query_id, query_text[:60])
+    logger.info("[%s] Pipeline start | mode=%s rrf_k=%d query='%s'",
+                query_id, mode, rrf_k, query_text[:60])
 
     if delay_seconds > 0:
         logger.info("[%s] Simulating WAN delay: %.0f ms", query_id, delay_seconds * 1000)
         await asyncio.sleep(delay_seconds)
 
-    # Step 1: Hybrid retrieval
-    fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms = await _hybrid_retrieve(
+    # Step 1: Retrieval (mode-aware)
+    (final_ids, sparse_ids, dense_ids, fused_ids,
+     t_dense_ms, t_sparse_ms, t_fusion_ms) = await _hybrid_retrieve(
         query=query_text, top_k=k, query_id=query_id,
+        mode=mode, rrf_k=rrf_k,
     )
 
-    if not fused_ids:
-        logger.warning("[%s] Hybrid retrieval produced no documents", query_id)
+    if not final_ids:
+        logger.warning("[%s] %s retrieval produced no documents", query_id, mode)
         return StreamingResponse(
             iter(["[No relevant documents found]"]),
             media_type="text/plain",
         )
 
-    # Step 2: Stream fused context to Node A and return tokens
+    # Step 2: Stream the final ranking to Node A and return tokens
     token_queue = await stream_to_node_a(
         query_id=query_id,
         query_text=query_text,
-        fused_doc_ids=fused_ids,
+        fused_doc_ids=final_ids,
         t_sparse_ms=t_sparse_ms,
         t_dense_ms=t_dense_ms,
         t_fusion_ms=t_fusion_ms,
@@ -377,11 +448,15 @@ async def query_endpoint(
 
     headers = {
         "X-Query-Id": query_id,
+        "X-Mode": mode,
+        "X-RRF-K": str(rrf_k),
         "X-Sparse-Time-Ms": f"{t_sparse_ms:.2f}",
         "X-Dense-Time-Ms": f"{t_dense_ms:.2f}",
         "X-Fusion-Time-Ms": f"{t_fusion_ms:.2f}",
         "X-Fused-Docs-Count": str(len(fused_ids)),
         "X-Fused-Doc-Ids": ",".join(fused_ids[:10]),
+        "X-Sparse-Doc-Ids": ",".join(sparse_ids[:10]),
+        "X-Dense-Doc-Ids": ",".join(dense_ids[:10]),
         "X-Simulated-WAN-Ms": str(int(delay_seconds * 1000)),
     }
 
@@ -395,8 +470,12 @@ class BenchmarkResponse(BaseModel):
     query_id: str
     query: str
     top_k: int
+    mode: str = "hybrid"
+    rrf_k: int = RRF_K
     timings: dict[str, float]
     fused_doc_ids: list[str]
+    sparse_doc_ids: list[str] = []
+    dense_doc_ids: list[str] = []
     token_count: int
     decode_tps: float
     answer_preview: str
@@ -414,23 +493,27 @@ async def benchmark_endpoint(
     query_id = str(uuid.uuid4())[:8]
     k = req.top_k or DEFAULT_TOP_K
     query_text = req.query.strip()
+    mode, rrf_k = _resolve_mode_and_k(req)
     delay_seconds = max(simulate_wan_delay_ms or 0, 0) / 1000.0
 
     t0 = time.perf_counter()
-    logger.info("[%s] Benchmark query start | query='%s'", query_id, query_text[:60])
+    logger.info("[%s] Benchmark query start | mode=%s rrf_k=%d query='%s'",
+                query_id, mode, rrf_k, query_text[:60])
 
     if delay_seconds > 0:
         logger.info("[%s] Simulating WAN delay: %.0f ms", query_id, delay_seconds * 1000)
         await asyncio.sleep(delay_seconds)
 
-    fused_ids, t_dense_ms, t_sparse_ms, t_fusion_ms = await _hybrid_retrieve(
+    (final_ids, sparse_ids, dense_ids, fused_ids,
+     t_dense_ms, t_sparse_ms, t_fusion_ms) = await _hybrid_retrieve(
         query=query_text, top_k=k, query_id=query_id,
+        mode=mode, rrf_k=rrf_k,
     )
 
     token_queue = await stream_to_node_a(
         query_id=query_id,
         query_text=query_text,
-        fused_doc_ids=fused_ids,
+        fused_doc_ids=final_ids,
         t_sparse_ms=t_sparse_ms,
         t_dense_ms=t_dense_ms,
         t_fusion_ms=t_fusion_ms,
@@ -475,8 +558,12 @@ async def benchmark_endpoint(
             "query_id": query_id,
             "query": query_text,
             "top_k": k,
+            "mode": mode,
+            "rrf_k": rrf_k,
             "timings": timings,
             "fused_docs": fused_ids[:10],
+            "sparse_doc_ids": sparse_ids[:10],
+            "dense_doc_ids": dense_ids[:10],
             "token_count": token_count,
             "decode_tps": round(tps, 2),
         }) + "\n")
@@ -485,8 +572,15 @@ async def benchmark_endpoint(
         query_id=query_id,
         query=query_text,
         top_k=k,
+        mode=mode,
+        rrf_k=rrf_k,
         timings=timings,
-        fused_doc_ids=fused_ids[:10],
+        # Full ranked lists (up to top_k) so the eval driver can score
+        # nDCG/recall against qrels. fused_doc_ids is only populated in
+        # hybrid mode; sparse/dense legs are empty when skipped.
+        fused_doc_ids=fused_ids,
+        sparse_doc_ids=sparse_ids,
+        dense_doc_ids=dense_ids,
         token_count=token_count,
         decode_tps=round(tps, 2),
         answer_preview=preview,
