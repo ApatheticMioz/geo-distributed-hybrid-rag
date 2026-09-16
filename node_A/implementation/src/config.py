@@ -17,10 +17,13 @@ RRF_K: int = 60
 MAX_TOKENS: int = 512
 TEMPERATURE: float = 0.2
 
+# Mode
+MOCK_MODE: bool = False  # True: skip vLLM/AWQ model loading, return simulated responses
+
 # vLLM options
 GPU_MEMORY_UTILIZATION: float = 0.90
 QUANTIZATION: str = "awq"
-MAX_MODEL_LEN: int = 1024
+MAX_MODEL_LEN: int = 4096
 ENFORCE_EAGER: bool = True
 
 # Small helper to allow env overrides
