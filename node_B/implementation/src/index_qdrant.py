@@ -3,11 +3,12 @@ Offline Indexing Script for Node B
 Indexes the corpus into Qdrant Vector Database
 """
 
+import argparse
 import logging
 import sqlite3
 import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 from FlagEmbedding import BGEM3FlagModel
@@ -29,6 +30,8 @@ VECTOR_SIZE = 1024
 BATCH_SIZE = 128
 MODEL_NAME = "BAAI/bge-m3"
 DATASET_PATH = Path(__file__).resolve().parent.parent / "corpus.sqlite"
+# Max rows to ingest. 0 (or unset) means the full corpus (no LIMIT clause).
+INDEX_LIMIT = int(os.environ.get("INDEX_LIMIT", "0"))
 
 
 def load_model() -> BGEM3FlagModel:
@@ -66,21 +69,32 @@ def init_qdrant() -> QdrantClient:
     return client
 
 
-def load_dataset() -> List[Tuple[str, str]]:
-    """Load corpus.sqlite dataset."""
+def load_dataset(limit: Optional[int] = None) -> List[Tuple[str, str]]:
+    """Load corpus.sqlite dataset.
+
+    `limit` (when provided) overrides the INDEX_LIMIT env default.
+    A limit of 0 or None means the full corpus (no LIMIT clause).
+    """
     if not DATASET_PATH.exists():
         raise FileNotFoundError(
             f"Dataset not found at {DATASET_PATH}. "
             "Please ensure corpus.sqlite exists in the implementation folder."
         )
-    
-    logger.info(f"Loading dataset from {DATASET_PATH}...")
+
+    effective_limit = INDEX_LIMIT if limit is None else limit
+    if effective_limit and effective_limit > 0:
+        sql = "SELECT doc_id, text FROM passages LIMIT ?"
+        logger.info(f"Loading dataset from {DATASET_PATH}... (limit={effective_limit})")
+    else:
+        sql = "SELECT doc_id, text FROM passages"
+        logger.info(f"Loading dataset from {DATASET_PATH}... (full corpus)")
+
     data = []
-    
+
     conn = sqlite3.connect(str(DATASET_PATH))
     cursor = conn.cursor()
-    cursor.execute("SELECT doc_id, text FROM passages LIMIT 1000000")
-    
+    cursor.execute(sql, (effective_limit,) if effective_limit and effective_limit > 0 else ())
+
     for line_num, (doc_id, text) in enumerate(cursor.fetchall(), 1):
         data.append((doc_id, text))
         if line_num % 10000 == 0:
@@ -141,11 +155,20 @@ def index_corpus(model: BGEM3FlagModel, client: QdrantClient, data: List[Tuple[s
 
 def main():
     """Main execution function."""
+    parser = argparse.ArgumentParser(description="Index the corpus into Qdrant.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Max rows to ingest (overrides INDEX_LIMIT env; 0 = full corpus).",
+    )
+    args = parser.parse_args()
+
     try:
         # Initialize
         model = load_model()
         client = init_qdrant()
-        data = load_dataset()
+        data = load_dataset(limit=args.limit)
         
         # Index
         index_corpus(model, client, data)
