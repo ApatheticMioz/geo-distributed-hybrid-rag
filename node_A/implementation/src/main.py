@@ -9,7 +9,6 @@ import uuid
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict
-from xml.parsers.expat import model
 
 import grpc
 from fastapi import FastAPI, Request, HTTPException
@@ -19,8 +18,7 @@ import uvicorn
 from . import config
 from .db import get_document_texts
 
-# vLLM imports disabled — running in mock mode to avoid GPU OOM
-# These imports are guarded so the server starts without loading the AWQ model.
+# vLLM imports are guarded so the server can start even if vLLM is unavailable.
 try:
     from vllm.engine.async_llm_engine import AsyncLLMEngine
     from vllm.engine.arg_utils import AsyncEngineArgs
@@ -50,12 +48,10 @@ grpc_task_owner: str | None = None
 # LLM Engine
 # ============================================================================
 
-MOCK_MODE = False  # Set to False to load the real AWQ model
-
 def create_engine():
     """Initialize the vLLM engine (or skip in mock mode)."""
     global engine
-    if MOCK_MODE:
+    if config.MOCK_MODE:
         logger.warning("MOCK MODE: Skipping vLLM/AWQ model loading. Responses will be simulated.")
         engine = None
         return
@@ -70,7 +66,7 @@ def create_engine():
         quantization="awq",
         enforce_eager=True,  # Conserves VRAM as per your paper
         gpu_memory_utilization=0.90,
-        max_model_len=4096
+        max_model_len=config.MAX_MODEL_LEN
     )
     engine = AsyncLLMEngine.from_engine_args(engine_args)
     logger.info("vLLM engine loaded successfully.")
@@ -127,7 +123,7 @@ async def generate(request: Request):
 
 async def _llm_stream_generator(prompt: str):
     """Yield text chunks from the vLLM async engine (or mock response)."""
-    if MOCK_MODE or engine is None:
+    if config.MOCK_MODE or engine is None:
         logger.info("MOCK MODE: Returning simulated response.")
         mock_response = (
             "[MOCK RESPONSE] This is a simulated response from Node A. "
@@ -207,9 +203,6 @@ class GenerationOrchestratorServicer(hybrid_coordination_pb2_grpc.GenerationOrch
 
                 # Extract pre-fused doc IDs from Node B
                 fused_doc_ids = [doc.doc_id for doc in request.fused_docs]
-
-                # ADD THIS LINE:
-                logger.info(f"🚨 DEBUG - IDs FROM NODE B: {fused_doc_ids}")
 
                 logger.info(
                     "[%s] fused_docs_received docs=%d t_sparse=%.1fms t_dense=%.1fms",
