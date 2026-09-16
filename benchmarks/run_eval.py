@@ -18,6 +18,10 @@ Usage:
         --mode hybrid --limit 100 --top-k 100 --rrf-k 60 \
         --out benchmarks/eval_hybrid.jsonl
 
+    Add --retrieval-only to skip Node A generation (quality runs): the
+    gateway returns per-mode rankings + retrieval timings with zeroed
+    generation metrics and no gRPC call.
+
 Behavior:
     * Loads queries.tsv (col0=qid, col1=text) and keeps only qids that also
       appear in qrels.tsv (col0=qid, col2=pid) — the evaluable set.
@@ -126,6 +130,10 @@ def main() -> None:
                     help="top_k sent to the gateway")
     ap.add_argument("--rrf-k", type=int, default=60,
                     help="RRF constant k sent to the gateway")
+    ap.add_argument("--retrieval-only", action="store_true", default=False,
+                    help="Send retrieval_only=true: gateway skips Node A "
+                         "generation and returns rankings + retrieval timings "
+                         "only (zeroed generation metrics)")
     ap.add_argument("--out", required=True, help="Output JSONL path")
     args = ap.parse_args()
 
@@ -163,6 +171,7 @@ def main() -> None:
                 "top_k": args.top_k,
                 "mode": args.mode,
                 "rrf_k": args.rrf_k,
+                "retrieval_only": args.retrieval_only,
             })
         except Exception as e:
             print(f"ERROR: warmup [{w + 1}/2] failed: {e}", file=sys.stderr)
@@ -184,6 +193,7 @@ def main() -> None:
                     "top_k": args.top_k,
                     "mode": args.mode,
                     "rrf_k": args.rrf_k,
+                    "retrieval_only": args.retrieval_only,
                 })
             except Exception as e:
                 print(f"ERROR: query qid={qid} ('{text[:40]}') failed: {e}",
