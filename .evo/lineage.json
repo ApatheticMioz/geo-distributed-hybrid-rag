@@ -1,7 +1,7 @@
 {
   "version": "2026.1",
   "rootId": "baseline",
-  "currentHeadId": "baseline",
+  "currentHeadId": "cand_1789583895864_3xtc",
   "nodes": [
     {
       "id": "baseline",
@@ -13,7 +13,95 @@
         "status": "accepted"
       },
       "timestamp": "2026-09-14T14:48:09.323Z"
+    },
+    {
+      "id": "cand_1789583410920_f5k3",
+      "parentId": "baseline",
+      "hypothesis": "Fix 4 verified defects in node_A main.py/config.py: (1) remove dead import `from xml.parsers.expat import model` (main.py:12, confirmed unused); (2) remove stray debug comment + logger.info (main.py:211-212); (3) resolve MOCK_MODE drift by moving it to config.py as `MOCK_MODE: bool = False`, referencing config.MOCK_MODE in main.py, and fixing the stale L22 comment; (4) set config.MAX_MODEL_LEN to 4096 (preserving real behavior) and reference config.MAX_MODEL_LEN in main.py. Minimal diffs, no unrelated refactors, real-path behavior unchanged.",
+      "filesModified": [
+        "node_A/implementation/src/main.py",
+        "node_A/implementation/src/config.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789583410920_f5k3",
+        "snapshotCount": 2,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && node_A/.venv/bin/python -m py_compile node_A/implementation/src/main.py && node_A/.venv/bin/python -m py_compile node_A/implementation/src/config.py && echo \"COMPILE_OK\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T18:30:10.939Z",
+      "updatedAt": "2026-09-16T18:31:47.296Z"
+    },
+    {
+      "id": "cand_1789583604318_cdgc",
+      "parentId": "cand_1789583410920_f5k3",
+      "hypothesis": "Threading the measured t_fusion_ms through stream_to_node_a (replacing hardcoded 0.0), replacing the magic top-5 with a configurable TOP_K_DOCS constant (default 5, debug log when truncating), and serializing BGE model.encode with a module-level threading.Lock will fix 3 verified defects in node_B/implementation/src/server.py while keeping py_compile green and real-path behavior identical (default top-k stays 5, streaming path untouched).",
+      "filesModified": [
+        "node_B/implementation/src/server.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789583604318_cdgc",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && node_B/implementation/.venv/bin/python -m py_compile node_B/implementation/src/server.py && echo \"COMPILE_OK\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T18:33:24.330Z",
+      "updatedAt": "2026-09-16T18:34:10.711Z"
+    },
+    {
+      "id": "cand_1789583895864_3xtc",
+      "parentId": "cand_1789583604318_cdgc",
+      "hypothesis": "Making index_qdrant.py ingest the full corpus by default (LIMIT driven by INDEX_LIMIT env, 0/unset = no LIMIT clause, with an optional --limit CLI override) while preserving batching/progress logging will remove the vestigial 1,000,000-row cap; py_compile stays green.",
+      "filesModified": [
+        "node_B/implementation/src/index_qdrant.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789583895864_3xtc",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && node_B/implementation/.venv/bin/python -m py_compile node_B/implementation/src/index_qdrant.py && echo \"COMPILE_OK\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-16T18:38:15.882Z",
+      "updatedAt": "2026-09-16T18:38:46.832Z"
     }
   ],
-  "updatedAt": "2026-09-14T14:48:09.325Z"
+  "updatedAt": "2026-09-16T18:38:46.838Z"
 }
