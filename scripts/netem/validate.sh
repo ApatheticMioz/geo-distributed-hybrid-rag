@@ -76,7 +76,11 @@ median() {
 ping_samples() {
   local i out
   for i in $(seq 1 "$PING_COUNT"); do
-    out="$(ping -c 1 -W 2 "$PEER" 2>/dev/null | grep -oE 'time[= ]+[0-9]+(\.[0-9]+)?' | grep -oE '[0-9]+(\.[0-9]+)?' || true)"
+    # Extract ONLY the per-ping 'time=<ms>' value. The stats line
+    # ('... 0% packet loss, time 0ms') uses a SPACE, not '=', so a
+    # 'time=' pattern never matches it — the old 'time[= ]+' pattern
+    # matched both and injected spurious 0s into the sample list.
+    out="$(ping -c 1 -W 2 "$PEER" 2>/dev/null | grep -oE 'time=[0-9]+(\.[0-9]+)?' | cut -d= -f2 || true)"
     [ -n "$out" ] && echo "$out"
   done
 }
@@ -108,12 +112,16 @@ echo "shaped median: ${SHAPED_MEDIAN} ms"
 
 # --- 5. verdict: shaped - baseline ~= RTT_MS within +/-20% ---------------------
 # (one-way shaping: RTT delta should equal the one-way delay, not 2x)
+# PASS iff |delta - RTT_MS| <= 0.2 * RTT_MS  (symmetric tolerance: a delta
+# far BELOW expected is a FAIL, not a PASS — the old 'ad - d <= tol' test
+# accepted any delta below expected, e.g. 49.925 vs 100).
 VERDICT="$(awk -v b="$BASE_MEDIAN" -v s="$SHAPED_MEDIAN" -v d="$RTT_MS" 'BEGIN {
   delta = s - b
   tol = d * 0.20
-  if (delta < 0) ad = -delta; else ad = delta
-  if (ad - d <= tol) { printf "PASS delta=%.3fms expected=%.0fms tol=+/-%.2fms", delta, d, tol }
-  else { printf "FAIL delta=%.3fms expected=%.0fms tol=+/-%.2fms", delta, d, tol }
+  diff = delta - d
+  if (diff < 0) ad = -diff; else ad = diff
+  if (ad <= tol) { printf "PASS delta=%.3fms (shaped=%.3f - baseline=%.3f) expected=%.0fms tol=+/-%.2fms", delta, s, b, d, tol }
+  else { printf "FAIL delta=%.3fms (shaped=%.3f - baseline=%.3f) expected=%.0fms tol=+/-%.2fms", delta, s, b, d, tol }
 }')"
 echo
 echo "RESULT: ${VERDICT}"
