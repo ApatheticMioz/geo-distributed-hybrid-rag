@@ -2,8 +2,13 @@
 """
 Publication-grade vector figures for the ICDCS paper.
 
-Generates six IEEE-styled vector PDFs into ``paper/figures/``:
+Generates IEEE-styled vector PDFs into ``paper/figures/``:
 
+  * fig1_arch.pdf             -- System architecture: Client / Node B (Edge
+                                  Gateway) / Node A (Cloud) with data-flow arrows
+                                  and per-stage timing annotations.
+  * fig2_topologies.pdf       -- Placement topology taxonomy (P0, P1, P2,
+                                  P2-SPHP, P3) as a component-placement matrix.
   * fig3_sphp_timeline.pdf    -- Gantt/timeline: SPHP speculative prefill overlap
                                  vs. baseline serialized P2 pipeline.
   * fig4_stage_breakdown.pdf  -- Stacked bar of per-stage latencies across the
@@ -39,7 +44,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
-from matplotlib.patches import Patch
+from matplotlib.patches import Patch, FancyBboxPatch, FancyArrowPatch
 from matplotlib.colors import ListedColormap
 
 # ---------------------------------------------------------------------------
@@ -157,6 +162,141 @@ def load_validation() -> dict:
 def fit_model() -> PlacementCostModel:
     model, _ = fit_model_from_benchmark(BENCH_FILE)
     return model
+
+
+# ---------------------------------------------------------------------------
+# Fig 1 -- System architecture
+# ---------------------------------------------------------------------------
+def fig1_arch(model: PlacementCostModel) -> Path:
+    fig, ax = plt.subplots(figsize=(8.2, 4.6))
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 6)
+    ax.axis("off")
+
+    def box(x, y, w, h, title, items, fc, ec):
+        p = FancyBboxPatch((x, y), w, h,
+                           boxstyle="round,pad=0.0,rounding_size=0.12",
+                           linewidth=1.3, edgecolor=ec, facecolor=fc, zorder=2)
+        ax.add_patch(p)
+        ax.text(x + w / 2, y + h - 0.18, title, ha="center", va="top",
+                fontsize=9, fontweight="bold", color=ec, zorder=3)
+        top = y + h - 0.44
+        step = (h - 0.55) / max(len(items), 1)
+        for i, it in enumerate(items):
+            ax.text(x + 0.12, top - i * step, "• " + it, ha="left", va="top",
+                    fontsize=7, color="black", zorder=3)
+
+    # Client
+    box(0.2, 2.0, 1.7, 2.0, "Client",
+        ["User query", "Receives streamed tokens"],
+        "#F0EAF3", OKABE_ITO["purple"])
+
+    # Node B (Edge Gateway)
+    box(3.0, 1.0, 3.0, 4.0, "Node B — Edge Gateway",
+        ["Tantivy BM25 (8.84M)", "BGE-M3 Dense (GPU)", "RRF Fusion",
+         f"t_sparse ≈ {model.t_sparse_base_ms:.0f} ms",
+         f"t_dense ≈ {model.t_dense_base_ms:.0f} ms"],
+        "#EAF3FB", OKABE_ITO["blue"])
+
+    # Node A (Cloud / Workstation)
+    box(7.3, 1.0, 2.5, 4.0, "Node A — Cloud / Workstation",
+        ["SQLite hydration (8.84M)", "SPHP speculative prefill",
+         "vLLM LLaMA-3-8B AWQ",
+         f"t_prefill ≈ {model.t_prefill_base_ms:.0f} ms"],
+        "#FBEFEA", OKABE_ITO["vermillion"])
+
+    def arrow(x1, y1, x2, y2, label, color, ls="-", dy=0.0, rad=0.0):
+        a = FancyArrowPatch(
+            (x1, y1), (x2, y2),
+            arrowstyle="-|>", mutation_scale=14,
+            linewidth=1.4, color=color, linestyle=ls, zorder=4,
+            connectionstyle=f"arc3,rad={rad}" if rad else "arc3,rad=0")
+        ax.add_patch(a)
+        ax.text((x1 + x2) / 2, (y1 + y2) / 2 + dy, label, ha="center",
+                va="bottom", fontsize=7, color=color, zorder=5)
+
+    # Client -> Node B
+    arrow(1.9, 3.0, 3.0, 3.0, "Query", OKABE_ITO["black"], dy=0.10)
+    # Node B -> Node A (WAN, gRPC stream)
+    arrow(6.0, 3.7, 7.3, 3.7,
+          "SparseHint / FusedContext\n(gRPC stream · WireGuard WAN)",
+          OKABE_ITO["blue"], ls="--", dy=0.12)
+    # Node A -> Client (token stream, curved below)
+    arrow(8.5, 1.0, 1.0, 2.0, "Token stream (streamed back)",
+          OKABE_ITO["vermillion"], ls=":", dy=-0.30, rad=-0.35)
+
+    ax.set_title("Geo-Distributed Hybrid RAG: System Architecture",
+                 fontsize=10, pad=8)
+    return _save(fig, "fig1_arch.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Fig 2 -- Placement topology taxonomy
+# ---------------------------------------------------------------------------
+def fig2_topologies() -> Path:
+    # (name, short description, [Client stages, Edge stages, Cloud stages])
+    topologies = [
+        ("P0", "Colocated",
+         ["Query", [], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
+        ("P1", "Gateway + all on A",
+         ["Query", ["Gateway"], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
+        ("P2", "Retrieval B / Gen A",
+         ["Query", ["Sparse", "Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
+        ("P2-SPHP", "SPHP speculative prefill",
+         ["Query", ["Sparse", "Dense", "Fusion"], ["Hydrate", "Spec. Prefill", "Decode"]]),
+        ("P3", "Retrieval+Hydrate B",
+         ["Query", ["Sparse", "Dense", "Fusion", "Hydrate"], ["Prefill", "Decode"]]),
+    ]
+    col_titles = ["", "Client", "Edge (Node B)", "Cloud (Node A)"]
+    col_x = [0, 1.9, 3.8, 6.8, 10.0]
+    col_fc = ["white", "#F2F2F2", "#EAF3FB", "#FBEFEA"]
+    col_ec = ["gray", OKABE_ITO["gray"], OKABE_ITO["blue"], OKABE_ITO["vermillion"]]
+
+    n_rows = len(topologies)
+    row_h = 0.95
+    header_h = 0.55
+    total_h = header_h + n_rows * row_h
+
+    fig, ax = plt.subplots(figsize=(8.2, total_h * 0.92 + 0.6))
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, total_h)
+    ax.axis("off")
+
+    def cell(x0, x1, y0, y1, title, items, fc, ec,
+             title_fs=8, item_fs=6.5):
+        p = FancyBboxPatch((x0, y0), x1 - x0, y1 - y0,
+                           boxstyle="round,pad=0.0,rounding_size=0.06",
+                           linewidth=0.9, edgecolor=ec, facecolor=fc, zorder=2)
+        ax.add_patch(p)
+        if title:
+            ax.text((x0 + x1) / 2, y1 - 0.12, title, ha="center", va="top",
+                    fontsize=title_fs, fontweight="bold", color=ec, zorder=3)
+        if items:
+            top = y1 - 0.32
+            step = (y1 - y0 - 0.40) / max(len(items), 1)
+            for i, it in enumerate(items):
+                ax.text(x0 + 0.10, top - i * step, "• " + it, ha="left",
+                        va="top", fontsize=item_fs, color="black", zorder=3)
+
+    # Header row.
+    y_top = total_h
+    for j, ct in enumerate(col_titles):
+        cell(col_x[j], col_x[j + 1], y_top - header_h, y_top,
+             ct, [], col_fc[j], col_ec[j], title_fs=8)
+
+    # Data rows.
+    for i, (name, desc, cells) in enumerate(topologies):
+        y1 = y_top - header_h - i * row_h
+        y0 = y1 - row_h
+        # Label cell: topology name (bold) + short description.
+        cell(col_x[0], col_x[1], y0, y1, name, [desc], "white",
+             OKABE_ITO["black"], title_fs=8, item_fs=5.5)
+        for j, items in enumerate(cells):
+            cell(col_x[j + 1], col_x[j + 2], y0, y1, "", items,
+                 col_fc[j + 1], col_ec[j + 1], item_fs=6.5)
+
+    ax.set_title("Placement Topology Taxonomy (P0–P3)", fontsize=10, pad=8)
+    return _save(fig, "fig2_topologies.pdf")
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +676,8 @@ def main() -> None:
     model = fit_model()
 
     outputs = [
+        fig1_arch(model),
+        fig2_topologies(),
         fig3_sphp_timeline(model),
         fig4_stage_breakdown(bench),
         fig5_ttft_vs_rtt(model),
