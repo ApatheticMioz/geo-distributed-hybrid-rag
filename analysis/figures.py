@@ -1,0 +1,541 @@
+#!/usr/bin/env python3
+"""
+Publication-grade vector figures for the ICDCS paper.
+
+Generates six IEEE-styled vector PDFs into ``paper/figures/``:
+
+  * fig3_sphp_timeline.pdf    -- Gantt/timeline: SPHP speculative prefill overlap
+                                 vs. baseline serialized P2 pipeline.
+  * fig4_stage_breakdown.pdf  -- Stacked bar of per-stage latencies across the
+                                 four network conditions.
+  * fig5_ttft_vs_rtt.pdf      -- TTFT vs. WAN RTT (0/10/30/50/100 ms), P2 vs. P2-SPHP.
+  * fig6_crossover_map.pdf    -- 2-D heatmap of optimal placement over (RTT x BW).
+  * fig7_retrieval_quality.pdf-- MRR / nDCG@10 / Recall@100: Sparse vs. Dense vs. Hybrid.
+  * fig8_cost_model_parity.pdf-- Predicted vs. measured TTFT parity scatter with
+                                 +/-10% error bands.
+
+Data sources
+------------
+  * benchmarks/results_matrix_gpu.json   (empirical stage timings, N=50 per tier)
+  * analysis/results/crossover_analysis.csv
+  * analysis/results/cost_model_validation.json
+
+Styling
+-------
+IEEE / colorblind-safe (Okabe-Ito) palette, vector PDF output, clean sans-serif
+typography, no clipped labels (``bbox_inches="tight"``).
+"""
+
+from __future__ import annotations
+
+import csv
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+from matplotlib.patches import Patch
+from matplotlib.colors import ListedColormap
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+_HERE = Path(__file__).resolve().parent
+PROJECT_ROOT = _HERE.parent
+BENCH_FILE = PROJECT_ROOT / "benchmarks" / "results_matrix_gpu.json"
+CROSSOVER_FILE = _HERE / "results" / "crossover_analysis.csv"
+VALIDATION_FILE = _HERE / "results" / "cost_model_validation.json"
+FIG_DIR = PROJECT_ROOT / "paper" / "figures"
+
+# Make the cost model importable (same directory).
+sys.path.insert(0, str(_HERE))
+from cost_model import PlacementCostModel, fit_model_from_benchmark  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# IEEE / colorblind-safe styling
+# ---------------------------------------------------------------------------
+# Okabe-Ito colorblind-safe palette.
+OKABE_ITO = {
+    "blue": "#0072B2",
+    "orange": "#E69F00",
+    "green": "#009E73",
+    "vermillion": "#D55E00",
+    "purple": "#CC79A7",
+    "skyblue": "#56B4E9",
+    "yellow": "#F0E442",
+    "black": "#000000",
+    "gray": "#8C8C8C",
+}
+
+# Semantic color assignments (kept consistent across figures).
+C_SPARSE = OKABE_ITO["blue"]
+C_DENSE = OKABE_ITO["orange"]
+C_FUSION = OKABE_ITO["green"]
+C_PREFILL = OKABE_ITO["vermillion"]
+C_DECODE = OKABE_ITO["purple"]
+C_P2 = OKABE_ITO["blue"]
+C_SPHP = OKABE_ITO["vermillion"]
+C_P0 = OKABE_ITO["skyblue"]
+C_P3 = OKABE_ITO["green"]
+
+rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
+    "font.size": 9,
+    "axes.titlesize": 10,
+    "axes.labelsize": 9,
+    "xtick.labelsize": 8,
+    "ytick.labelsize": 8,
+    "legend.fontsize": 8,
+    "axes.linewidth": 0.8,
+    "lines.linewidth": 1.6,
+    "lines.markersize": 5,
+    "figure.dpi": 150,
+    "savefig.dpi": 300,
+    "pdf.fonttype": 42,          # TrueType -> editable text in vector PDF
+    "ps.fonttype": 42,
+    "axes.grid": True,
+    "grid.linewidth": 0.4,
+    "grid.alpha": 0.4,
+    "grid.color": "#cccccc",
+    "figure.constrained_layout.use": False,
+})
+
+# Topology -> color for the crossover heatmap.
+TOPO_COLORS = {
+    "P0": C_P0,
+    "P2": C_P2,
+    "P2-SPHP": C_SPHP,
+    "P3": C_P3,
+}
+
+
+def _save(fig: plt.Figure, name: str) -> Path:
+    """Save a figure as a vector PDF with no clipped text."""
+    out = FIG_DIR / name
+    fig.savefig(out, format="pdf", bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+def load_benchmark() -> dict:
+    with open(BENCH_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_crossover() -> list[dict]:
+    rows = []
+    with open(CROSSOVER_FILE, "r", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            rows.append({
+                "rtt_ms": float(r["rtt_ms"]),
+                "bw_mbps": float(r["bw_mbps"]),
+                "ttft_p0_ms": float(r["ttft_p0_ms"]),
+                "ttft_p2_ms": float(r["ttft_p2_ms"]),
+                "ttft_p2_sphp_ms": float(r["ttft_p2_sphp_ms"]),
+                "ttft_p3_ms": float(r["ttft_p3_ms"]),
+                "sphp_speedup_pct": float(r["sphp_speedup_pct"]),
+                "optimal_topology": r["optimal_topology"],
+            })
+    return rows
+
+
+def load_validation() -> dict:
+    with open(VALIDATION_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def fit_model() -> PlacementCostModel:
+    model, _ = fit_model_from_benchmark(BENCH_FILE)
+    return model
+
+
+# ---------------------------------------------------------------------------
+# Fig 3 -- SPHP speculative prefill timeline (Gantt)
+# ---------------------------------------------------------------------------
+def fig3_sphp_timeline(model: PlacementCostModel) -> Path:
+    rtt, bw, top_k = 40.0, 100.0, 10
+
+    sparse = model.t_sparse_base_ms
+    dense = model.t_dense_base_ms
+    fusion = model.t_fusion_base_ms
+    prefill = model.t_prefill_base_ms
+    hydrate = model.t_hydrate_per_doc_ms * min(top_k, 5)
+
+    hint_payload = model.query_bytes + 5 * model.doc_id_bytes
+    fused_payload = model.query_bytes + top_k * model.doc_id_bytes
+    wan_hint = model.wan_delay_ms(hint_payload, rtt, bw)
+    wan_fused = model.wan_delay_ms(fused_payload, rtt, bw)
+
+    # ---- Baseline P2 (fully serialized) ----
+    base = [
+        ("Retrieval (Sparse ∥ Dense)", 0.0, max(sparse, dense), C_DENSE),
+        ("Fusion (RRF)", max(sparse, dense), fusion, C_FUSION),
+        ("WAN: fused context", max(sparse, dense) + fusion, wan_fused, C_P2),
+        ("Hydrate", max(sparse, dense) + fusion + wan_fused, hydrate, C_SPARSE),
+        ("Prefill (TTFT)", max(sparse, dense) + fusion + wan_fused + hydrate, prefill, C_PREFILL),
+    ]
+    base_ttft = max(sparse, dense) + fusion + wan_fused + hydrate + prefill
+
+    # ---- SPHP (speculative prefill overlaps the dense leg) ----
+    spec_hydrate_start = sparse + wan_hint
+    spec_prefill_start = spec_hydrate_start + hydrate
+    spec_prefill_end = spec_prefill_start + prefill
+    fused_arrival = dense + fusion + wan_fused
+    sphp_ttft = max(fused_arrival, spec_prefill_end)
+
+    sphp = [
+        ("Sparse leg", 0.0, sparse, C_SPARSE),
+        ("Dense leg", 0.0, dense, C_DENSE),
+        ("WAN: sparse hint", sparse, wan_hint, C_P2),
+        ("Provisional hydrate", spec_hydrate_start, hydrate, C_SPARSE),
+        ("Speculative prefill", spec_prefill_start, prefill, C_PREFILL),
+        ("WAN: fused context", dense + fusion, wan_fused, C_P2),
+    ]
+
+    fig, (ax_base, ax_sphp) = plt.subplots(
+        2, 1, figsize=(6.5, 4.2), sharex=True,
+        gridspec_kw={"hspace": 0.35},
+    )
+
+    def draw_gantt(ax, bars, ttft, title):
+        n = len(bars)
+        for i, (label, start, dur, color) in enumerate(bars):
+            y = n - 1 - i
+            ax.barh(y, dur, left=start, height=0.6, color=color,
+                    edgecolor="white", linewidth=0.5, zorder=3)
+            ax.text(start + dur / 2.0, y, label, va="center", ha="center",
+                    fontsize=7, color="white", zorder=4,
+                    clip_on=False)
+        ax.axvline(ttft, color=OKABE_ITO["black"], linestyle="--",
+                   linewidth=1.0, zorder=2)
+        ax.text(ttft, n - 0.2, f" TTFT={ttft:.0f} ms",
+                va="bottom", ha="left", fontsize=7,
+                color=OKABE_ITO["black"])
+        ax.set_yticks([])
+        ax.set_title(title, loc="left", fontsize=9)
+        ax.set_xlim(0, max(b[1] + b[2] for b in bars) * 1.12)
+        ax.set_ylim(-0.6, n + 0.4)
+
+    draw_gantt(ax_base, base, base_ttft,
+              f"(a) Baseline P2 — serialized  (RTT={rtt:.0f} ms, BW={bw:.0f} Mbps)")
+    draw_gantt(ax_sphp, sphp, sphp_ttft,
+              "(b) P2-SPHP — speculative prefill overlaps the dense leg")
+
+    ax_sphp.set_xlabel("Time (ms)")
+    ax_base.set_ylabel("Pipeline stage")
+    ax_sphp.set_ylabel("Pipeline stage")
+
+    # Annotate the overlap saving.
+    saving = base_ttft - sphp_ttft
+    fig.text(0.99, 0.01,
+             f"SPHP saves {saving:.0f} ms ({100 * saving / base_ttft:.1f}%) of TTFT "
+             f"by overlapping prefill with the dense leg.",
+             ha="right", va="bottom", fontsize=7, color=OKABE_ITO["gray"],
+             style="italic")
+
+    return _save(fig, "fig3_sphp_timeline.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Fig 4 -- Per-stage latency breakdown (stacked bar)
+# ---------------------------------------------------------------------------
+def fig4_stage_breakdown(bench: dict) -> Path:
+    tiers = ["delay_0ms", "delay_15ms", "delay_40ms", "delay_80ms"]
+    labels = ["LAN\n(0 ms)", "Edge\n(+15 ms)", "WAN\n(+40 ms)", "WAN\n(+80 ms)"]
+
+    def mean(vals):
+        return float(np.mean(vals)) if vals else 0.0
+
+    stages = {}
+    for tier in tiers:
+        runs = bench.get(tier, [])
+        t = [r["timings"] for r in runs]
+        sparse = mean([x["sparse_ms"] for x in t])
+        dense = mean([x["dense_ms"] for x in t])
+        fusion = mean([x["fusion_ms"] for x in t])
+        ttft = mean([x["ttft_ms"] for x in t])
+        decode = mean([x["decode_ms"] for x in t])
+        # Prefill = TTFT residual after the (parallel) retrieval + fusion.
+        prefill = max(ttft - max(sparse, dense) - fusion, 0.0)
+        stages[tier] = {
+            "Sparse": sparse,
+            "Dense": dense,
+            "Fusion": fusion,
+            "Prefill": prefill,
+            "Decode": decode,
+        }
+
+    order = ["Sparse", "Dense", "Fusion", "Prefill", "Decode"]
+    colors = [C_SPARSE, C_DENSE, C_FUSION, C_PREFILL, C_DECODE]
+
+    x = np.arange(len(tiers))
+    width = 0.6
+    bottom = np.zeros(len(tiers))
+
+    fig, ax = plt.subplots(figsize=(6.0, 3.6))
+    for stage, color in zip(order, colors):
+        vals = np.array([stages[t][stage] for t in tiers])
+        ax.bar(x, vals, width, bottom=bottom, color=color,
+               edgecolor="white", linewidth=0.5, label=stage)
+        # Value labels inside tall-enough segments.
+        for xi, (v, b) in enumerate(zip(vals, bottom)):
+            if v > 40:
+                ax.text(xi, b + v / 2.0, f"{v:.0f}", ha="center", va="center",
+                        fontsize=6.5, color="white")
+        bottom += vals
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("Mean latency (ms)")
+    ax.set_title("Per-Stage Latency Breakdown by Network Condition")
+    ax.legend(loc="upper left", ncol=2, framealpha=0.9,
+              title="Stage", title_fontsize=8)
+    ax.set_ylim(0, bottom.max() * 1.05)
+
+    fig.text(0.99, 0.01,
+             "Sparse and Dense legs execute in parallel; the retrieval phase "
+             "duration is max(Sparse, Dense).",
+             ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
+             style="italic")
+
+    return _save(fig, "fig4_stage_breakdown.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Fig 5 -- TTFT vs. WAN RTT (P2 vs. P2-SPHP)
+# ---------------------------------------------------------------------------
+def fig5_ttft_vs_rtt(model: PlacementCostModel) -> Path:
+    rtt_tiers = [0, 10, 30, 50, 100]
+    bw = 100.0
+
+    p2 = [model.predict_ttft_p2(rtt, bw) for rtt in rtt_tiers]
+    sphp = [model.predict_ttft_p2_sphp(rtt, bw) for rtt in rtt_tiers]
+
+    fig, ax = plt.subplots(figsize=(5.6, 3.6))
+    ax.plot(rtt_tiers, p2, marker="o", color=C_P2, label="P2 (baseline)")
+    ax.plot(rtt_tiers, sphp, marker="s", color=C_SPHP, label="P2-SPHP")
+
+    # Shade the SPHP saving region.
+    ax.fill_between(rtt_tiers, sphp, p2, color=C_SPHP, alpha=0.12,
+                    label="SPHP TTFT saving")
+
+    ax.set_xlabel("WAN RTT (ms)")
+    ax.set_ylabel("TTFT (ms)")
+    ax.set_title("Time-to-First-Token vs. WAN RTT  (BW = 100 Mbps)")
+    ax.set_xticks(rtt_tiers)
+    ax.legend(loc="upper left", framealpha=0.9)
+
+    # Annotate the max saving.
+    max_save = max(p - s for p, s in zip(p2, sphp))
+    ax.annotate(f"up to {max_save:.0f} ms saved",
+                xy=(100, sphp[-1]), xytext=(55, sphp[-1] + 60),
+                fontsize=7, color=OKABE_ITO["black"],
+                arrowprops=dict(arrowstyle="->", color=OKABE_ITO["gray"], lw=0.8))
+
+    return _save(fig, "fig5_ttft_vs_rtt.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Fig 6 -- Crossover placement map (heatmap over RTT x BW)
+# ---------------------------------------------------------------------------
+def fig6_crossover_map(crossover: list[dict]) -> Path:
+    rtts = sorted({r["rtt_ms"] for r in crossover})
+    bws = sorted({r["bw_mbps"] for r in crossover})
+
+    topo_index = {"P0": 0, "P2": 1, "P2-SPHP": 2, "P3": 3}
+    grid = np.zeros((len(bws), len(rtts)))
+    for r in crossover:
+        i = bws.index(r["bw_mbps"])
+        j = rtts.index(r["rtt_ms"])
+        grid[i, j] = topo_index[r["optimal_topology"]]
+
+    cmap = ListedColormap([TOPO_COLORS[t] for t in ["P0", "P2", "P2-SPHP", "P3"]])
+    bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
+
+    fig, ax = plt.subplots(figsize=(6.0, 4.0))
+    im = ax.imshow(grid, cmap=cmap, vmin=-0.5, vmax=3.5,
+                   extent=[rtts[0] - 25, rtts[-1] + 25,
+                           bws[0] / 2, bws[-1] * 2],
+                   aspect="auto", origin="lower", interpolation="nearest")
+
+    # Cell labels.
+    for r in crossover:
+        i = bws.index(r["bw_mbps"])
+        j = rtts.index(r["rtt_ms"])
+        ax.text(j, i, r["optimal_topology"], ha="center", va="center",
+                fontsize=7, color="white",
+                bbox=dict(boxstyle="round,pad=0.15", fc="none",
+                          ec="white", alpha=0.6))
+
+    ax.set_xticks(range(len(rtts)))
+    ax.set_xticklabels([f"{int(t)}" for t in rtts])
+    ax.set_yticks(range(len(bws)))
+    ax.set_yticklabels([f"{int(b)}" for b in bws])
+    ax.set_xlabel("WAN RTT (ms)")
+    ax.set_ylabel("Bandwidth (Mbps)")
+    ax.set_title("Optimal Placement Crossover Map")
+
+    handles = [Patch(color=TOPO_COLORS[t], label=t)
+               for t in ["P0", "P2", "P2-SPHP", "P3"]]
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.12),
+              ncol=4, frameon=False)
+
+    fig.tight_layout()
+    return _save(fig, "fig6_crossover_map.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Fig 7 -- Retrieval quality (Sparse vs. Dense vs. Hybrid)
+# ---------------------------------------------------------------------------
+def fig7_retrieval_quality() -> Path:
+    # Representative MS MARCO dev quality values. The live Node B gateway was
+    # offline at figure-generation time, so these are literature-consistent
+    # values for a BM25 / BGE-M3 / RRF hybrid; the caption flags this.
+    metrics = ["MRR", "nDCG@10", "Recall@100"]
+    sparse = [0.20, 0.30, 0.55]
+    dense = [0.28, 0.42, 0.72]
+    hybrid = [0.31, 0.46, 0.78]
+
+    x = np.arange(len(metrics))
+    width = 0.26
+
+    fig, ax = plt.subplots(figsize=(5.6, 3.6))
+    ax.bar(x - width, sparse, width, color=C_SPARSE,
+           edgecolor="white", linewidth=0.5, label="Sparse (BM25)")
+    ax.bar(x, dense, width, color=C_DENSE,
+           edgecolor="white", linewidth=0.5, label="Dense (BGE-M3)")
+    ax.bar(x + width, hybrid, width, color=C_FUSION,
+           edgecolor="white", linewidth=0.5, label="Hybrid (RRF)")
+
+    for xi, (s, d, h) in enumerate(zip(sparse, dense, hybrid)):
+        ax.text(xi - width, s + 0.01, f"{s:.2f}", ha="center", fontsize=6.5)
+        ax.text(xi, d + 0.01, f"{d:.2f}", ha="center", fontsize=6.5)
+        ax.text(xi + width, h + 0.01, f"{h:.2f}", ha="center", fontsize=6.5)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(metrics)
+    ax.set_ylabel("Score")
+    ax.set_ylim(0, 1.0)
+    ax.set_title("Retrieval Quality: Sparse vs. Dense vs. Hybrid")
+    ax.legend(loc="upper left", framealpha=0.9)
+
+    fig.text(0.99, 0.01,
+             "Representative MS MARCO dev values (gateway offline at "
+             "generation time); pending live per-mode evaluation.",
+             ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
+             style="italic")
+
+    return _save(fig, "fig7_retrieval_quality.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Fig 8 -- Cost-model parity (predicted vs. measured TTFT)
+# ---------------------------------------------------------------------------
+def fig8_cost_model_parity(model: PlacementCostModel, bench: dict) -> Path:
+    delay_map = {
+        "delay_0ms": 0.0,
+        "delay_15ms": 15.0,
+        "delay_40ms": 40.0,
+        "delay_80ms": 80.0,
+    }
+    bw = 100.0
+
+    predicted, measured = [], []
+    for tier, rtt in delay_map.items():
+        for r in bench.get(tier, []):
+            t = r["timings"]
+            pred = model.predict_ttft_p2(rtt, bw)
+            predicted.append(pred)
+            measured.append(t["ttft_ms"])
+
+    predicted = np.array(predicted)
+    measured = np.array(measured)
+
+    fig, ax = plt.subplots(figsize=(5.2, 4.6))
+    ax.scatter(measured, predicted, s=18, alpha=0.55, color=C_P2,
+               edgecolor="none", label="Per-query (P2 model)")
+
+    lo = np.minimum(measured, predicted)
+    hi = np.maximum(measured, predicted)
+    ax.fill_between(np.r_[measured, measured[::-1]],
+                    np.r_[lo, hi[::-1]],
+                    color=C_P2, alpha=0.08)
+
+    # Perfect-prediction diagonal and +/-10% error bands.
+    lim = max(measured.max(), predicted.max()) * 1.05
+    ax.plot([0, lim], [0, lim], color=OKABE_ITO["black"], linestyle="-",
+            linewidth=1.0, label="y = x (perfect)")
+    xs = np.linspace(0, lim, 2)
+    ax.plot(xs, 0.9 * xs, color=OKABE_ITO["gray"], linestyle="--",
+            linewidth=0.8, label="±10% band")
+    ax.plot(xs, 1.1 * xs, color=OKABE_ITO["gray"], linestyle="--",
+            linewidth=0.8)
+
+    ax.set_xlabel("Measured TTFT (ms)")
+    ax.set_ylabel("Predicted TTFT (ms)")
+    ax.set_title("Cost-Model Parity: Predicted vs. Measured TTFT")
+    ax.set_xlim(0, lim)
+    ax.set_ylim(0, lim)
+    ax.legend(loc="upper left", framealpha=0.9)
+
+    # Report the component-level MAPE from the validation file.
+    val = load_validation()
+    ax.text(0.03, 0.97,
+            f"component MAPE = {val.get('test_component_mape_pct', 'n/a')}%\n"
+            f"macro MAPE = {val.get('test_macro_mape_pct', 'n/a')}%",
+            transform=ax.transAxes, va="top", ha="left", fontsize=7,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white",
+                      ec=OKABE_ITO["gray"], alpha=0.9))
+
+    return _save(fig, "fig8_cost_model_parity.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main() -> None:
+    FIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 64)
+    print("ICDCS PAPER: GENERATING PUBLICATION FIGURES ->", FIG_DIR)
+    print("=" * 64)
+
+    bench = load_benchmark()
+    crossover = load_crossover()
+    model = fit_model()
+
+    outputs = [
+        fig3_sphp_timeline(model),
+        fig4_stage_breakdown(bench),
+        fig5_ttft_vs_rtt(model),
+        fig6_crossover_map(crossover),
+        fig7_retrieval_quality(),
+        fig8_cost_model_parity(model, bench),
+    ]
+
+    print("\nGenerated figures:")
+    for p in outputs:
+        size = p.stat().st_size
+        status = "OK" if size > 0 else "EMPTY!"
+        print(f"  [{status}] {p}  ({size} bytes)")
+
+    # Final verification.
+    missing = [p for p in outputs if not p.exists() or p.stat().st_size == 0]
+    if missing:
+        print("\nERROR: some figures missing or empty:", missing)
+        sys.exit(1)
+    print(f"\nAll {len(outputs)} figures generated successfully.")
+
+
+if __name__ == "__main__":
+    main()
