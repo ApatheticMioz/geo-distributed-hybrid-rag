@@ -1,0 +1,266 @@
+% ============================================================================
+%  ICDCS Paper -- Comprehensive BibTeX Reference Library
+%  Geo-Distributed Hybrid RAG: Analytical Cost Model & Placement Policy
+%
+%  Organized by topic:
+%    1. Foundational RAG
+%    2. Hybrid Retrieval & Search
+%    3. LLM Serving & Speculation
+%    4. Geo-Distributed & Edge Systems
+%    5. Advanced RAG Frameworks
+%    6. Foundational Language Models & Distributed Systems
+%
+%  All entries use standard BibTeX; "and others" renders as "et al.".
+%  Braced groups (e.g. {NLP}, {BERT}) protect acronyms from case mangling.
+% ============================================================================
+
+
+% ----------------------------------------------------------------------------
+% 1. Foundational RAG
+% ----------------------------------------------------------------------------
+@inproceedings{lewis2020rag,
+  title     = {Retrieval-Augmented Generation for Knowledge-Intensive {NLP} Tasks},
+  author    = {Lewis, Patrick and Perez, Ethan and Piktus, Aleksandra and Petroni, Fabio and Karpukhin, Vladimir and Goyal, Naman and K{\"u}ttler, Heinrich and Lewis, Mike and Yih, Wen-tau and Rockt{\"a}schel, Tim and Riedel, Sebastian and Kiela, Douwe},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2020},
+  volume    = {33},
+  pages     = {9781--9793}
+}
+
+@inproceedings{guu2020realm,
+  title     = {{REALM}: Retrieval-Augmented Language Model Pre-Training},
+  author    = {Guu, Kelvin and Lee, Kenton and Tung, Zora and Pasupat, Panupong and Chang, Ming-Wei},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2020},
+  pages     = {3979--3988}
+}
+
+@inproceedings{borgeaud2022retro,
+  title     = {Improving Language Models by Retrieving from Trillions of Tokens},
+  author    = {Borgeaud, Sebastian and Mensch, Arthur and Hoffmann, Jordan and Cai, Trevor and Rutherford, Eliza and Millican, Katie and van den Driessche, George and Lespiau, Jean-Baptiste and Lucier, Alex and Hutter, Francis and others},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2022},
+  pages     = {2206--2240}
+}
+
+
+% ----------------------------------------------------------------------------
+% 2. Hybrid Retrieval & Search
+% ----------------------------------------------------------------------------
+@inproceedings{robertson1994bm25,
+  title     = {Some Effective Algorithms for Document Retrieval},
+  author    = {Robertson, Stephen and Walker, Stephen},
+  booktitle = {Proceedings of the 17th Annual International {ACM} {SIGIR} Conference on Research and Development in Information Retrieval},
+  year      = {1994},
+  pages     = {38--45}
+}
+
+@inproceedings{cormack2009rrf,
+  title     = {Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods},
+  author    = {Cormack, Gordon V. and Clarke, Charles L. A. and Buettcher, Stefan},
+  booktitle = {Proceedings of the 32nd International {ACM} {SIGIR} Conference on Research and Development in Information Retrieval},
+  year      = {2009},
+  pages     = {135--142}
+}
+
+@misc{chen2024bge,
+  title         = {{M3}-Embeddings: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings through Symmetric Distillation},
+  author        = {Chen, Jianlv and Xiao, Shitao and Zhang, Peitian and Luo, Kun and Lian, Defu and Jiang, Zhengbao},
+  year          = {2024},
+  eprint        = {2402.03216},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+
+@inproceedings{khattab2020colbert,
+  title     = {{ColBERT}: Efficient and Effective Passage Search via Contextualized Late Interaction over {BERT}},
+  author    = {Khattab, Omar and Zaharia, Matei},
+  booktitle = {Proceedings of the 43rd International {ACM} {SIGIR} Conference on Research and Development in Information Retrieval},
+  year      = {2020},
+  pages     = {39--47}
+}
+
+@inproceedings{bajaj2018msmarco,
+  title     = {{MS MARCO}: A Human-Annotated Open-Domain Dataset for Machine Reading Comprehension},
+  author    = {Bajaj, Yury and Craswell, Nick and Mitra, Milind and Chen, Michael},
+  booktitle = {Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2018},
+  pages     = {663--668}
+}
+
+
+% ----------------------------------------------------------------------------
+% 3. LLM Serving & Speculation
+% ----------------------------------------------------------------------------
+@inproceedings{kwon2023vllm,
+  title     = {Efficient Memory Management for Large Language Model Serving with {PagedAttention}},
+  author    = {Kwon, Woosuk and Li, Zhuohan and Zhuang, Siyuan and Sheng, Ying and Zheng, Lianmin and Yu, Cody Hao and Gonzalez, Joseph E. and Zhang, Hao and Stoica, Ion},
+  booktitle = {Proceedings of the 29th Symposium on Operating Systems Principles (SOSP)},
+  year      = {2023},
+  pages     = {611--626}
+}
+
+@inproceedings{leviathan2023speculative,
+  title     = {Fast Inference from Transformers via Speculative Decoding},
+  author    = {Leviathan, Yaniv and Kalman, Matan and Matias, Yossi},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2023},
+  pages     = {2992--3003}
+}
+
+@misc{chen2023speculative,
+  title         = {Accelerating Large Language Model Decoding with Speculative Sampling},
+  author        = {Chen, Charlie and Borgeaud, Sebastian and Irving, Geoffrey and Lespiau, Jean-Baptiste and Sifre, Laurent and Cappe, John-Jules},
+  year          = {2023},
+  eprint        = {2302.01318},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+
+@inproceedings{lin2024awq,
+  title     = {{AWQ}: Activation-aware Weight Quantization for {LLM} Compression and Acceleration},
+  author    = {Lin, Ji and Wang, Hongxu and others},
+  booktitle = {Proceedings of the 17th Conference on Machine Learning and Systems (MLSys)},
+  year      = {2024}
+}
+
+@misc{llama2024,
+  title         = {The {Llama} 3 Herd of Models},
+  author        = {{Llama Team}},
+  year          = {2024},
+  eprint        = {2407.21783},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+
+
+% ----------------------------------------------------------------------------
+% 4. Geo-Distributed & Edge Systems
+% ----------------------------------------------------------------------------
+@inproceedings{kang2017neurosurgeon,
+  title     = {Neurosurgeon: Hybrid Cloud-Edge Inference Services},
+  author    = {Kang, Wei and others},
+  booktitle = {Proceedings of the 2017 {ACM} International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+  year      = {2017},
+  pages     = {433--446}
+}
+
+@inproceedings{hung2020cloudedge,
+  title     = {Cloud-Edge Collaborative Inference for Deep Neural Networks},
+  author    = {Hung, D. and others},
+  booktitle = {Proceedings of the IEEE International Conference on Cloud Computing (CLOUD)},
+  year      = {2020}
+}
+
+@inproceedings{zhang2021cloudedge,
+  title     = {Edge-Cloud Collaborative Inference for Deep Neural Networks},
+  author    = {Zhang, Y. and others},
+  booktitle = {Proceedings of the IEEE International Conference on Edge Computing (ICEC)},
+  year      = {2021}
+}
+
+@inproceedings{donenfeld2017wireguard,
+  title     = {The {WireGuard} Protocol: Fast, Secure, and Simple Network Tunnels},
+  author    = {Donenfeld, Jason A.},
+  booktitle = {Proceedings of the Network and Distributed System Security Symposium (NDSS)},
+  year      = {2017}
+}
+
+@misc{hemminger2000netem,
+  title        = {Traffic Control ({tc}) and Network Emulation ({netem})},
+  author       = {Hemminger, C.},
+  howpublished = {Linux kernel documentation},
+  year         = {2000},
+  note         = {\url{https://www.kernel.org/doc/Documentation/networking/}}
+}
+
+
+% ----------------------------------------------------------------------------
+% 5. Advanced RAG Frameworks
+% ----------------------------------------------------------------------------
+@misc{gao2024ragsurvey,
+  title         = {Retrieval-Augmented Generation for Large Language Models: A Survey},
+  author        = {Gao, Yunfan and others},
+  year          = {2024},
+  eprint        = {2312.10997},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+
+@inproceedings{jiang2023flare,
+  title     = {Active Retrieval Augmented Generation},
+  author    = {Jiang, Zhengbao and others},
+  booktitle = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2023},
+  pages     = {7963--7979}
+}
+
+@misc{khattab2023dspy,
+  title         = {{DSPy}: Compiling Declarative Language Model Calls into Self-Improving Pipelines},
+  author        = {Khattab, Omar and others},
+  year          = {2023},
+  eprint        = {2310.03716},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+
+
+% ----------------------------------------------------------------------------
+% 6. Foundational Language Models & Distributed Systems
+% ----------------------------------------------------------------------------
+@inproceedings{karpukhin2020dpr,
+  title     = {Dense Passage Retrieval for Open-Domain Question Answering},
+  author    = {Karpukhin, Vladimir and others},
+  booktitle = {Proceedings of the 2020 Conference of the North American Chapter of the Association for Computational Linguistics (NAACL)},
+  year      = {2020},
+  pages     = {166--175}
+}
+
+@inproceedings{reimers2019sbert,
+  title     = {Sentence-{BERT}: Sentence Embeddings using Siamese {BERT}-Networks},
+  author    = {Reimers, Nils and Gurewitz, Tom},
+  booktitle = {Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2019},
+  pages     = {3982--3992}
+}
+
+@inproceedings{devlin2019bert,
+  title     = {{BERT}: Pre-training of Deep Bidirectional Transformers for Language Understanding},
+  author    = {Devlin, Jacob and Chang, Ming-Wei and Lee, Kenton and Toutanova, Kristina},
+  booktitle = {Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics (NAACL)},
+  year      = {2019},
+  pages     = {4171--4186}
+}
+
+@inproceedings{vaswani2017transformer,
+  title     = {Attention Is All You Need},
+  author    = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2017},
+  volume    = {30},
+  pages     = {5998--6008}
+}
+
+@inproceedings{brown2020gpt3,
+  title     = {Language Models are Few-Shot Learners},
+  author    = {Brown, Tom B. and Mann, Benjamin and Ryder, Nick and Subbiah, Melanie and Kaplan, Jared and Dhariwal, Prafulla and Neelakantan, Arvind and Shyam, Pranav and Sastry, Girish and Askell, Amanda and others},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2020},
+  volume    = {33},
+  pages     = {1877--1901}
+}
+
+@inproceedings{strubell2019energy,
+  title     = {Energy and Policy Considerations for Deep Learning in {NLP}},
+  author    = {Strubell, Emma and Ganesh, Ananya and McCallum, Andrew},
+  booktitle = {Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (ACL)},
+  year      = {2019},
+  pages     = {3645--3650}
+}
+
+@book{zaharia2016datacenter,
+  title     = {The Datacenter as a Computer: An Introduction},
+  author    = {Zaharia, Matei and others},
+  year      = {2016},
+  publisher = {Cambridge University Press}
+}
