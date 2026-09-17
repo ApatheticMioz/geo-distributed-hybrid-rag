@@ -206,24 +206,41 @@ def fig3_sphp_timeline(model: PlacementCostModel) -> Path:
         2, 1, figsize=(6.5, 4.2), sharex=True,
         gridspec_kw={"hspace": 0.35},
     )
+    # Extra bottom margin so the summary line clears the "Time (ms)" axis.
+    fig.subplots_adjust(bottom=0.18)
 
     def draw_gantt(ax, bars, ttft, title):
         n = len(bars)
+        names = []
         for i, (label, start, dur, color) in enumerate(bars):
             y = n - 1 - i
+            names.append(label)
             ax.barh(y, dur, left=start, height=0.6, color=color,
                     edgecolor="white", linewidth=0.5, zorder=3)
-            ax.text(start + dur / 2.0, y, label, va="center", ha="center",
-                    fontsize=7, color="white", zorder=4,
-                    clip_on=False)
+            if dur >= 300.0:
+                # Wide enough: label inside the bar.
+                ax.text(start + dur / 2.0, y, label, va="center", ha="center",
+                        fontsize=7, color="white", zorder=4, clip_on=False)
+            else:
+                # Narrow bar: place the label outside (to the right) with an
+                # arrow so it is never clipped.
+                ax.annotate(label, xy=(start + dur, y),
+                            xytext=(start + dur + 40.0, y),
+                            va="center", ha="left", fontsize=7,
+                            color=color, zorder=4, clip_on=False,
+                            arrowprops=dict(arrowstyle="-", color=color,
+                                            lw=0.6, shrinkA=0, shrinkB=0))
         ax.axvline(ttft, color=OKABE_ITO["black"], linestyle="--",
                    linewidth=1.0, zorder=2)
         ax.text(ttft, n - 0.2, f" TTFT={ttft:.0f} ms",
                 va="bottom", ha="left", fontsize=7,
                 color=OKABE_ITO["black"])
-        ax.set_yticks([])
+        # Stage names on the y-axis ticks (one per bar).
+        ax.set_yticks(range(n))
+        ax.set_yticklabels(names, fontsize=7)
         ax.set_title(title, loc="left", fontsize=9)
-        ax.set_xlim(0, max(b[1] + b[2] for b in bars) * 1.12)
+        # Extra headroom on the right so outside labels are not clipped.
+        ax.set_xlim(0, max(b[1] + b[2] for b in bars) * 1.30)
         ax.set_ylim(-0.6, n + 0.4)
 
     draw_gantt(ax_base, base, base_ttft,
@@ -283,6 +300,8 @@ def fig4_stage_breakdown(bench: dict) -> Path:
     bottom = np.zeros(len(tiers))
 
     fig, ax = plt.subplots(figsize=(6.0, 3.6))
+    # Extra bottom margin so the footnote clears the x-tick condition labels.
+    fig.subplots_adjust(bottom=0.20)
     for stage, color in zip(order, colors):
         vals = np.array([stages[t][stage] for t in tiers])
         ax.bar(x, vals, width, bottom=bottom, color=color,
@@ -363,9 +382,9 @@ def fig6_crossover_map(crossover: list[dict]) -> Path:
     bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
 
     fig, ax = plt.subplots(figsize=(6.0, 4.0))
+    # No `extent`: imshow uses pixel coords 0..N-1 so integer ticks line up
+    # one-to-one with the distinct RTT (columns) and BW (rows) values.
     im = ax.imshow(grid, cmap=cmap, vmin=-0.5, vmax=3.5,
-                   extent=[rtts[0] - 25, rtts[-1] + 25,
-                           bws[0] / 2, bws[-1] * 2],
                    aspect="auto", origin="lower", interpolation="nearest")
 
     # Cell labels.
@@ -377,6 +396,7 @@ def fig6_crossover_map(crossover: list[dict]) -> Path:
                 bbox=dict(boxstyle="round,pad=0.15", fc="none",
                           ec="white", alpha=0.6))
 
+    # Integer tick locations with the distinct sorted RTT / BW values as labels.
     ax.set_xticks(range(len(rtts)))
     ax.set_xticklabels([f"{int(t)}" for t in rtts])
     ax.set_yticks(range(len(bws)))
@@ -489,11 +509,12 @@ def fig8_cost_model_parity(model: PlacementCostModel, bench: dict) -> Path:
     ax.legend(loc="upper left", framealpha=0.9)
 
     # Report the component-level MAPE from the validation file.
+    # Placed bottom-right so it does not collide with the top-left legend.
     val = load_validation()
-    ax.text(0.03, 0.97,
+    ax.text(0.55, 0.15,
             f"component MAPE = {val.get('test_component_mape_pct', 'n/a')}%\n"
             f"macro MAPE = {val.get('test_macro_mape_pct', 'n/a')}%",
-            transform=ax.transAxes, va="top", ha="left", fontsize=7,
+            transform=ax.transAxes, va="bottom", ha="left", fontsize=7,
             bbox=dict(boxstyle="round,pad=0.3", fc="white",
                       ec=OKABE_ITO["gray"], alpha=0.9))
 
