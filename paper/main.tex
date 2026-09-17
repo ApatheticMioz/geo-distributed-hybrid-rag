@@ -12,6 +12,7 @@
 \usepackage{algpseudocode}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{balance}
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 
 % ---------------------------------------------------------------------------
@@ -458,16 +459,16 @@ $p_{\mathrm{hint}}=64+5\times8=104$~B (sparse hint), and
 $p_{\mathrm{text}}=64+5\times1200=6064$~B (hydrated passages).
 
 \subsection{Topology Costs}
-Let the retrieval phase be $\max(\Tsparse,\Tdense)$ (parallel legs) and let
+Let the retrieval phase be $T_{\mathrm{ret}} = \max(\Tsparse,\Tdense)$ (parallel legs) and let
 hydration cost $\Thydrate$ for the top passages. The four topologies are:
 \begin{align}
-\text{P0:}\quad \Tttft^{(0)} &= \max(\Tsparse,\Tdense)+\Tfusion+\Thydrate+\Tprefill,
+\text{P0:}\quad \Tttft^{(0)} &= T_{\mathrm{ret}} + \Tfusion + \Thydrate + \Tprefill,
 \label{eq:p0}\\
-\text{P2:}\quad \Tttft^{(2)} &= \max(\Tsparse,\Tdense)+\Tfusion
-+\Twan(p_{\mathrm{id}})+\Thydrate+\Tprefill,
+\text{P2:}\quad \Tttft^{(2)} &= T_{\mathrm{ret}} + \Tfusion + \Thydrate \nonumber\\
+&\quad + \Twan(p_{\mathrm{id}}) + \Tprefill,
 \label{eq:p2}\\
-\text{P3:}\quad \Tttft^{(3)} &= \max(\Tsparse,\Tdense)+\Tfusion+\Thydrate
-+\Twan(p_{\mathrm{text}})+\Tprefill,
+\text{P3:}\quad \Tttft^{(3)} &= T_{\mathrm{ret}} + \Tfusion + \Thydrate \nonumber\\
+&\quad + \Twan(p_{\mathrm{text}}) + \Tprefill,
 \label{eq:p3}
 \end{align}
 where P0 is colocated, P2 ships only identifiers, and P3 ships full text.
@@ -478,8 +479,8 @@ $t_{f}=\Tdense+\Tfusion+\Twan(p_{\mathrm{id}})$. On a hit the first token is
 emitted at $\max(t_{f},t_{p})$; on a miss it falls back to P2 plus a small
 reconciliation overhead $T_{\mathrm{WAN,recon}}$. The expected TTFT is
 \begin{equation}
-\Tttft^{(2,\mathrm{SPHP})} \;=\;
-h\,\max(t_{f},t_{p}) \;+\; (1-h)\left(\Tttft^{(2)}+T_{\mathrm{WAN,recon}}\right).
+\Tttft^{(2,\mathrm{SPHP})} =
+h\max(t_{f},t_{p}) + (1-h)\bigl(\Tttft^{(2)}+T_{\mathrm{WAN,recon}}\bigr).
 \label{eq:sphp}
 \end{equation}
 The total end-to-end latency adds decode and token-streaming time:
@@ -679,6 +680,7 @@ and richer network regimes.
 % ===========================================================================
 %  REFERENCES
 % ===========================================================================
+\balance
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 
