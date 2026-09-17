@@ -248,7 +248,9 @@ def fig2_topologies() -> Path:
          ["Query", ["Sparse", "Dense", "Fusion", "Hydrate"], ["Prefill", "Decode"]]),
     ]
     col_titles = ["", "Client", "Edge (Node B)", "Cloud (Node A)"]
-    col_x = [0, 1.9, 3.8, 6.8, 10.0]
+    # Client column is deliberately the widest data column so short items
+    # such as "• Query" never wrap or clip letter-by-letter.
+    col_x = [0, 1.4, 4.0, 6.8, 10.0]
     col_fc = ["white", "#F2F2F2", "#EAF3FB", "#FBEFEA"]
     col_ec = ["gray", OKABE_ITO["gray"], OKABE_ITO["blue"], OKABE_ITO["vermillion"]]
 
@@ -275,7 +277,9 @@ def fig2_topologies() -> Path:
             top = y1 - 0.32
             step = (y1 - y0 - 0.40) / max(len(items), 1)
             for i, it in enumerate(items):
-                ax.text(x0 + 0.10, top - i * step, "• " + it, ha="left",
+                # Center each item horizontally in its cell so short labels
+                # (e.g. "• Query") never clip or wrap at the left edge.
+                ax.text((x0 + x1) / 2, top - i * step, "• " + it, ha="center",
                         va="top", fontsize=item_fs, color="black", zorder=3)
 
     # Header row.
