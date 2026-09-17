@@ -237,15 +237,15 @@ def fig2_topologies() -> Path:
     # (name, short description, [Client stages, Edge stages, Cloud stages])
     topologies = [
         ("P0", "Colocated",
-         ["Query", [], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
+         [["Query"], [], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
         ("P1", "Gateway + all on A",
-         ["Query", ["Gateway"], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
+         [["Query"], ["Gateway"], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
         ("P2", "Retrieval B / Gen A",
-         ["Query", ["Sparse", "Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
+         [["Query"], ["Sparse", "Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
         ("P2-SPHP", "SPHP speculative prefill",
-         ["Query", ["Sparse", "Dense", "Fusion"], ["Hydrate", "Spec. Prefill", "Decode"]]),
+         [["Query"], ["Sparse", "Dense", "Fusion"], ["Hydrate", "Spec. Prefill", "Decode"]]),
         ("P3", "Retrieval+Hydrate B",
-         ["Query", ["Sparse", "Dense", "Fusion", "Hydrate"], ["Prefill", "Decode"]]),
+         [["Query"], ["Sparse", "Dense", "Fusion", "Hydrate"], ["Prefill", "Decode"]]),
     ]
     col_titles = ["", "Client", "Edge (Node B)", "Cloud (Node A)"]
     # Client column is deliberately the widest data column so short items
