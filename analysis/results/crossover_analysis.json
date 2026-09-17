@@ -1,0 +1,352 @@
+[
+  {
+    "rtt_ms": 0,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2533.0,
+    "ttft_p2_sphp_ms": 2368.9,
+    "ttft_p3_ms": 2537.8,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 0,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2533.0,
+    "ttft_p2_sphp_ms": 2368.8,
+    "ttft_p3_ms": 2533.9,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 0,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2532.9,
+    "ttft_p2_sphp_ms": 2368.8,
+    "ttft_p3_ms": 2533.4,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 0,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2532.9,
+    "ttft_p2_sphp_ms": 2368.7,
+    "ttft_p3_ms": 2533.0,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 0,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2532.9,
+    "ttft_p2_sphp_ms": 2368.7,
+    "ttft_p3_ms": 2533.0,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 10,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2538.0,
+    "ttft_p2_sphp_ms": 2373.9,
+    "ttft_p3_ms": 2542.8,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 10,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2538.0,
+    "ttft_p2_sphp_ms": 2373.8,
+    "ttft_p3_ms": 2538.9,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 10,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2537.9,
+    "ttft_p2_sphp_ms": 2373.8,
+    "ttft_p3_ms": 2538.4,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 10,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2537.9,
+    "ttft_p2_sphp_ms": 2373.7,
+    "ttft_p3_ms": 2538.0,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 10,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2537.9,
+    "ttft_p2_sphp_ms": 2373.7,
+    "ttft_p3_ms": 2538.0,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 25,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2545.5,
+    "ttft_p2_sphp_ms": 2381.4,
+    "ttft_p3_ms": 2550.3,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 25,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2545.5,
+    "ttft_p2_sphp_ms": 2381.3,
+    "ttft_p3_ms": 2546.4,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 25,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2545.4,
+    "ttft_p2_sphp_ms": 2381.3,
+    "ttft_p3_ms": 2545.9,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 25,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2545.4,
+    "ttft_p2_sphp_ms": 2381.2,
+    "ttft_p3_ms": 2545.5,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 25,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2545.4,
+    "ttft_p2_sphp_ms": 2381.2,
+    "ttft_p3_ms": 2545.5,
+    "sphp_speedup_pct": 6.5,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 50,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2558.0,
+    "ttft_p2_sphp_ms": 2393.9,
+    "ttft_p3_ms": 2562.8,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 50,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2558.0,
+    "ttft_p2_sphp_ms": 2393.8,
+    "ttft_p3_ms": 2558.9,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 50,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2557.9,
+    "ttft_p2_sphp_ms": 2393.8,
+    "ttft_p3_ms": 2558.4,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 50,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2557.9,
+    "ttft_p2_sphp_ms": 2393.7,
+    "ttft_p3_ms": 2558.0,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 50,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2557.9,
+    "ttft_p2_sphp_ms": 2393.7,
+    "ttft_p3_ms": 2558.0,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 100,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2583.0,
+    "ttft_p2_sphp_ms": 2418.9,
+    "ttft_p3_ms": 2587.8,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 100,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2583.0,
+    "ttft_p2_sphp_ms": 2418.8,
+    "ttft_p3_ms": 2583.9,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 100,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2582.9,
+    "ttft_p2_sphp_ms": 2418.8,
+    "ttft_p3_ms": 2583.4,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 100,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2582.9,
+    "ttft_p2_sphp_ms": 2418.7,
+    "ttft_p3_ms": 2583.0,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 100,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2582.9,
+    "ttft_p2_sphp_ms": 2418.7,
+    "ttft_p3_ms": 2583.0,
+    "sphp_speedup_pct": 6.4,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 150,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2608.0,
+    "ttft_p2_sphp_ms": 2443.9,
+    "ttft_p3_ms": 2612.8,
+    "sphp_speedup_pct": 6.3,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 150,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2608.0,
+    "ttft_p2_sphp_ms": 2443.8,
+    "ttft_p3_ms": 2608.9,
+    "sphp_speedup_pct": 6.3,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 150,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2607.9,
+    "ttft_p2_sphp_ms": 2443.8,
+    "ttft_p3_ms": 2608.4,
+    "sphp_speedup_pct": 6.3,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 150,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2607.9,
+    "ttft_p2_sphp_ms": 2443.7,
+    "ttft_p3_ms": 2608.0,
+    "sphp_speedup_pct": 6.3,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 150,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2607.9,
+    "ttft_p2_sphp_ms": 2443.7,
+    "ttft_p3_ms": 2608.0,
+    "sphp_speedup_pct": 6.3,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 200,
+    "bw_mbps": 10,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2633.0,
+    "ttft_p2_sphp_ms": 2468.9,
+    "ttft_p3_ms": 2637.8,
+    "sphp_speedup_pct": 6.2,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 200,
+    "bw_mbps": 50,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2633.0,
+    "ttft_p2_sphp_ms": 2468.8,
+    "ttft_p3_ms": 2633.9,
+    "sphp_speedup_pct": 6.2,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 200,
+    "bw_mbps": 100,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2632.9,
+    "ttft_p2_sphp_ms": 2468.8,
+    "ttft_p3_ms": 2633.4,
+    "sphp_speedup_pct": 6.2,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 200,
+    "bw_mbps": 500,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2632.9,
+    "ttft_p2_sphp_ms": 2468.7,
+    "ttft_p3_ms": 2633.0,
+    "sphp_speedup_pct": 6.2,
+    "optimal_topology": "P2-SPHP"
+  },
+  {
+    "rtt_ms": 200,
+    "bw_mbps": 1000,
+    "ttft_p0_ms": 2532.9,
+    "ttft_p2_ms": 2632.9,
+    "ttft_p2_sphp_ms": 2468.7,
+    "ttft_p3_ms": 2633.0,
+    "sphp_speedup_pct": 6.2,
+    "optimal_topology": "P2-SPHP"
+  }
+]
