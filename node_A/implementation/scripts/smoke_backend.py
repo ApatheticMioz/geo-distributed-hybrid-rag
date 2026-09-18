@@ -56,6 +56,7 @@ async def main() -> None:
         temperature=config.TEMPERATURE,
         max_tokens=config.MAX_TOKENS,
         stream=True,
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
 
     async for event in stream:

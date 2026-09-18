@@ -168,6 +168,9 @@ async def _external_stream_generator(context_text: str, query: str):
         temperature=config.TEMPERATURE,
         max_tokens=config.MAX_TOKENS,
         stream=True,
+        # Qwen3 emits <think> reasoning by default; suppress per request so
+        # TTFT measures the answer stream, not deliberation tokens.
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
 
     async for event in stream:
