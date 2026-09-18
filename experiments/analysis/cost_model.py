@@ -19,7 +19,7 @@ Evaluates placement topologies:
 
 Fitting (campaign-driven):
   Every parameter is fitted from a latency-campaign JSONL written by
-  benchmarks/campaign.py (benchmarks/campaigns/campaign_*.jsonl). Fitting is
+  experiments/bench/campaign.py (experiments/bench/campaigns/campaign_*.jsonl). Fitting is
   performed SEPARATELY per cache state
       cold = repeat_index 0  (first measured query of an arm slice; cold KV prefix)
       warm = repeat_index >= 1
@@ -47,9 +47,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE.parent
+PROJECT_ROOT = _HERE.parent.parent          # repo root (script lives in experiments/analysis)
 RESULTS_DIR = _HERE / "results"
-CAMPAIGN_GLOB = PROJECT_ROOT / "benchmarks" / "campaigns" / "campaign_*.jsonl"
+CAMPAIGN_GLOB = PROJECT_ROOT / "experiments" / "bench" / "campaigns" / "campaign_*.jsonl"
 
 
 def _mean(xs: List[float]) -> float:

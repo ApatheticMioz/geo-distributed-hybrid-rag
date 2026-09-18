@@ -31,10 +31,10 @@ Generates IEEE-styled vector PDFs into ``paper/figures/``:
 Data sources
 ------------
   * benchmarks/campaigns/campaign_*.jsonl  (freshest campaign; measured record)
-  * analysis/results/cost_model_validation.json (campaign-fitted parameters,
+  * experiments/analysis/results/cost_model_validation.json (campaign-fitted parameters,
     regime-level LOTO validation)
-  * analysis/results/crossover_analysis.json (+ _cold.json; model sweeps)
-  * analysis/results/live_retrieval_quality.json (seeded 500-query quality)
+  * experiments/analysis/results/crossover_analysis.json (+ _cold.json; model sweeps)
+  * experiments/analysis/results/live_retrieval_quality.json (seeded 500-query quality)
 
 Styling
 -------
@@ -65,8 +65,8 @@ from matplotlib.patches import Patch, FancyBboxPatch, FancyArrowPatch
 # Paths
 # ---------------------------------------------------------------------------
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE.parent
-CAMPAIGN_GLOB = PROJECT_ROOT / "benchmarks" / "campaigns" / "campaign_*.jsonl"
+PROJECT_ROOT = _HERE.parent.parent          # repo root (script lives in experiments/analysis)
+CAMPAIGN_GLOB = PROJECT_ROOT / "experiments" / "bench" / "campaigns" / "campaign_*.jsonl"
 CROSSOVER_FILE = _HERE / "results" / "crossover_analysis.json"
 CROSSOVER_COLD_FILE = _HERE / "results" / "crossover_analysis_cold.json"
 VALIDATION_FILE = _HERE / "results" / "cost_model_validation.json"

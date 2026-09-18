@@ -16,7 +16,7 @@ import tempfile
 
 import pytest
 
-from eval.metrics import (
+from experiments.eval.metrics import (
     load_qrels,
     mrr,
     mrr_at_10,

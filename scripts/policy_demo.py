@@ -6,7 +6,7 @@ This script demonstrates the *live* placement policy end-to-end against the
 running Node B gateway:
 
   1. Load BOTH cache-state PlacementCostModels from
-     analysis/results/cost_model_validation.json:
+     experiments/analysis/results/cost_model_validation.json:
        * WARM  (cache_states.warm.fitted_params)  -- the policy-selection basis
        * COLD  (cache_states.cold.fitted_params)  -- the state-matched comparison
   2. For each fixed WAN regime (RTT in {0, 15, 40, 80} ms, loss 0%), shape the
@@ -36,16 +36,16 @@ running Node B gateway:
 
 The gateway request pattern (headers, payload incl. the per-request
 think-suppression extra_body) and the netem apply/clear invocation are copied
-from benchmarks/campaign.py so this demo exercises the exact same live path.
+from experiments/bench/campaign.py so this demo exercises the exact same live path.
 
 Outputs:
-  analysis/results/live_policy_demo.jsonl        (one record per request)
-  analysis/results/live_policy_demo_summary.json (per-regime, per-state summary)
+  experiments/analysis/results/live_policy_demo.jsonl        (one record per request)
+  experiments/analysis/results/live_policy_demo_summary.json (per-regime, per-state summary)
 
 Stdout: a compact per-regime table with one row per cache state (warm and
 cold): predicted vs realized TTFT, selected variant, abs error %.
 
-The script is stdlib-only (plus the local analysis.cost_model module) so it
+The script is stdlib-only (plus the local experiments.analysis.cost_model module) so it
 can run from the orchestration host against the live gateway.  It FAILS FAST
 on HTTP errors (the HTTP status code is always surfaced, never masked) and
 ALWAYS clears netem in a finally block, even on failure.
@@ -75,13 +75,13 @@ from typing import Any, Dict, List, Tuple
 _HERE = Path(__file__).resolve().parent          # scripts/
 PROJECT_ROOT = _HERE.parent                      # project root
 sys.path.insert(0, str(PROJECT_ROOT))            # so `analysis.cost_model` imports
-from analysis.cost_model import PlacementCostModel  # noqa: E402
+from experiments.analysis.cost_model import PlacementCostModel  # noqa: E402
 
 NETEM_DIR = PROJECT_ROOT / "scripts" / "netem"
 APPLY_SH = NETEM_DIR / "apply.sh"
 CLEAR_SH = NETEM_DIR / "clear.sh"
-VALIDATION_JSON = PROJECT_ROOT / "analysis" / "results" / "cost_model_validation.json"
-RESULTS_DIR = PROJECT_ROOT / "analysis" / "results"
+VALIDATION_JSON = PROJECT_ROOT / "experiments" / "analysis" / "results" / "cost_model_validation.json"
+RESULTS_DIR = PROJECT_ROOT / "experiments" / "analysis" / "results"
 
 # Fixed WAN regimes for the RQ3 demo (one-way RTT tiers, no loss).
 REGIMES_MS = (0, 15, 40, 80)
@@ -93,7 +93,7 @@ DEFAULT_REPEATS = 3      # back-to-back repeats per recorded query (R)
 
 # Per-request think-suppression (Qwen3 emits reasoning tokens by default;
 # suppress so TTFT measures the answer stream, not deliberation tokens).
-# Copied from the Node A LLM backend (node_A/implementation/src/main.py).
+# Copied from the Node A LLM backend (systems/node_a/implementation/src/main.py).
 # The gateway's QueryRequest ignores unknown fields (Pydantic extra=ignore),
 # so carrying it in the payload is harmless and documents the per-request
 # intent.
@@ -166,7 +166,7 @@ def mean_std(values: List[float]) -> Tuple[float, float]:
 
 
 # ---------------------------------------------------------------------------
-# netem (copied from benchmarks/campaign.py)
+# netem (copied from experiments/bench/campaign.py)
 # ---------------------------------------------------------------------------
 def run_netem(script: Path, *args: str) -> Tuple[bool, str]:
     """Run a netem shell script; return (ok, combined_output)."""
@@ -210,7 +210,7 @@ def clear_netem() -> None:
 
 
 # ---------------------------------------------------------------------------
-# HTTP (copied from benchmarks/campaign.py; fail-fast, never mask status codes)
+# HTTP (copied from experiments/bench/campaign.py; fail-fast, never mask status codes)
 # ---------------------------------------------------------------------------
 def http_post_json(url: str, payload: Dict[str, Any], timeout: int) -> Dict[str, Any]:
     """POST JSON to ``url`` and return the parsed JSON response.
@@ -601,7 +601,7 @@ def main() -> None:
         "loss_pct": LOSS_PCT,
         "policy_state": "warm",
         "model": "warm+cold PlacementCostModel "
-                 "(analysis/results/cost_model_validation.json)",
+                 "(experiments/analysis/results/cost_model_validation.json)",
         "n_ok": n_ok,
         "n_warmup_ok": n_warmup_ok,
         "summary": summary_rows,

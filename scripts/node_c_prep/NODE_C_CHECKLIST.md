@@ -75,8 +75,7 @@ Node B: push from Node A, pull on the node).
    ssh <user>@<node-c-lan-ip>
    ```
 2. **Clone or pull the project repo** (Node C runs from the same repository;
-   its runtime config is `Node C/config.yaml` until the repo restructure
-   relocates it):
+   its runtime config is `systems/node_c/config.yaml`):
    ```bash
    git -C <repo-path> pull --ff-only
    ```
@@ -110,14 +109,14 @@ Unlike the old client-only package, the sparse tier needs real dependencies
 ## 4. Transfer the Tantivy index (~3.2 GB)
 
 The full sparse index lives on Node B at
-`node_B/implementation/data/tantivy_index_full`. Transfer it with the same
+`systems/node_b/implementation/data/tantivy_index_full`. Transfer it with the same
 tar-over-ssh pattern used by `scripts/transfer_tantivy.sh`, targeted at C:
 
 ```bash
 # From Node B (or from Node A ssh'd to B), adjust <user>@<node-c-ip>:
 REMOTE_DIR=<repo-path>/data/tantivy_index
 ssh <user>@<node-c-ip> "mkdir -p '$REMOTE_DIR'"
-tar -cf - -C node_B/implementation/data/tantivy_index_full . \
+tar -cf - -C systems/node_b/implementation/data/tantivy_index_full . \
     | ssh <user>@<node-c-ip> "tar -xf - -C '$REMOTE_DIR'"
 ```
 

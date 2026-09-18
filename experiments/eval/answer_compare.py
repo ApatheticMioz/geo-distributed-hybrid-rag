@@ -15,7 +15,7 @@ reported separately over hit and miss subsets, so the paper's "no quality
 cost" claim rests on measured agreement instead of assumption.
 
 Requires the gateway to expose ``answer_full`` on /query/benchmark
-(node_B/src/server.py); the script fails loudly on truncated previews.
+(systems/node_b/implementation/src/server.py); the script fails loudly on truncated previews.
 
 Usage::
 
@@ -25,7 +25,7 @@ Usage::
         --qrels   /home/apath/Work/PDC/data/msmarco/qrels.dev.small.tsv \
         --limit 200 --seed 42 --top-k 10 \
         --out /tmp/answers_sphp.jsonl \
-        --report analysis/results/answer_comparison.json
+        --report experiments/analysis/results/answer_comparison.json
 """
 from __future__ import annotations
 
@@ -122,7 +122,7 @@ def main() -> int:
     ap.add_argument("--rrf-k", type=int, default=60)
     ap.add_argument("--mode", default="hybrid", choices=VALID_MODES)
     ap.add_argument("--out", required=True, help="per-query JSONL with both answers")
-    ap.add_argument("--report", default="analysis/results/answer_comparison.json")
+    ap.add_argument("--report", default="experiments/analysis/results/answer_comparison.json")
     args = ap.parse_args()
 
     queries = load_queries(args.queries)
