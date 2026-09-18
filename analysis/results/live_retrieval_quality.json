@@ -1,25 +1,19 @@
 {
-  "title": "Live retrieval quality evaluation \u2014 Node B hybrid gateway (MS MARCO dev)",
-  "generated_utc": "2026-09-18T07:13:33Z",
+  "title": "Live retrieval quality evaluation — Node B hybrid gateway (MS MARCO dev)",
+  "generated_utc": "2026-09-18T14:35:38Z",
+  "generator": "eval/make_quality_report.py (scripted; replaces hand assembly)",
   "provenance": {
     "gateway": "http://10.8.0.2:8000",
     "node": "B",
     "node_role": "hybrid_retrieval_gateway",
-    "health": {
-      "status": "ok",
-      "node": "B",
-      "role": "hybrid_retrieval_gateway"
-    },
     "sparse_engine": "BM25 (Tantivy)",
     "dense_engine": "BGE-M3 (BAAI/bge-m3) over Qdrant",
     "fusion": "Reciprocal Rank Fusion (RRF)",
     "corpus": "MS MARCO passages (qdrant collection 'msmarco_passages')",
     "queries_file": "/home/apath/Work/PDC/data/msmarco/queries.dev.tsv",
     "qrels_file": "/home/apath/Work/PDC/data/msmarco/qrels.dev.small.tsv",
-    "qrels_qids": 6980,
-    "qrels_judgments": 7437,
-    "evaluable_set": "queries.dev \u2229 qrels.dev.small (6980 qids); first 200 in file order",
-    "n_queries": 200,
+    "evaluable_set": "queries.dev ∩ qrels.dev.small; seeded random sample (seed=42), limit=500",
+    "n_queries": 500,
     "top_k": 100,
     "rrf_k": 60,
     "mode": "hybrid (single run returns sparse + dense + fused rankings on an identical query set)",
@@ -27,76 +21,59 @@
     "warmups": 2,
     "driver": "benchmarks/run_eval.py",
     "scorer": "eval/compute_metrics.py (eval/metrics.py)",
-    "run_file": "/tmp/live_hybrid_200.jsonl",
-    "wall_clock": "~9 min (200 sequential queries, fail-fast, no retries)"
+    "run_file": "/tmp/live_hybrid_500.jsonl"
   },
   "metrics": {
-    "sparse": {
-      "mrr": 0.201536,
-      "mrr@10": 0.190687,
-      "ndcg@10": 0.233741,
-      "recall@100": 0.66,
-      "recall@1000": 0.66
-    },
     "dense": {
-      "mrr": 0.325517,
-      "mrr@10": 0.313885,
-      "ndcg@10": 0.372907,
-      "recall@100": 0.844167,
-      "recall@1000": 0.844167
+      "n_queries": 500,
+      "mrr": 0.333685,
+      "mrr@10": 0.32086,
+      "ndcg@10": 0.377186,
+      "recall@100": 0.847833,
+      "recall@1000": 0.847833
+    },
+    "sparse": {
+      "n_queries": 500,
+      "mrr": 0.190077,
+      "mrr@10": 0.177887,
+      "ndcg@10": 0.22217,
+      "recall@100": 0.669167,
+      "recall@1000": 0.669167
     },
     "hybrid": {
-      "mrr": 0.30805,
-      "mrr@10": 0.295375,
-      "ndcg@10": 0.355013,
-      "recall@100": 0.854167,
-      "recall@1000": 0.899167
+      "n_queries": 500,
+      "mrr": 0.297406,
+      "mrr@10": 0.28392,
+      "ndcg@10": 0.344857,
+      "recall@100": 0.851333,
+      "recall@1000": 0.894833
     }
   },
-  "n_queries": 200,
+  "n_queries": 500,
   "latency_ms": {
     "sparse_leg": {
-      "mean_ms": 1381.5,
-      "median_ms": 1593.4,
-      "p95_ms": 3163.6,
-      "max_ms": 4032.9
+      "mean_ms": 1456.4,
+      "median_ms": 1734.6,
+      "p95_ms": 3318.7,
+      "max_ms": 4269.9
     },
     "dense_leg": {
-      "mean_ms": 2630.8,
-      "median_ms": 2747.0,
-      "p95_ms": 3495.5,
-      "max_ms": 3921.3
+      "mean_ms": 2768.5,
+      "median_ms": 2748.9,
+      "p95_ms": 3618.9,
+      "max_ms": 6334.1
     },
     "hybrid_total": {
-      "mean_ms": 2651.7,
-      "median_ms": 2762.3,
-      "p95_ms": 3496.2,
-      "max_ms": 4035.5
-    }
-  },
-  "placeholder_replaced": {
-    "source": "analysis/figures.py::fig7_retrieval_quality (hardcoded fig7 bars)",
-    "note": "Placeholder values replaced by live empirical measurements below.",
-    "sparse": {
-      "mrr": 0.2,
-      "ndcg@10": 0.3,
-      "recall@100": 0.55
-    },
-    "dense": {
-      "mrr": 0.28,
-      "ndcg@10": 0.42,
-      "recall@100": 0.72
-    },
-    "hybrid": {
-      "mrr": 0.31,
-      "ndcg@10": 0.46,
-      "recall@100": 0.78
+      "mean_ms": 2794.1,
+      "median_ms": 2755.8,
+      "p95_ms": 3619.6,
+      "max_ms": 6336.1
     }
   },
   "findings": [
-    "Dense (BGE-M3) leads on MRR (0.3255) and nDCG@10 (0.3729); hybrid (RRF) leads on Recall@100 (0.8542) and Recall@1000 (0.8992).",
-    "Hybrid (RRF) does NOT dominate on all three metrics as the placeholder figure implied \u2014 it trades a small MRR/nDCG@10 loss for a clear recall gain.",
-    "Sparse (BM25) is weakest on every metric (MRR 0.2015, nDCG@10 0.2337, Recall@100 0.6600).",
-    "recall@100 == recall@1000 for sparse and dense because each leg returns at most top_k=100 docs; hybrid's fused pool (up to ~190) lets recall@1000 exceed recall@100."
+    "mrr@10: leader=dense (sparse 0.1779, dense 0.3209, hybrid 0.2839).",
+    "ndcg@10: leader=dense (sparse 0.2222, dense 0.3772, hybrid 0.3449).",
+    "recall@100: leader=hybrid (sparse 0.6692, dense 0.8478, hybrid 0.8513).",
+    "Hybrid (RRF) trades a small MRR/nDCG@10 delta against dense for a recall gain; sparse (BM25) is weakest on every reported metric."
   ]
 }
