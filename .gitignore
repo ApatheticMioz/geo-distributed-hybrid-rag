@@ -24,9 +24,15 @@ Thumbs.db
 .idea/
 
 # LaTeX build artifacts
-proposal/*.aux
-proposal/*.log
-proposal/*.out
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
 
 # Large Datasets and Vector Stores
 **/qdrant_storage/
@@ -38,14 +44,12 @@ proposal/*.out
 # Models
 llama3-awq
 **/llama3-awq/
-*.log
 
 # Runtime benchmark logs
 *.jsonl
 **/benchmarks/*.jsonl
 
-/.evo
-.evo/
-/evo
-.evo
+# Evo lineage & snapshots
+.evo/snapshots/
 **/evo_state
+!.evo/lineage.json
