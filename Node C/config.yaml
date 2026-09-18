@@ -1,23 +1,36 @@
-# Node VPN addresses (WireGuard VPN)
+# Node C — sparse retrieval + user-facing tier (3-node topology)
+#
+# Role (decided 2026-09-18, supersedes the old client-only design):
+#   * serves the client directly (user-facing FastAPI gateway), and
+#   * hosts the Tantivy BM25 sparse index, so the sparse leg — and
+#     therefore the SPHP sparse hint — originates one hop closer to the
+#     user. The dense leg + RRF fusion stay on Node B; generation stays
+#     on Node A behind Node B's existing P2 path.
+role: sparse_user_facing
+wireguard_ip: "10.8.0.3"
+
 node_b:
-  host: "10.8.0.5"          # Node B WireGuard IP — Dense Retrieval Engine
-  port: 50051               # Node B gRPC DenseDispatcher port
+  host: "10.8.0.2"          # Node B WireGuard IP — dense + RRF fusion
+  port: 8000                # Node B HTTP FastAPI gateway
+  # NOTE: the legacy gRPC DenseDispatcher (10.8.0.5:50051) is retired;
+  # Node B's retrieval surface is its FastAPI gateway.
 
 node_a:
-  grpc_host: "10.8.0.1"     # Node A WireGuard IP — Node C -> Node A gRPC over WireGuard
-  grpc_port: 50052          # Node A gRPC GenerationOrchestrator port
-  lan_host:  "10.8.0.1"     # Node A WireGuard IP for Node B -> Node A forwarding
+  host: "10.8.0.1"          # Node A WireGuard IP — vLLM generation host
+  grpc_port: 50052          # GenerationOrchestrator gRPC (B -> A leg;
+                            # reached from C only transitively via B)
 
-# Tantivy disk-backed BM25 index
+# Tantivy disk-backed BM25 index (sparse leg lives HERE, on C)
 corpus:
   tantivy_index_path: "data/tantivy_index"
   raw_corpus_path: "data/documents.jsonl"
 
 # Retrieval parameters
 retrieval:
-  top_k: 10
+  top_k: 10                 # sparse leg depth at C
+  hint_depth: 5             # SPHP sparse-hint depth (subset of top_k)
 
-# FastAPI gateway
+# User-facing FastAPI gateway (clients talk to C, not to B)
 gateway:
   host: "0.0.0.0"
   port: 8000
