@@ -45,9 +45,12 @@ Thumbs.db
 llama3-awq
 **/llama3-awq/
 
-# Runtime benchmark logs
+# Runtime benchmark logs (raw records under campaigns/ and analysis/results/
+# are primary evidence and stay in git; everything else stays ignored)
 *.jsonl
 **/benchmarks/*.jsonl
+!benchmarks/campaigns/*.jsonl
+!analysis/results/*.jsonl
 
 # Evo lineage & snapshots
 .evo/snapshots/
