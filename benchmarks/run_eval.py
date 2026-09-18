@@ -126,6 +126,11 @@ def main() -> None:
                     help="Retrieval mode sent to the gateway")
     ap.add_argument("--limit", type=int, default=100,
                     help="Number of queries to evaluate (after warmups)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="When set, sample --limit queries uniformly at random "
+                         "(seeded shuffle) from the evaluable set instead of "
+                         "taking the first --limit in file order. Use a fixed "
+                         "seed for reproducible, order-unbiased eval sets.")
     ap.add_argument("--top-k", type=int, default=100,
                     help="top_k sent to the gateway")
     ap.add_argument("--rrf-k", type=int, default=60,
@@ -144,6 +149,9 @@ def main() -> None:
     if not eval_queries:
         print("ERROR: no queries in common with qrels", file=sys.stderr)
         sys.exit(1)
+    if args.seed is not None:
+        import random
+        random.Random(args.seed).shuffle(eval_queries)
     eval_queries = eval_queries[: args.limit]
 
     # 2. Health check (fail-fast if the gateway is down).

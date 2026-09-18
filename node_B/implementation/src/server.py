@@ -575,6 +575,9 @@ class BenchmarkResponse(BaseModel):
     token_count: int
     decode_tps: float
     answer_preview: str
+    # Full generated answer (untruncated) for offline answer-level evaluation;
+    # answer_preview stays capped at 120 chars for logs/UI.
+    answer_full: str = ""
     sphp: bool = False
     sphp_hit: bool | None = None
     sphp_overlap: float | None = None
@@ -746,6 +749,7 @@ async def benchmark_endpoint(
         token_count=token_count,
         decode_tps=round(tps, 2),
         answer_preview=preview,
+        answer_full=answer,
         sphp=req.sphp,
         sphp_hit=meta.get("sphp_hit"),
         sphp_overlap=meta.get("sphp_overlap"),
