@@ -14,8 +14,11 @@ Generates IEEE-styled vector PDFs into ``paper/figures/``:
   * fig4_stage_breakdown.pdf  -- Stacked bar of per-stage latencies across the
                                  four network conditions.
   * fig5_ttft_vs_rtt.pdf      -- TTFT vs. WAN RTT (0/10/30/50/100 ms), P2 vs. P2-SPHP.
-  * fig6_crossover_map.pdf    -- 2-D heatmap of optimal placement over (RTT x BW).
-  * fig7_retrieval_quality.pdf-- MRR / nDCG@10 / Recall@100: Sparse vs. Dense vs. Hybrid.
+  * fig6_crossover_map.pdf    -- Placement trade-off map over (Bandwidth x context
+                                  depth K): optimal-topology heatmap plus P2 /
+                                  P2-SPHP / P3 TTFT curves at the 40 ms WAN RTT.
+  * fig7_retrieval_quality.pdf-- MRR@10 / nDCG@10 / Recall@100: Sparse vs. Dense vs.
+                                  Hybrid, from the live 200-query Node B evaluation.
   * fig8_cost_model_parity.pdf-- Predicted vs. measured TTFT parity scatter with
                                  +/-10% error bands.
 
@@ -24,6 +27,8 @@ Data sources
   * benchmarks/results_matrix_gpu.json   (empirical stage timings, N=50 per tier)
   * analysis/results/crossover_analysis.csv
   * analysis/results/cost_model_validation.json
+  * analysis/results/live_retrieval_quality.json (200 live MS MARCO dev queries,
+    Node B hybrid gateway)
 
 Styling
 -------
@@ -55,6 +60,7 @@ PROJECT_ROOT = _HERE.parent
 BENCH_FILE = PROJECT_ROOT / "benchmarks" / "results_matrix_gpu.json"
 CROSSOVER_FILE = _HERE / "results" / "crossover_analysis.csv"
 VALIDATION_FILE = _HERE / "results" / "cost_model_validation.json"
+LIVE_QUALITY_FILE = _HERE / "results" / "live_retrieval_quality.json"
 FIG_DIR = PROJECT_ROOT / "paper" / "figures"
 
 # Make the cost model importable (same directory).
@@ -156,6 +162,12 @@ def load_crossover() -> list[dict]:
 
 def load_validation() -> dict:
     with open(VALIDATION_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_live_quality() -> dict:
+    """Live per-mode retrieval quality from the 200-query Node B evaluation."""
+    with open(LIVE_QUALITY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -509,52 +521,128 @@ def fig5_ttft_vs_rtt(model: PlacementCostModel) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Fig 6 -- Crossover placement map (heatmap over RTT x BW)
+# Fig 6 -- Placement trade-off map over (Bandwidth x context depth K)
 # ---------------------------------------------------------------------------
-def fig6_crossover_map(crossover: list[dict]) -> Path:
-    rtts = sorted({r["rtt_ms"] for r in crossover})
-    bws = sorted({r["bw_mbps"] for r in crossover})
+def fig6_crossover_map(model: PlacementCostModel) -> Path:
+    """Physical placement trade-off grounded in the real Node A (workstation)
+    <-> Node B (laptop) WAN link.
 
-    topo_index = {"P0": 0, "P2": 1, "P2-SPHP": 2, "P3": 3}
-    grid = np.zeros((len(bws), len(rtts)))
-    for r in crossover:
-        i = bws.index(r["bw_mbps"])
-        j = rtts.index(r["rtt_ms"])
-        grid[i, j] = topo_index[r["optimal_topology"]]
+    Compares the three split placements, using the fitted model's stage
+    parameters and the exact wire payloads:
+      * P2       -- 144 B of doc IDs (query 64 B + 10 x 8 B) over the WAN
+      * P2-SPHP  -- speculative prefill (104 B sparse hint + 144 B fused)
+      * P3       -- hydrated text p_text = 64 + K*1200 B over the WAN
+    across bandwidth (0.5-100 Mbps) and context depth K (1/5/10/20 passages).
+    Under a constrained uplink (< 2 Mbps) or large K, P3's serialization delay
+    makes P2 / P2-SPHP dominant.
+    """
+    rtt = 40.0  # measured WAN RTT (delay_40ms tier)
 
-    cmap = ListedColormap([TOPO_COLORS[t] for t in ["P0", "P2", "P2-SPHP", "P3"]])
-    bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
+    def ttft_p2(bw, k):
+        retrieval = max(model.t_sparse_base_ms, model.t_dense_base_ms)
+        payload = 144  # query(64) + 10 doc_ids(8)
+        wan = model.wan_delay_ms(payload, rtt, bw)
+        hydrate = model.t_hydrate_per_doc_ms * k
+        return retrieval + model.t_fusion_base_ms + wan + hydrate + model.t_prefill_base_ms
 
-    fig, ax = plt.subplots(figsize=(6.0, 4.0))
-    # No `extent`: imshow uses pixel coords 0..N-1 so integer ticks line up
-    # one-to-one with the distinct RTT (columns) and BW (rows) values.
-    im = ax.imshow(grid, cmap=cmap, vmin=-0.5, vmax=3.5,
-                   aspect="auto", origin="lower", interpolation="nearest")
+    def ttft_p2_sphp(bw, k):
+        retrieval = max(model.t_sparse_base_ms, model.t_dense_base_ms)
+        hint_payload = 64 + 5 * 8  # 104 B sparse hint
+        fused_payload = 144
+        wan_hint = model.wan_delay_ms(hint_payload, rtt, bw)
+        wan_fused = model.wan_delay_ms(fused_payload, rtt, bw)
+        hydrate = model.t_hydrate_per_doc_ms * k
+        t_prefill_start = model.t_sparse_base_ms + wan_hint + hydrate
+        t_prefill_finish = t_prefill_start + model.t_prefill_base_ms
+        t_fused_arrival = model.t_dense_base_ms + model.t_fusion_base_ms + wan_fused
+        ttft_hit = max(t_fused_arrival, t_prefill_finish)
+        ttft_miss = ttft_p2(bw, k) + 5.0
+        return model.sphp_hit_rate * ttft_hit + (1 - model.sphp_hit_rate) * ttft_miss
 
-    # Cell labels.
-    for r in crossover:
-        i = bws.index(r["bw_mbps"])
-        j = rtts.index(r["rtt_ms"])
-        ax.text(j, i, r["optimal_topology"], ha="center", va="center",
-                fontsize=7, color="white",
-                bbox=dict(boxstyle="round,pad=0.15", fc="none",
-                          ec="white", alpha=0.6))
+    def ttft_p3(bw, k):
+        retrieval = max(model.t_sparse_base_ms, model.t_dense_base_ms)
+        hydrate = model.t_hydrate_per_doc_ms * k
+        payload = 64 + k * 1200  # hydrated text p_text
+        wan = model.wan_delay_ms(payload, rtt, bw)
+        return retrieval + model.t_fusion_base_ms + hydrate + wan + model.t_prefill_base_ms
 
-    # Integer tick locations with the distinct sorted RTT / BW values as labels.
-    ax.set_xticks(range(len(rtts)))
-    ax.set_xticklabels([f"{int(t)}" for t in rtts])
-    ax.set_yticks(range(len(bws)))
-    ax.set_yticklabels([f"{int(b)}" for b in bws])
-    ax.set_xlabel("WAN RTT (ms)")
-    ax.set_ylabel("Bandwidth (Mbps)")
-    ax.set_title("Optimal Placement Crossover Map")
+    k_vals = [1, 5, 10, 20]
+    bw_grid = [0.5, 1, 2, 5, 10, 25, 50, 100]
 
+    def best_topo(bw, k):
+        opts = {"P2": ttft_p2(bw, k),
+                "P2-SPHP": ttft_p2_sphp(bw, k),
+                "P3": ttft_p3(bw, k)}
+        return min(opts, key=opts.get)
+
+    # ---- Panel (a): optimal-topology heatmap over (BW x K) ----
+    topo_index = {"P2": 0, "P2-SPHP": 1, "P3": 2}
+    grid = np.zeros((len(bw_grid), len(k_vals)))
+    for i, bw in enumerate(bw_grid):
+        for j, k in enumerate(k_vals):
+            grid[i, j] = topo_index[best_topo(bw, k)]
+
+    cmap = ListedColormap([TOPO_COLORS[t] for t in ["P2", "P2-SPHP", "P3"]])
+
+    fig = plt.figure(figsize=(9.0, 4.6))
+    gs = fig.add_gridspec(2, 3, width_ratios=[1.0, 1.0, 1.0],
+                          wspace=0.42, hspace=0.55)
+
+    ax_h = fig.add_subplot(gs[:, 0])
+    im = ax_h.imshow(grid, cmap=cmap, vmin=-0.5, vmax=2.5,
+                     aspect="auto", origin="lower", interpolation="nearest")
+    for i, bw in enumerate(bw_grid):
+        for j, k in enumerate(k_vals):
+            ax_h.text(j, i, best_topo(bw, k), ha="center", va="center",
+                      fontsize=6, color="white",
+                      bbox=dict(boxstyle="round,pad=0.12", fc="none",
+                                ec="white", alpha=0.6))
+    ax_h.set_xticks(range(len(k_vals)))
+    ax_h.set_xticklabels([f"K={k}" for k in k_vals])
+    ax_h.set_yticks(range(len(bw_grid)))
+    ax_h.set_yticklabels([f"{b:g}" for b in bw_grid])
+    ax_h.set_xlabel("Context depth K (passages)")
+    ax_h.set_ylabel("Bandwidth (Mbps)")
+    ax_h.set_title("(a) Optimal placement", loc="left", fontsize=9)
     handles = [Patch(color=TOPO_COLORS[t], label=t)
-               for t in ["P0", "P2", "P2-SPHP", "P3"]]
-    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.12),
-              ncol=4, frameon=False)
+               for t in ["P2", "P2-SPHP", "P3"]]
+    ax_h.legend(handles=handles, loc="upper center",
+                bbox_to_anchor=(0.5, -0.16), ncol=3, frameon=False, fontsize=7)
 
-    fig.tight_layout()
+    # ---- Panel (b): TTFT-vs-bandwidth curves, one small multiple per K ----
+    bw_curve = np.logspace(np.log10(0.5), np.log10(100), 60)
+    for j, k in enumerate(k_vals):
+        row, col = divmod(j, 2)
+        ax_c = fig.add_subplot(gs[row, 1 + col])
+        ax_c.axvspan(0.5, 2.0, color=OKABE_ITO["vermillion"], alpha=0.08,
+                     zorder=0)
+        ax_c.plot(bw_curve, [ttft_p2(b, k) for b in bw_curve],
+                  color=C_P2, label="P2 (144 B IDs)")
+        ax_c.plot(bw_curve, [ttft_p2_sphp(b, k) for b in bw_curve],
+                  color=C_SPHP, label="P2-SPHP")
+        ax_c.plot(bw_curve, [ttft_p3(b, k) for b in bw_curve],
+                  color=C_P3, label="P3 (64+K*1200 B)")
+        ax_c.set_xscale("log")
+        ax_c.set_xlim(0.5, 100)
+        ax_c.set_xticks([0.5, 1, 2, 10, 100])
+        ax_c.set_xticklabels(["0.5", "1", "2", "10", "100"])
+        ax_c.set_title(f"(b) K={k}", loc="left", fontsize=8)
+        if row == 1:
+            ax_c.set_xlabel("Bandwidth (Mbps)")
+        if col == 0:
+            ax_c.set_ylabel("TTFT (ms)")
+        if j == 0:
+            ax_c.legend(loc="upper left", framealpha=0.9, fontsize=6)
+
+    fig.suptitle("Placement Crossover Map: P2 / P2-SPHP / P3 over "
+                 "(Bandwidth x K)  (RTT = 40 ms, Node A <-> Node B)",
+                 fontsize=10)
+    fig.text(0.99, 0.01,
+             "Shaded band: constrained uplink (< 2 Mbps). P3's hydrated-text "
+             "serialization delay makes P2 / P2-SPHP dominant at low BW or large K.",
+             ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
+             style="italic")
+
     return _save(fig, "fig6_crossover_map.pdf")
 
 
@@ -562,13 +650,16 @@ def fig6_crossover_map(crossover: list[dict]) -> Path:
 # Fig 7 -- Retrieval quality (Sparse vs. Dense vs. Hybrid)
 # ---------------------------------------------------------------------------
 def fig7_retrieval_quality() -> Path:
-    # Representative MS MARCO dev quality values. The live Node B gateway was
-    # offline at figure-generation time, so these are literature-consistent
-    # values for a BM25 / BGE-M3 / RRF hybrid; the caption flags this.
-    metrics = ["MRR", "nDCG@10", "Recall@100"]
-    sparse = [0.20, 0.30, 0.55]
-    dense = [0.28, 0.42, 0.72]
-    hybrid = [0.31, 0.46, 0.78]
+    # Live empirical quality from the 200-query MS MARCO dev evaluation run
+    # against the deployed Node B hybrid gateway (GTX 1660 Ti).
+    live = load_live_quality()
+    m = live["metrics"]
+    n_queries = live.get("n_queries", 200)
+
+    metrics = ["MRR@10", "nDCG@10", "Recall@100"]
+    sparse = [m["sparse"]["mrr@10"], m["sparse"]["ndcg@10"], m["sparse"]["recall@100"]]
+    dense = [m["dense"]["mrr@10"], m["dense"]["ndcg@10"], m["dense"]["recall@100"]]
+    hybrid = [m["hybrid"]["mrr@10"], m["hybrid"]["ndcg@10"], m["hybrid"]["recall@100"]]
 
     x = np.arange(len(metrics))
     width = 0.26
@@ -594,8 +685,8 @@ def fig7_retrieval_quality() -> Path:
     ax.legend(loc="upper left", framealpha=0.9)
 
     fig.text(0.99, 0.01,
-             "Representative MS MARCO dev values (gateway offline at "
-             "generation time); pending live per-mode evaluation.",
+             f"{n_queries} MS MARCO dev queries evaluated live on Node B "
+             "(GTX 1660 Ti); RRF k=60, top_k=100.",
              ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
              style="italic")
 
@@ -685,7 +776,7 @@ def main() -> None:
         fig3_sphp_timeline(model),
         fig4_stage_breakdown(bench),
         fig5_ttft_vs_rtt(model),
-        fig6_crossover_map(crossover),
+        fig6_crossover_map(model),
         fig7_retrieval_quality(),
         fig8_cost_model_parity(model, bench),
     ]
