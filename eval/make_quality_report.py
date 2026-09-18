@@ -118,6 +118,11 @@ def main() -> int:
     metrics = json.loads(tmp_metrics.read_text(encoding="utf-8"))
     tmp_metrics.unlink()
 
+    # The scorer names the fused ranking "fused" (from fused_doc_ids); the
+    # paper and figures.py refer to it as "hybrid". Alias for compatibility.
+    if "fused" in metrics and "hybrid" not in metrics:
+        metrics["hybrid"] = metrics.pop("fused")
+
     n = len(runs)
     prov_bits = []
     if args.seed is not None:

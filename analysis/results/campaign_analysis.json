@@ -1,0 +1,760 @@
+{
+  "source": "benchmarks/campaigns/campaign_20260918T130756Z.jsonl",
+  "n_records": 1200,
+  "method": {
+    "bootstrap": "1000 resamples, seed 42, percentile 2.5/97.5",
+    "cold": "repeat_index == 0",
+    "warm": "repeat_index >= 1",
+    "hit_rate_ci": "Wilson 95%",
+    "delta_ci": "independent-sample bootstrap of (sphp_mean - baseline_mean)",
+    "slopes": "ordinary least squares over the 4 rtt tiers",
+    "decode_tps": "mean over all records; also reported excluding degenerate records (decode_tps > 100, i.e. sub-8ms decode_ms)"
+  },
+  "per_tier": {
+    "rtt0_baseline": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 3633.64,
+        "median": 3675.1,
+        "p95": 4227.01,
+        "ci95": [
+          3513.91,
+          3763.43
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 817.95,
+        "median": 817.57,
+        "p95": 1045.37,
+        "ci95": [
+          789.72,
+          848.0
+        ]
+      },
+      "total_ms_cold_mean": 4843.27,
+      "total_ms_warm_mean": 1701.25,
+      "decode_tps_mean": 34.31,
+      "decode_tps_mean_excl_degenerate": 34.31,
+      "decode_tps_n_degenerate": 0
+    },
+    "rtt0_sphp": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 2948.21,
+        "median": 2906.97,
+        "p95": 3926.71,
+        "ci95": [
+          2746.92,
+          3138.46
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 738.91,
+        "median": 724.75,
+        "p95": 1062.86,
+        "ci95": [
+          699.66,
+          777.37
+        ]
+      },
+      "total_ms_cold_mean": 3071.37,
+      "total_ms_warm_mean": 1922.38,
+      "decode_tps_mean": 1604.8,
+      "decode_tps_mean_excl_degenerate": 34.95,
+      "decode_tps_n_degenerate": 40
+    },
+    "rtt15_baseline": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 3569.72,
+        "median": 3609.68,
+        "p95": 4251.75,
+        "ci95": [
+          3422.48,
+          3709.64
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 815.76,
+        "median": 817.13,
+        "p95": 1012.92,
+        "ci95": [
+          788.93,
+          842.18
+        ]
+      },
+      "total_ms_cold_mean": 5586.36,
+      "total_ms_warm_mean": 1999.33,
+      "decode_tps_mean": 35.28,
+      "decode_tps_mean_excl_degenerate": 35.28,
+      "decode_tps_n_degenerate": 0
+    },
+    "rtt15_sphp": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 2892.14,
+        "median": 2895.16,
+        "p95": 3869.18,
+        "ci95": [
+          2734.71,
+          3053.45
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 778.06,
+        "median": 748.0,
+        "p95": 1150.95,
+        "ci95": [
+          743.98,
+          816.41
+        ]
+      },
+      "total_ms_cold_mean": 3612.76,
+      "total_ms_warm_mean": 1620.95,
+      "decode_tps_mean": 604.83,
+      "decode_tps_mean_excl_degenerate": 35.43,
+      "decode_tps_n_degenerate": 40
+    },
+    "rtt40_baseline": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 3555.69,
+        "median": 3524.13,
+        "p95": 4276.41,
+        "ci95": [
+          3424.02,
+          3692.64
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 817.06,
+        "median": 804.43,
+        "p95": 1049.56,
+        "ci95": [
+          788.65,
+          845.26
+        ]
+      },
+      "total_ms_cold_mean": 4465.4,
+      "total_ms_warm_mean": 1638.41,
+      "decode_tps_mean": 35.15,
+      "decode_tps_mean_excl_degenerate": 35.15,
+      "decode_tps_n_degenerate": 0
+    },
+    "rtt40_sphp": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 2996.78,
+        "median": 3066.85,
+        "p95": 4066.58,
+        "ci95": [
+          2829.26,
+          3167.47
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 842.17,
+        "median": 796.06,
+        "p95": 1236.38,
+        "ci95": [
+          799.56,
+          885.5
+        ]
+      },
+      "total_ms_cold_mean": 3134.94,
+      "total_ms_warm_mean": 1734.9,
+      "decode_tps_mean": 269.0,
+      "decode_tps_mean_excl_degenerate": 35.22,
+      "decode_tps_n_degenerate": 41
+    },
+    "rtt80_baseline": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 3544.63,
+        "median": 3519.94,
+        "p95": 4541.65,
+        "ci95": [
+          3364.33,
+          3729.22
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 875.04,
+        "median": 851.17,
+        "p95": 1110.03,
+        "ci95": [
+          851.73,
+          900.53
+        ]
+      },
+      "total_ms_cold_mean": 4729.47,
+      "total_ms_warm_mean": 2039.34,
+      "decode_tps_mean": 34.67,
+      "decode_tps_mean_excl_degenerate": 34.67,
+      "decode_tps_n_degenerate": 0
+    },
+    "rtt80_sphp": {
+      "n": 150,
+      "ttft_cold": {
+        "n": 50,
+        "mean": 2982.08,
+        "median": 2940.34,
+        "p95": 3930.04,
+        "ci95": [
+          2828.22,
+          3132.17
+        ]
+      },
+      "ttft_warm": {
+        "n": 100,
+        "mean": 896.85,
+        "median": 847.2,
+        "p95": 1323.75,
+        "ci95": [
+          859.13,
+          935.97
+        ]
+      },
+      "total_ms_cold_mean": 3539.9,
+      "total_ms_warm_mean": 2105.6,
+      "decode_tps_mean": 132.56,
+      "decode_tps_mean_excl_degenerate": 35.24,
+      "decode_tps_n_degenerate": 39
+    }
+  },
+  "per_leg": {
+    "rtt0_baseline": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 1964.21,
+          "median": 2445.14
+        },
+        "warm": {
+          "mean": 75.94,
+          "median": 67.34
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2742.24,
+          "median": 2775.76
+        },
+        "warm": {
+          "mean": 193.48,
+          "median": 217.44
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt0_sphp": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 161.18,
+          "median": 159.75
+        },
+        "warm": {
+          "mean": 60.61,
+          "median": 55.05
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2653.86,
+          "median": 2715.52
+        },
+        "warm": {
+          "mean": 168.16,
+          "median": 165.88
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt15_baseline": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 1511.01,
+          "median": 2102.03
+        },
+        "warm": {
+          "mean": 65.67,
+          "median": 57.38
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2697.24,
+          "median": 2740.53
+        },
+        "warm": {
+          "mean": 191.71,
+          "median": 204.18
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt15_sphp": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 182.61,
+          "median": 149.12
+        },
+        "warm": {
+          "mean": 66.26,
+          "median": 62.48
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2629.58,
+          "median": 2693.8
+        },
+        "warm": {
+          "mean": 173.27,
+          "median": 171.11
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt40_baseline": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 1649.39,
+          "median": 2133.44
+        },
+        "warm": {
+          "mean": 79.77,
+          "median": 77.7
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2663.28,
+          "median": 2671.28
+        },
+        "warm": {
+          "mean": 186.31,
+          "median": 185.94
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt40_sphp": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 203.81,
+          "median": 195.43
+        },
+        "warm": {
+          "mean": 91.77,
+          "median": 81.94
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2635.05,
+          "median": 2712.12
+        },
+        "warm": {
+          "mean": 173.04,
+          "median": 176.4
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt80_baseline": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 1720.57,
+          "median": 2031.82
+        },
+        "warm": {
+          "mean": 77.83,
+          "median": 67.19
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2620.65,
+          "median": 2554.47
+        },
+        "warm": {
+          "mean": 191.72,
+          "median": 183.5
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.01
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    },
+    "rtt80_sphp": {
+      "sparse_ms": {
+        "cold": {
+          "mean": 185.79,
+          "median": 174.35
+        },
+        "warm": {
+          "mean": 72.11,
+          "median": 69.55
+        }
+      },
+      "dense_ms": {
+        "cold": {
+          "mean": 2583.52,
+          "median": 2597.91
+        },
+        "warm": {
+          "mean": 184.7,
+          "median": 184.58
+        }
+      },
+      "fusion_ms": {
+        "cold": {
+          "mean": 0.02,
+          "median": 0.02
+        },
+        "warm": {
+          "mean": 0.02,
+          "median": 0.02
+        }
+      }
+    }
+  },
+  "sphp_detail": {
+    "rtt0": {
+      "n_evaluated": 147,
+      "n_hit": 120,
+      "n_miss": 27,
+      "hit_rate": 0.8163,
+      "hit_rate_ci95_wilson": [
+        0.746,
+        0.8706
+      ],
+      "ttft_cold": {
+        "hit_mean": 2854.54,
+        "miss_mean": 3655.96
+      },
+      "ttft_warm": {
+        "hit_mean": 702.04,
+        "miss_mean": 962.69
+      },
+      "wasted_prefill_ms": {
+        "hit": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "miss": {
+          "n": 27,
+          "mean": 1050.36,
+          "median": 249.32
+        }
+      },
+      "overlap": {
+        "n": 147,
+        "p10": 0.4,
+        "p50": 0.6,
+        "p90": 0.8
+      }
+    },
+    "rtt15": {
+      "n_evaluated": 150,
+      "n_hit": 135,
+      "n_miss": 15,
+      "hit_rate": 0.9,
+      "hit_rate_ci95_wilson": [
+        0.8416,
+        0.9385
+      ],
+      "ttft_cold": {
+        "hit_mean": 2818.42,
+        "miss_mean": 3555.63
+      },
+      "ttft_warm": {
+        "hit_mean": 743.43,
+        "miss_mean": 1089.73
+      },
+      "wasted_prefill_ms": {
+        "hit": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "miss": {
+          "n": 15,
+          "mean": 1026.48,
+          "median": 269.9
+        }
+      },
+      "overlap": {
+        "n": 150,
+        "p10": 0.58,
+        "p50": 0.6,
+        "p90": 0.8
+      }
+    },
+    "rtt40": {
+      "n_evaluated": 150,
+      "n_hit": 126,
+      "n_miss": 24,
+      "hit_rate": 0.84,
+      "hit_rate_ci95_wilson": [
+        0.773,
+        0.8901
+      ],
+      "ttft_cold": {
+        "hit_mean": 2870.72,
+        "miss_mean": 3658.58
+      },
+      "ttft_warm": {
+        "hit_mean": 775.59,
+        "miss_mean": 1191.69
+      },
+      "wasted_prefill_ms": {
+        "hit": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "miss": {
+          "n": 24,
+          "mean": 1028.83,
+          "median": 248.31
+        }
+      },
+      "overlap": {
+        "n": 150,
+        "p10": 0.4,
+        "p50": 0.6,
+        "p90": 0.8
+      }
+    },
+    "rtt80": {
+      "n_evaluated": 150,
+      "n_hit": 123,
+      "n_miss": 27,
+      "hit_rate": 0.82,
+      "hit_rate_ci95_wilson": [
+        0.7508,
+        0.8732
+      ],
+      "ttft_cold": {
+        "hit_mean": 2851.89,
+        "miss_mean": 3575.16
+      },
+      "ttft_warm": {
+        "hit_mean": 823.41,
+        "miss_mean": 1231.38
+      },
+      "wasted_prefill_ms": {
+        "hit": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "miss": {
+          "n": 27,
+          "mean": 1007.05,
+          "median": 264.58
+        }
+      },
+      "overlap": {
+        "n": 150,
+        "p10": 0.4,
+        "p50": 0.6,
+        "p90": 0.8
+      }
+    }
+  },
+  "deltas": {
+    "rtt0": {
+      "ttft_cold": {
+        "baseline_mean": 3633.64,
+        "sphp_mean": 2948.21,
+        "delta_ms": -685.42,
+        "delta_pct": -18.86,
+        "delta_ci95": [
+          -915.94,
+          -476.12
+        ]
+      },
+      "ttft_warm": {
+        "baseline_mean": 817.95,
+        "sphp_mean": 738.91,
+        "delta_ms": -79.04,
+        "delta_pct": -9.66,
+        "delta_ci95": [
+          -126.18,
+          -27.83
+        ]
+      }
+    },
+    "rtt15": {
+      "ttft_cold": {
+        "baseline_mean": 3569.72,
+        "sphp_mean": 2892.14,
+        "delta_ms": -677.57,
+        "delta_pct": -18.98,
+        "delta_ci95": [
+          -896.68,
+          -469.32
+        ]
+      },
+      "ttft_warm": {
+        "baseline_mean": 815.76,
+        "sphp_mean": 778.06,
+        "delta_ms": -37.69,
+        "delta_pct": -4.62,
+        "delta_ci95": [
+          -82.55,
+          10.85
+        ]
+      }
+    },
+    "rtt40": {
+      "ttft_cold": {
+        "baseline_mean": 3555.69,
+        "sphp_mean": 2996.78,
+        "delta_ms": -558.91,
+        "delta_pct": -15.72,
+        "delta_ci95": [
+          -775.36,
+          -349.58
+        ]
+      },
+      "ttft_warm": {
+        "baseline_mean": 817.06,
+        "sphp_mean": 842.17,
+        "delta_ms": 25.11,
+        "delta_pct": 3.07,
+        "delta_ci95": [
+          -26.78,
+          79.48
+        ]
+      }
+    },
+    "rtt80": {
+      "ttft_cold": {
+        "baseline_mean": 3544.63,
+        "sphp_mean": 2982.08,
+        "delta_ms": -562.55,
+        "delta_pct": -15.87,
+        "delta_ci95": [
+          -793.56,
+          -327.5
+        ]
+      },
+      "ttft_warm": {
+        "baseline_mean": 875.04,
+        "sphp_mean": 896.85,
+        "delta_ms": 21.81,
+        "delta_pct": 2.49,
+        "delta_ci95": [
+          -22.97,
+          73.21
+        ]
+      }
+    }
+  },
+  "rtt_sensitivity": {
+    "baseline_cold_ttft_mean_by_rtt": {
+      "0": 3633.64,
+      "15": 3569.72,
+      "40": 3555.69,
+      "80": 3544.63
+    },
+    "baseline_cold_total_mean_by_rtt": {
+      "0": 4843.27,
+      "15": 5586.36,
+      "40": 4465.4,
+      "80": 4729.47
+    },
+    "ttft_slope_ms_per_rtt_ms": -0.928,
+    "total_slope_ms_per_rtt_ms": -5.876
+  },
+  "notes": [
+    "TTFT delta (sphp - baseline) at rtt=0ms: cold -685 ms (-18.9%, CI -916..-476); warm -79 ms (-9.7%).",
+    "TTFT delta (sphp - baseline) at rtt=15ms: cold -678 ms (-19.0%, CI -897..-469); warm -38 ms (-4.6%).",
+    "TTFT delta (sphp - baseline) at rtt=40ms: cold -559 ms (-15.7%, CI -775..-350); warm +25 ms (+3.1%).",
+    "TTFT delta (sphp - baseline) at rtt=80ms: cold -563 ms (-15.9%, CI -794..-328); warm +22 ms (+2.5%).",
+    "Cache warmth (baseline, rtt=0): cold TTFT 3634 ms vs warm 818 ms (77% reduction); cold leg time is dominated by retrieval (sparse ~1964 ms, dense ~2742 ms) vs warm (sparse ~76 ms, dense ~193 ms).",
+    "SPHP hit rate at rtt=0 is 81.6% (Wilson CI 74.6%..87.1%); misses pay a wasted-prefill penalty of 1050 ms mean / 249 ms median, while hits record no wasted prefill.",
+    "SPHP overlap (fraction of prompt covered by cached prefix) is concentrated: p10/p50/p90 = 0.4/0.6/0.8 at rtt=0 (values are 0.4/0.6/0.8/1.0).",
+    "Data-quality flag: 160/600 sphp records (all repeat_index==0, all sphp_hit=True) report degenerate decode_tps (100-6800 tps) from sub-8 ms decode_ms; they are excluded from decode_tps_mean_excl_degenerate. Baseline has no such records.",
+    "Baseline cold TTFT is essentially flat across RTT tiers (3634 ms at rtt=0 vs 3545 ms at rtt=80; OLS slope -0.93 ms per ms RTT, within run-to-run noise), while cold total_ms is noisier (slope -5.88 ms/ms) \u2014 the simulated WAN RTT adds little to measured TTFT, which is dominated by retrieval/prefill."
+  ]
+}
