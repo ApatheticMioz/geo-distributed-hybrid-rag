@@ -41,7 +41,7 @@ no HTTP, no output files.
 Usage (the paper's final matrix — 4 WAN regimes x SPHP on/off, hybrid mode):
     python3 benchmarks/campaign.py \
         --gateway-url http://10.8.0.2:8000 \
-        --queries benchmarks/queries50.txt \
+        --queries experiments/bench/queries/latency_dev480_seed42.txt \
         --rtt-tiers 0 15 40 80 \
         --loss-tiers 0 \
         --modes hybrid \
@@ -296,7 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--gateway-url", default="http://10.8.0.2:8000",
                     help="Node B gateway base URL")
-    ap.add_argument("--queries", default="benchmarks/queries50.txt",
+    ap.add_argument("--queries", default="experiments/bench/queries/latency_dev480_seed42.txt",
                     help="Path to a one-query-per-line text file")
     ap.add_argument("--rtt-tiers", nargs="+", type=int,
                     default=[0, 15, 40, 80],
@@ -325,7 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Per-request HTTP timeout (seconds)")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print the plan only: no netem, no HTTP, no output files")
-    ap.add_argument("--out-dir", default="benchmarks/campaigns",
+    ap.add_argument("--out-dir", default="experiments/bench/campaigns",
                     help="Directory for JSONL/CSV/JSON outputs")
     return ap
 

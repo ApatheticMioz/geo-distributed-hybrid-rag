@@ -53,7 +53,7 @@ ALWAYS clears netem in a finally block, even on failure.
 Usage:
     python3 scripts/policy_demo.py
     python3 scripts/policy_demo.py --gateway http://10.8.0.2:8000 \
-        --queries benchmarks/queries/latency_dev480_seed42.txt \
+        --queries experiments/bench/queries/latency_dev480_seed42.txt \
         --per-regime 5 --warmups 2 --repeats 3
 """
 
@@ -434,7 +434,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--gateway", default="http://10.8.0.2:8000",
                     help="Node B gateway base URL")
     ap.add_argument("--queries",
-                    default="benchmarks/queries/latency_dev480_seed42.txt",
+                    default="experiments/bench/queries/latency_dev480_seed42.txt",
                     help="Path to a one-query-per-line text file")
     ap.add_argument("--per-regime", type=int, default=5,
                     help="Number of RECORDED queries per regime (N)")

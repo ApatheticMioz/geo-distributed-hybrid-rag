@@ -21,7 +21,7 @@ Usage examples
     python3 run_node_c_benchmark.py
 
     # full campaign shape: 50 queries, 40 ms one-way WAN delay, both modes
-    python3 run_node_c_benchmark.py --queries benchmarks/queries50.txt \
+    python3 run_node_c_benchmark.py --queries experiments/bench/queries/latency_dev480_seed42.txt \
         --wan-delay 40 --both-modes
 
     # quick smoke test: 2 queries, SPHP enabled only
