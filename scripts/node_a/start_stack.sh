@@ -5,7 +5,7 @@
 # Fail-fast: no retries, no masking. PID recorded in /tmp/pdc_node_a_orchestrator.pid
 set -euo pipefail
 
-IMPL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../node_A/implementation" && pwd)"
+IMPL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../systems/node_a/implementation" && pwd)"
 PID_FILE="/tmp/pdc_node_a_orchestrator.pid"
 
 if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then

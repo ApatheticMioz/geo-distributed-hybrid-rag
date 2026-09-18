@@ -1,6 +1,6 @@
 {
   "generator": "analysis/cost_model.py (campaign-driven refit)",
-  "campaign": "/home/apath/Work/PDC/Project/benchmarks/campaigns/campaign_20260918T130756Z.jsonl",
+  "campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_20260918T130756Z.jsonl",
   "n_records": 1200,
   "n_cold": 400,
   "n_warm": 800,

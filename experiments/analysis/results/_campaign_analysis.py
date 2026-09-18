@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""One-shot analysis of benchmarks/campaigns/campaign_20260918T130756Z.jsonl.
+"""One-shot analysis of experiments/bench/campaigns/campaign_20260918T130756Z.jsonl.
 Writes analysis/results/campaign_analysis.json. Stdlib only; bootstrap seed 42."""
 import json, math, random, statistics
 from collections import defaultdict
 
-SRC = "benchmarks/campaigns/campaign_20260918T130756Z.jsonl"
+SRC = "experiments/bench/campaigns/campaign_20260918T130756Z.jsonl"
 OUT = "analysis/results/campaign_analysis.json"
 RTTS = [0, 15, 40, 80]
 B = 1000
@@ -243,7 +243,7 @@ notes.append(
 )
 
 out = {
-    "source": "benchmarks/campaigns/campaign_20260918T130756Z.jsonl",
+    "source": "experiments/bench/campaigns/campaign_20260918T130756Z.jsonl",
     "n_records": len(recs),
     "method": {
         "bootstrap": f"{B} resamples, seed {SEED}, percentile 2.5/97.5",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble analysis/results/live_retrieval_quality.json from run artifacts.
+"""Assemble experiments/analysis/results/live_retrieval_quality.json from run artifacts.
 
 Replaces the former hand-assembled quality report (no script produced it —
 a reproducibility hole against paper claim C4). This script is the single
@@ -7,7 +7,7 @@ generator: it shells out to the proven scorer (eval/compute_metrics.py) and
 merges the result with provenance + retrieval-latency statistics extracted
 from the run JSONL.
 
-The output schema keeps the keys consumed by analysis/figures.py::fig7
+The output schema keeps the keys consumed by experiments/analysis/figures.py::fig7
 (metrics.<mode>.{mrr@10,ndcg@10,recall@100}).
 
 Usage::
@@ -18,7 +18,7 @@ Usage::
         --gateway http://10.8.0.2:8000 \
         --queries-file /home/apath/Work/PDC/data/msmarco/queries.dev.tsv \
         --seed 42 --limit 500 --top-k 100 --rrf-k 60 \
-        --out analysis/results/live_retrieval_quality.json
+        --out experiments/analysis/results/live_retrieval_quality.json
 """
 from __future__ import annotations
 
@@ -91,9 +91,9 @@ def _findings(metrics: dict) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--run", required=True, help="run JSONL from benchmarks/run_eval.py")
+    ap.add_argument("--run", required=True, help="run JSONL from experiments/bench/run_eval.py")
     ap.add_argument("--qrels", required=True, help="TREC qrels file")
-    ap.add_argument("--out", default="analysis/results/live_retrieval_quality.json")
+    ap.add_argument("--out", default="experiments/analysis/results/live_retrieval_quality.json")
     ap.add_argument("--gateway", default="http://10.8.0.2:8000")
     ap.add_argument("--queries-file", default="")
     ap.add_argument("--seed", type=int, default=None)
@@ -154,7 +154,7 @@ def main() -> int:
             "mode": "hybrid (single run returns sparse + dense + fused rankings on an identical query set)",
             "retrieval_only": args.retrieval_only,
             "warmups": args.warmups,
-            "driver": "benchmarks/run_eval.py",
+            "driver": "experiments/bench/run_eval.py",
             "scorer": "eval/compute_metrics.py (eval/metrics.py)",
             "run_file": str(Path(args.run).resolve()),
         },

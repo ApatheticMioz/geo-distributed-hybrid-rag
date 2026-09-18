@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline quality-metrics CLI for the Node B hybrid retrieval gateway.
 
-Reads a JSONL run file produced by ``benchmarks/run_eval.py`` (one record per
+Reads a JSONL run file produced by ``experiments/bench/run_eval.py`` (one record per
 query, each carrying ``qid`` and one or more ``<mode>_doc_ids`` arrays),
 scores every ``*_doc_ids`` array present against a TREC qrels file, and writes
 a JSON report.
@@ -123,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     ap.add_argument("--run", required=True,
-                    help="JSONL run file from benchmarks/run_eval.py")
+                    help="JSONL run file from experiments/bench/run_eval.py")
     ap.add_argument("--qrels", required=True,
                     help="TREC qrels file (col0=qid, col2=pid)")
     ap.add_argument("--out", required=True, help="Output JSON report path")
