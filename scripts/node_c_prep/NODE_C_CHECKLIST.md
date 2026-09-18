@@ -1,20 +1,23 @@
-# Node C Onboarding Checklist — 3-Node Remote WAN Campaign
+# Node C Onboarding Checklist — Sparse Retrieval + User-Facing Tier
 
 > **Purpose.** This package prepares the remote laptop **Node C** (WireGuard
-> address `10.8.0.3`) to act as the *client / entry node* for the 3-node
-> geo-distributed hybrid-RAG campaign. Node C sends queries to the **Node B**
-> gateway (`10.8.0.2:8000`) and, transitively, to the **Node A** generation
-> host (`10.8.0.1:50052`). Everything in this folder is self-contained and
-> stdlib-only so it runs on a stock laptop with no GPU and no heavy
-> dependencies.
+> address `10.8.0.3`) for its role in the 3-node geo-distributed hybrid-RAG
+> campaign. Node C is **not** a bare client: it (a) hosts the **Tantivy BM25
+> sparse index**, so the sparse leg — and the SPHP sparse hint — originates
+> one hop closer to the user, and (b) acts as the **user-facing tier**: client
+> queries enter at C, which runs sparse locally and forwards the dense leg to
+> the Node B gateway (`10.8.0.2:8000`). Generation remains on Node A behind
+> Node B's existing P2 path (`10.8.0.1:50052`, reached transitively).
+>
+> This supersedes the earlier client-only design (retired 2026-09-18).
 
 **Node roles & addresses**
 
 | Node | Role | WireGuard IP | Service | Port |
 |------|------|--------------|---------|------|
-| A | Generation host (RTX 3090, vLLM LLaMA-3 AWQ) | `10.8.0.1` | gRPC `GenerationOrchestrator` | `50052` |
-| B | Edge gateway (GTX 1660 Ti, BM25 + BGE-M3 + RRF) | `10.8.0.2` | HTTP FastAPI gateway | `8000` |
-| C | **Remote client / entry node (this laptop)** | `10.8.0.3` | — (client only) | — |
+| A | Generation host (RTX 3090, vLLM Qwen3.8-27B W4A16) | `10.8.0.1` | gRPC `GenerationOrchestrator` | `50052` |
+| B | Dense + fusion gateway (GTX 1660 Ti, BGE-M3/Qdrant + RRF) | `10.8.0.2` | HTTP FastAPI gateway | `8000` |
+| C | **Sparse retrieval (Tantivy) + user-facing tier (this laptop)** | `10.8.0.3` | FastAPI gateway + local Tantivy | `8000` |
 
 Work through the steps in order. Each step has a **verify** line; do not
 proceed until it passes.
@@ -32,9 +35,7 @@ Node C must be a peer on the same WireGuard mesh as Nodes A and B.
    # Fedora
    sudo dnf install -y wireguard-tools
    ```
-2. **Create the Node C peer config** `/etc/wireguard/wg0.conf`. Replace
-   `PUBLIC_KEY_NODE_C` with Node C's public key and `PEER_*` with the
-   public keys + endpoints of the existing peers (A and B). The `Address`
+2. **Create the Node C peer config** `/etc/wireguard/wg0.conf`. The `Address`
    **must** be `10.8.0.3/24` to match the campaign topology:
    ```ini
    [Interface]
@@ -58,139 +59,135 @@ Node C must be a peer on the same WireGuard mesh as Nodes A and B.
    ```bash
    ip addr show wg0            # must show 10.8.0.3/24
    wg show                     # must list the interface with peers
+   ping -c 3 10.8.0.2          # record RTT (B)
+   ping -c 3 10.8.0.1          # record RTT (A)
    ```
-
-> **Note.** If the campaign uses a pre-shared mesh where Node C is already a
-> peer, skip straight to the verify line. The rest of this checklist only
-> needs `10.8.0.3` to be reachable from A and B.
 
 ---
 
-## 2. SSH access
+## 2. SSH access and repo sync
 
-Node C is operated over SSH. Confirm you can reach it and that the working
-directory is in place.
+Node C is operated over SSH and gets code via git (same deploy pattern as
+Node B: push from Node A, pull on the node).
 
-1. **From a trusted machine, open a session:**
+1. **From Node A (or a trusted machine), open a session:**
    ```bash
    ssh <user>@<node-c-lan-ip>
    ```
-2. **Confirm the repo / package is present:**
+2. **Clone or pull the project repo** (Node C runs from the same repository;
+   its runtime config is `Node C/config.yaml` until the repo restructure
+   relocates it):
    ```bash
-   ls scripts/node_c_prep/
-   # expect: NODE_C_CHECKLIST.md  preflight.sh  run_node_c_benchmark.py
+   git -C <repo-path> pull --ff-only
    ```
-3. **Confirm the Python interpreter:**
-   ```bash
-   python3 --version   # 3.8+ (stdlib only; no pip installs required)
-   ```
-4. **Verify:** the three files above list cleanly and `python3` reports a
-   version ≥ 3.8.
-
-> If the laptop is a Windows/WSL host, run the package inside the WSL
-> distribution so that `bash`, `ping`, and `/dev/tcp` behave as documented.
+3. **Verify:** `git -C <repo-path> log --oneline -1` matches the commit Node A
+   pushed most recently.
 
 ---
 
-## 3. Python environment setup
+## 3. Python environment
 
-The benchmark client is **stdlib-only** — no `pip install` is required. This
-step only confirms the interpreter and the output location.
+Unlike the old client-only package, the sparse tier needs real dependencies
+(Tantivy + FastAPI), not just stdlib.
 
-1. **Confirm no third-party imports are needed:**
+1. **Create an isolated environment:**
    ```bash
-   python3 -m py_compile scripts/node_c_prep/run_node_c_benchmark.py && echo OK
+   python3 --version            # 3.10+ recommended
+   python3 -m venv .venv-nodec
+   . .venv-nodec/bin/activate
+   pip install tantivy fastapi uvicorn requests pyyaml
    ```
-2. **Ensure the results directory exists** (the client creates it, but create
-   it explicitly to catch permission problems early):
+2. **Verify:**
    ```bash
-   mkdir -p benchmarks
+   python3 -c "import tantivy, fastapi, uvicorn, requests; print('OK')"
    ```
-3. **Verify:** `py_compile` prints `OK` and `benchmarks/` is writable.
 
-> The client writes to `benchmarks/results_node_c.json` (relative to the
-> project root). If you run from a different working directory, pass
-> `--out <path>` to override.
+> If Node C is a Windows/WSL host, run everything inside the WSL
+> distribution so that `bash`, `ping`, and `tar` behave as documented.
 
 ---
 
-## 4. Preflight connectivity probe
+## 4. Transfer the Tantivy index (~3.2 GB)
 
-Run the automated probe **before** the campaign. It checks ping, MTU, and the
-two service ports, and exits non-zero if anything is unreachable.
+The full sparse index lives on Node B at
+`node_B/implementation/data/tantivy_index_full`. Transfer it with the same
+tar-over-ssh pattern used by `scripts/transfer_tantivy.sh`, targeted at C:
 
 ```bash
-# Full probe (real network)
-bash scripts/node_c_prep/preflight.sh
-
-# Local syntax / logic test — no network, always exits 0
-bash scripts/node_c_prep/preflight.sh --dry-run
+# From Node B (or from Node A ssh'd to B), adjust <user>@<node-c-ip>:
+REMOTE_DIR=<repo-path>/data/tantivy_index
+ssh <user>@<node-c-ip> "mkdir -p '$REMOTE_DIR'"
+tar -cf - -C node_B/implementation/data/tantivy_index_full . \
+    | ssh <user>@<node-c-ip> "tar -xf - -C '$REMOTE_DIR'"
 ```
 
-**What it checks**
+1. **Verify the index loads** (build/load check, do not rebuild the corpus):
+   ```bash
+   python3 - <<'PY'
+   import tantivy
+   idx = tantivy.Index.open("<repo-path>/data/tantivy_index")
+   print("index OK:", idx.num_docs(), "documents")
+   PY
+   ```
+   Expect ≈ 8,841,823 documents.
+2. **Spot-check one BM25 query** returns ranked hits in well under a second
+   (cold first query may be slower while the page cache warms).
+
+---
+
+## 5. Preflight connectivity probe
+
+Run the automated probe **before** the campaign
+(`bash scripts/node_c_prep/preflight.sh`; `--dry-run` for a no-network logic
+test). Required checks for the new role:
 
 | Check | Target | Pass criterion |
 |-------|--------|----------------|
 | Ping | `10.8.0.1` (A), `10.8.0.2` (B) | ≥ 1 reply, RTT recorded |
 | MTU | `10.8.0.1`, `10.8.0.2` | largest non-fragmented payload (≤ 1500) |
-| Port | `10.8.0.1:50052` (gRPC) | TCP connect succeeds |
-| Port | `10.8.0.2:8000` (HTTP) | TCP connect succeeds |
+| Port | `10.8.0.2:8000` (B gateway, dense+fusion leg) | TCP connect + HTTP 200 |
+| Port | `10.8.0.1:50052` (A gRPC, transitive via B) | TCP connect from B |
 
-**Verify:** the probe prints a `PREFLIGHT: PASS` summary and exits `0`. If it
-fails, fix the corresponding step above (usually WireGuard) and re-run.
-
----
-
-## 5. Cross-site benchmark (SPHP on/off)
-
-With the preflight green, run the cross-site benchmark. It queries the Node B
-gateway with SPHP **disabled** and **enabled**, records client-side RTT, TTFT,
-TPS, and total latency, and writes `benchmarks/results_node_c.json`.
-
-```bash
-# Default: 10 queries per SPHP mode, 0 ms simulated WAN delay
-python3 scripts/node_c_prep/run_node_c_benchmark.py
-
-# Full campaign shape: 50 queries, 40 ms one-way WAN delay, both SPHP modes
-python3 scripts/node_c_prep/run_node_c_benchmark.py \
-    --queries benchmarks/queries50.txt \
-    --wan-delay 40 \
-    --both-modes
-
-# Quick smoke test (2 queries, SPHP on only)
-python3 scripts/node_c_prep/run_node_c_benchmark.py --n 2 --sphp-only
-```
-
-**Key flags**
-
-| Flag | Meaning | Default |
-|------|---------|---------|
-| `--gateway` | Node B base URL | `http://10.8.0.2:8000` |
-| `--queries` | Path to a one-query-per-line file | built-in 10-query set |
-| `--n` | Number of queries to run per mode | `10` |
-| `--top-k` | Retrieval depth | `10` |
-| `--wan-delay` | One-way WAN delay (ms) via `X-Simulate-WAN-Delay` | `0` |
-| `--sphp-only` / `--no-sphp` / `--both-modes` | Which SPHP mode(s) to run | `--both-modes` |
-| `--out` | Output JSON path | `benchmarks/results_node_c.json` |
-| `--rtt-probes` | Number of RTT probe samples | `3` |
-
-**Verify:** the run prints a per-mode summary table and writes
-`benchmarks/results_node_c.json`. Open it and confirm both `sphp_enabled` and
-`sphp_disabled` arrays are populated with `ttft_ms`, `tps`, `total_ms`, and
-`client_rtt_ms` fields.
+**Verify:** the probe prints a `PREFLIGHT: PASS` summary and exits `0`.
 
 ---
 
-## 6. Pre-campaign sign-off
+## 6. End-to-end smoke through Node C
 
-Before the remote WAN campaign starts, confirm all of the following:
+Bring up C's user-facing gateway and prove the full 3-node path once:
 
-- [ ] `wg0` is up and shows `10.8.0.3/24`
+1. **Start C's gateway** (sparse at C; dense+fusion forwarded to B):
+   ```bash
+   . .venv-nodec/bin/activate
+   python3 -m uvicorn gateway:app --host 0.0.0.0 --port 8000   # per config.yaml
+   ```
+2. **Query it** from another shell:
+   ```bash
+   curl -s http://10.8.0.3:8000/query -H 'Content-Type: application/json' \
+        -d '{"query":"who wrote the origin of species","top_k":10}'
+   ```
+3. **Verify:** the response carries per-leg timings with the sparse leg
+   served locally at C (sub-100 ms warm) and the dense leg crossing to B;
+   the generated tokens stream back through C to the client.
+
+> **SPHP note for the 3-node topology:** because the sparse tier lives on C
+> (the user-facing node), the provisional sparse hint no longer waits for a
+> cross-link sparse leg — it is available immediately. Measuring how this
+> reshapes the SPHP cold/warm deltas is a primary 3-node deliverable.
+
+---
+
+## 7. Pre-campaign sign-off
+
+Before the 3-node campaign starts, confirm all of the following:
+
+- [ ] `wg0` is up and shows `10.8.0.3/24`; RTTs to A and B recorded
+- [ ] Node C repo is at the same commit Node A pushed
+- [ ] Tantivy index loads on C with ≈ 8.84M documents; BM25 spot-query OK
 - [ ] `preflight.sh` prints `PREFLIGHT: PASS` (exit 0)
-- [ ] `run_node_c_benchmark.py --n 2 --both-modes` completes and writes a
-      valid `results_node_c.json`
-- [ ] The SPHP-enabled TTFT is ≤ the SPHP-disabled TTFT (sanity check that the
-      speculative path is actually engaged)
+- [ ] End-to-end smoke through `10.8.0.3:8000` returns per-leg timings with
+      sparse served at C
+- [ ] Netem plan for the two legs (C–B, B–A) agreed; shaping validated
+      bidirectionally per leg before any measured window
 
-If all four boxes are ticked, Node C is ready for the 3-node remote WAN
-campaign.
+If all boxes are ticked, Node C is ready for the 3-node campaign.
