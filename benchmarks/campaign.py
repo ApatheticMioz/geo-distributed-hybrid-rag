@@ -1,37 +1,50 @@
 #!/usr/bin/env python3
 """
-Factorial campaign runner for the Node B hybrid RAG gateway.
+Final-matrix campaign runner for the Node B hybrid RAG gateway.
 
-Sweeps the full factorial of:
+Sweeps the paper's final matrix:
 
-    topology  x  rtt  x  loss  x  mode  x  repeat  x  query
+    (rtt, loss)  x  mode  x  variant  x  query  x  repeat
 
-and, for each network regime ``(rtt, loss)``, applies kernel-level WAN shaping
-via ``scripts/netem/apply.sh`` (and clears it with ``clear.sh``) so that every
-hop of the gateway -> Node A path is shaped, not just an application-level
-header.  The baseline regime ``(rtt=0, loss=0)`` runs unshaped.
+where:
+  * (rtt, loss) is the WAN regime, shaped via ``scripts/netem/apply.sh``
+    (and cleared with ``clear.sh``) so every hop of the gateway -> Node A
+    path is shaped, not just an application-level header.  The baseline
+    regime ``(rtt=0, loss=0)`` runs unshaped.
+  * mode is the retrieval mode (``hybrid`` | ``dense`` | ``sparse``).
+  * variant is the SPHP axis: with ``--sphp-axis``, mode=hybrid runs two
+    variants per tier (``baseline`` sphp=false and ``sphp`` sphp=true);
+    dense/sparse run once (no variant).
+  * query is a seeded sample of N+W queries drawn from the queries file.
+    The first W are per-arm warmups (executed but NOT recorded, so the
+    measured sample's prefixes stay cold for repeat 0); the remaining N are
+    the measured sample.
+  * repeat is the back-to-back repeat index (0..R-1) per measured query.
+    No cache is flushed (the engine has no flush endpoint), so repeat 0 is
+    the cold-prefix reference and repeats 1..R-1 are warm.
 
 For every measured query execution the runner:
   * POSTs to the gateway ``/query/benchmark`` endpoint,
   * appends a full-timing JSONL record to ``<out-dir>/campaign_<run_id>.jsonl``.
 
 At the end it writes:
-  * ``<out-dir>/summary_<run_id>.csv``  (p50/p95 TTFT + total latency per cell)
+  * ``<out-dir>/summary_<run_id>.csv``  (per (tier, mode, variant) summary)
   * ``<out-dir>/summary_<run_id>.json`` (same summary + run metadata)
 
 The runner is intentionally stdlib-only so it can run from the orchestration
 host against the live gateway.  ``--dry-run`` prints the plan only: no netem,
 no HTTP, no output files.
 
-Usage:
+Usage (the paper's final matrix — 4 WAN regimes x SPHP on/off, hybrid mode):
     python3 benchmarks/campaign.py \
         --gateway-url http://10.8.0.2:8000 \
         --queries benchmarks/queries50.txt \
-        --topologies P0 P2 \
-        --rtt-tiers 0 10 50 100 200 \
-        --loss-tiers 0 1 \
-        --modes hybrid dense sparse \
-        --repeats 3 --warmups 2 \
+        --rtt-tiers 0 15 40 80 \
+        --loss-tiers 0 \
+        --modes hybrid \
+        --sphp-axis \
+        --query-sample 50 --seed 42 \
+        --warmups 5 --repeats 3 \
         --out-dir benchmarks/campaigns
 
     # Plan only (no netem, no HTTP, no files):
@@ -42,6 +55,7 @@ import argparse
 import csv
 import json
 import math
+import random
 import subprocess
 import sys
 import time
@@ -59,8 +73,17 @@ NETEM_DIR = PROJECT_ROOT / "scripts" / "netem"
 APPLY_SH = NETEM_DIR / "apply.sh"
 CLEAR_SH = NETEM_DIR / "clear.sh"
 
-VALID_TOPOLOGIES = ("P0", "P2")
 VALID_MODES = ("hybrid", "sparse", "dense")
+
+# Timing fields echoed by /query/benchmark (flattened into each JSONL record).
+TIMING_FIELDS = (
+    "sparse_ms", "dense_ms", "fusion_ms", "ttft_ms",
+    "decode_ms", "total_ms", "simulated_wan_ms",
+)
+# Top-level response fields flattened into each JSONL record.
+RESPONSE_FIELDS = ("token_count", "decode_tps")
+# SPHP fields (present only when the sphp axis is exercised).
+SPHP_FIELDS = ("sphp_hit", "sphp_overlap", "wasted_prefill_ms")
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +122,22 @@ def resolve_queries_path(path: str) -> str:
     return path  # let load_queries raise a clear error
 
 
+def sample_queries(queries: List[str], n: int, warmups: int, seed: int) -> List[str]:
+    """Shuffle all queries with a seeded RNG and take the first N+WARMUPS.
+
+    The first WARMUPS of the returned list are the per-arm warmups (executed
+    but not recorded); the remaining N are the measured sample.  Because the
+    warmups are drawn from a disjoint prefix of the shuffled order, they do
+    not prime the measured sample's prefixes, keeping repeat 0 cold.  A fixed
+    seed makes the sample reproducible across reruns.
+    """
+    k = min(n + warmups, len(queries))
+    rng = random.Random(seed)
+    shuffled = list(queries)
+    rng.shuffle(shuffled)
+    return shuffled[:k]
+
+
 def percentile(values: List[float], p: float) -> float:
     """Linear-interpolation percentile (p in 0..100)."""
     if not values:
@@ -116,20 +155,16 @@ def percentile(values: List[float], p: float) -> float:
     return float(s[lo] * (1.0 - frac) + s[hi] * frac)
 
 
-def summarize(values: List[float]) -> Dict[str, float]:
-    """Return n/mean/p50/p95/min/max for a list of latency samples (ms)."""
+def mean_std(values: List[float]) -> Tuple[float, float]:
+    """Return (mean, population std) for a list of values."""
     if not values:
-        return {"n": 0, "mean": 0.0, "p50": 0.0, "p95": 0.0, "min": 0.0, "max": 0.0}
+        return 0.0, 0.0
     n = len(values)
-    mean = sum(values) / n
-    return {
-        "n": n,
-        "mean": round(mean, 2),
-        "p50": round(percentile(values, 50), 2),
-        "p95": round(percentile(values, 95), 2),
-        "min": round(min(values), 2),
-        "max": round(max(values), 2),
-    }
+    m = sum(values) / n
+    if n < 2:
+        return m, 0.0
+    var = sum((x - m) ** 2 for x in values) / n
+    return m, math.sqrt(var)
 
 
 # ---------------------------------------------------------------------------
@@ -205,28 +240,34 @@ def check_health(gateway: str, timeout: int = 15) -> bool:
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="Factorial campaign runner for the Node B hybrid RAG gateway.",
+        description="Final-matrix campaign runner for the Node B hybrid RAG gateway.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     ap.add_argument("--gateway-url", default="http://10.8.0.2:8000",
                     help="Node B gateway base URL")
     ap.add_argument("--queries", default="benchmarks/queries50.txt",
                     help="Path to a one-query-per-line text file")
-    ap.add_argument("--topologies", nargs="+", default=list(VALID_TOPOLOGIES),
-                    choices=VALID_TOPOLOGIES,
-                    help="Placement topology presets to sweep")
     ap.add_argument("--rtt-tiers", nargs="+", type=int,
-                    default=[0, 10, 50, 100, 200],
-                    help="One-way RTT tiers (ms) to sweep")
+                    default=[0, 15, 40, 80],
+                    help="One-way RTT tiers (ms) to sweep (paper tiers)")
     ap.add_argument("--loss-tiers", nargs="+", type=int, default=[0, 1],
                     help="Packet-loss tiers (%%) to sweep")
     ap.add_argument("--modes", nargs="+", default=["hybrid", "dense", "sparse"],
                     choices=VALID_MODES,
                     help="Retrieval modes to sweep")
+    ap.add_argument("--sphp-axis", action="store_true",
+                    help="For mode=hybrid, run two variants per tier "
+                         "(sphp=false baseline and sphp=true); dense/sparse run once")
+    ap.add_argument("--query-sample", type=int, default=50,
+                    help="Number of measured queries per arm (N)")
+    ap.add_argument("--seed", type=int, default=42,
+                    help="RNG seed for the query sample (reproducible)")
     ap.add_argument("--repeats", type=int, default=3,
-                    help="Measured repeats (full passes over the query set) per cell")
-    ap.add_argument("--warmups", type=int, default=2,
-                    help="Warmup requests per (rtt, loss, mode) before measuring")
+                    help="Back-to-back repeats per measured query (R); "
+                         "repeat 0 is the cold-prefix reference")
+    ap.add_argument("--warmups", type=int, default=5,
+                    help="Warmup queries per (tier, mode, variant) arm (W); "
+                         "executed but not recorded")
     ap.add_argument("--top-k", type=int, default=10,
                     help="top_k sent to the gateway")
     ap.add_argument("--timeout", type=int, default=120,
@@ -239,34 +280,70 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 # ---------------------------------------------------------------------------
+# Variant expansion
+# ---------------------------------------------------------------------------
+def variants_for_mode(mode: str, sphp_axis: bool) -> List[str]:
+    """Return the list of variant labels for a mode.
+
+    hybrid + sphp_axis -> ["baseline", "sphp"]; otherwise -> ["baseline"].
+    """
+    if mode == "hybrid" and sphp_axis:
+        return ["baseline", "sphp"]
+    return ["baseline"]
+
+
+def sphp_flag_for_variant(variant: str) -> bool:
+    return variant == "sphp"
+
+
+# ---------------------------------------------------------------------------
 # Plan / dry-run
 # ---------------------------------------------------------------------------
-def print_plan(args: argparse.ArgumentParser, queries: List[str]) -> None:
+def print_plan(args: argparse.Namespace, all_queries: List[str],
+               measured_queries: List[str], warmup_queries: List[str]) -> None:
     n_regimes = len(args.rtt_tiers) * len(args.loss_tiers)
-    n_cells = n_regimes * len(args.topologies) * len(args.modes)
-    n_measured = n_cells * args.repeats * len(queries)
-    n_warmups = (len(args.rtt_tiers) * len(args.loss_tiers)
-                * len(args.modes) * args.warmups)
+    n_variants_per_mode = {
+        m: len(variants_for_mode(m, args.sphp_axis)) for m in args.modes
+    }
+    n_variants_per_regime = sum(n_variants_per_mode[m] for m in args.modes)
+    n_arms = n_regimes * n_variants_per_regime
+    # Actual per-arm counts (the sample is capped by the file size).
+    n_measured_per_arm = len(measured_queries) * args.repeats
+    n_warmups_per_arm = len(warmup_queries)
+    n_total_per_arm = n_warmups_per_arm + n_measured_per_arm
+    n_measured = n_arms * n_measured_per_arm
+    n_warmups = n_arms * n_warmups_per_arm
+    n_total = n_arms * n_total_per_arm
     n_shaped = sum(1 for r in args.rtt_tiers for l in args.loss_tiers
                    if not (r == 0 and l == 0))
 
     print("=" * 78)
-    print("FACTORIAL CAMPAIGN RUNNER (Node B hybrid RAG gateway) — DRY RUN")
+    print("FINAL-MATRIX CAMPAIGN RUNNER (Node B hybrid RAG gateway) — DRY RUN")
     print("=" * 78)
     print(f"  gateway      : {args.gateway_url}")
-    print(f"  queries file : {args.queries} ({len(queries)} queries)")
-    print(f"  topologies   : {args.topologies}")
+    print(f"  queries file : {args.queries} ({len(all_queries)} queries total)")
+    print(f"  query sample : N={args.query_sample} measured + W={args.warmups} warmups "
+          f"(seed={args.seed})")
+    if len(measured_queries) < args.query_sample:
+        print(f"  WARNING      : only {len(all_queries)} queries available; "
+              f"sampled {len(measured_queries)} measured + "
+              f"{len(warmup_queries)} warmups (need {args.query_sample} + "
+              f"{args.warmups} distinct). Add more queries to the file to "
+              f"reach the full N.")
     print(f"  rtt tiers    : {args.rtt_tiers} ms")
     print(f"  loss tiers   : {args.loss_tiers} %")
     print(f"  modes        : {args.modes}")
-    print(f"  repeats      : {args.repeats}")
-    print(f"  warmups      : {args.warmups} per (rtt, loss, mode)")
+    print(f"  sphp axis    : {args.sphp_axis}")
+    print(f"  repeats      : {args.repeats} per measured query")
     print(f"  top_k        : {args.top_k}")
     print(f"  out dir      : {args.out_dir}")
     print(f"  regimes      : {n_regimes} (rtt x loss)")
-    print(f"  cells        : {n_cells} (regime x topology x mode)")
-    print(f"  measured req : {n_measured}")
-    print(f"  warmup req   : {n_warmups}")
+    print(f"  variants/regime: {n_variants_per_regime} "
+          f"({', '.join(f'{m}={n_variants_per_mode[m]}' for m in args.modes)})")
+    print(f"  arms         : {n_arms} (regime x mode x variant)")
+    print(f"  measured req : {n_measured}  (arms x {len(measured_queries)} x R)")
+    print(f"  warmup req   : {n_warmups}  (arms x {len(warmup_queries)})")
+    print(f"  total req    : {n_total}  (arms x (W + N x R))")
     print(f"  shaped regimes (netem apply/clear): {n_shaped}")
     print("-" * 78)
     print("  Plan (netem would be applied/cleared for shaped regimes only):")
@@ -276,11 +353,103 @@ def print_plan(args: argparse.ArgumentParser, queries: List[str]) -> None:
             tag = "shaped" if shaped else "baseline"
             print(f"    regime rtt={rtt:>3}ms loss={loss}%  [{tag}]")
             for mode in args.modes:
-                for topo in args.topologies:
-                    print(f"        mode={mode:<7} topology={topo}  "
-                          f"-> {args.repeats} repeats x {len(queries)} queries")
+                for variant in variants_for_mode(mode, args.sphp_axis):
+                    print(f"        mode={mode:<7} variant={variant:<8}  "
+                          f"-> {len(warmup_queries)} warmups + "
+                          f"{len(measured_queries)} x {args.repeats} measured")
     print("-" * 78)
     print("  DRY RUN complete. No network calls, no netem, no files were made.")
+
+
+# ---------------------------------------------------------------------------
+# Record building
+# ---------------------------------------------------------------------------
+def build_record(
+    run_id: str,
+    rtt: int,
+    loss: int,
+    mode: str,
+    variant: str,
+    repeat_index: int,
+    query: str,
+    res: Dict[str, Any],
+    netem_applied: bool,
+) -> Dict[str, Any]:
+    """Flatten a /query/benchmark response into a single JSONL record."""
+    timings = res.get("timings", {}) or {}
+    rec: Dict[str, Any] = {
+        "run_id": run_id,
+        "timestamp": _now_iso(),
+        "query_id": res.get("query_id"),
+        "query": query,
+        "rtt_ms": rtt,
+        "loss_pct": loss,
+        "mode": mode,
+        "variant": variant,
+        "repeat_index": repeat_index,
+        "top_k": res.get("top_k"),
+        "netem_applied": netem_applied,
+    }
+    # All timing fields from the response.
+    for f in TIMING_FIELDS:
+        rec[f] = timings.get(f)
+    # Top-level response fields.
+    for f in RESPONSE_FIELDS:
+        rec[f] = res.get(f)
+    # SPHP fields (present only when the sphp axis is exercised).
+    for f in SPHP_FIELDS:
+        if f in res:
+            rec[f] = res.get(f)
+        elif f in timings:
+            rec[f] = timings.get(f)
+    return rec
+
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+def summarize_arm(recs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Compute the per-(tier, mode, variant) summary row from measured records."""
+    ok_recs = [r for r in recs if "error" not in r]
+    ttft_vals = [r.get("ttft_ms") or 0.0 for r in ok_recs]
+    total_vals = [r.get("total_ms") or 0.0 for r in ok_recs]
+
+    ttft_mean, ttft_std = mean_std(ttft_vals)
+    total_mean, _ = mean_std(total_vals)
+
+    # Cold-prefix (repeat 0) vs warm (repeats 1..R-1) TTFT.
+    ttft_repeat0 = [r.get("ttft_ms") or 0.0 for r in ok_recs
+                    if r.get("repeat_index") == 0]
+    ttft_warm = [r.get("ttft_ms") or 0.0 for r in ok_recs
+                 if r.get("repeat_index", 0) >= 1]
+    ttft_repeat0_mean, _ = mean_std(ttft_repeat0)
+    ttft_warm_mean, _ = mean_std(ttft_warm)
+
+    # SPHP hit rate and mean overlap (only meaningful for the sphp variant).
+    sphp_hits = [r.get("sphp_hit") for r in ok_recs
+                 if r.get("sphp_hit") is not None]
+    sphp_hit_rate = (sum(1 for h in sphp_hits if h) / len(sphp_hits)) \
+        if sphp_hits else None
+    overlaps = [r.get("sphp_overlap") for r in ok_recs
+                if r.get("sphp_overlap") is not None]
+    mean_overlap = (sum(overlaps) / len(overlaps)) if overlaps else None
+
+    return {
+        "n": len(ok_recs),
+        "n_errors": len(recs) - len(ok_recs),
+        "ttft_mean": round(ttft_mean, 2),
+        "ttft_p50": round(percentile(ttft_vals, 50), 2),
+        "ttft_p95": round(percentile(ttft_vals, 95), 2),
+        "ttft_std": round(ttft_std, 2),
+        "total_mean": round(total_mean, 2),
+        "total_p95": round(percentile(total_vals, 95), 2),
+        "ttft_repeat0_mean": round(ttft_repeat0_mean, 2),
+        "ttft_warm_mean": round(ttft_warm_mean, 2),
+        "sphp_hit_rate": round(sphp_hit_rate, 4)
+        if sphp_hit_rate is not None else None,
+        "mean_overlap": round(mean_overlap, 4)
+        if mean_overlap is not None else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -291,18 +460,24 @@ def main() -> None:
 
     queries_path = resolve_queries_path(args.queries)
     try:
-        queries = load_queries(queries_path)
+        all_queries = load_queries(queries_path)
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
-    if not queries:
+    if not all_queries:
         print(f"ERROR: no queries loaded from {queries_path}", file=sys.stderr)
         sys.exit(1)
+
+    # Seeded sample of N+WARMUPS queries; first W are warmups, next N measured.
+    sampled = sample_queries(all_queries, args.query_sample, args.warmups,
+                             args.seed)
+    warmup_queries = sampled[:args.warmups]
+    measured_queries = sampled[args.warmups:args.warmups + args.query_sample]
 
     endpoint = args.gateway_url.rstrip("/") + "/query/benchmark"
 
     if args.dry_run:
-        print_plan(args, queries)
+        print_plan(args, all_queries, measured_queries, warmup_queries)
         return
 
     # Health check (fail fast if the gateway is down).
@@ -322,10 +497,12 @@ def main() -> None:
     csv_path = out_dir / f"summary_{run_id}.csv"
     json_path = out_dir / f"summary_{run_id}.json"
 
-    # Accumulator: cell key (topology, rtt, loss, mode) -> list of records.
-    cells: Dict[Tuple[str, int, int, str], List[Dict[str, Any]]] = {}
+    # Accumulator: arm key (rtt, loss, mode, variant) -> list of measured records.
+    arms: Dict[Tuple[int, int, str, str], List[Dict[str, Any]]] = {}
     n_ok = 0
     n_err = 0
+    n_warmup_ok = 0
+    n_warmup_err = 0
 
     jsonl_f = open(jsonl_path, "w", encoding="utf-8")
     try:
@@ -337,32 +514,42 @@ def main() -> None:
                 netem_applied = apply_netem(rtt, loss, dry_run=False)
 
                 for mode in args.modes:
-                    # Warmups (not measured, not written) — prime GPU / caches.
-                    for w in range(args.warmups):
-                        try:
-                            http_post_json(endpoint, {
-                                "query": f"warmup query {w}",
-                                "top_k": args.top_k,
-                                "mode": mode,
-                            }, timeout=args.timeout)
-                        except Exception as e:
-                            print(f"    [warmup] {mode} w={w} failed: {e}",
-                                  file=sys.stderr)
+                    for variant in variants_for_mode(mode, args.sphp_axis):
+                        sphp = sphp_flag_for_variant(variant)
+                        arm_key = (rtt, loss, mode, variant)
+                        print(f"  mode={mode:<7} variant={variant:<8} "
+                              f"(sphp={sphp})")
 
-                    for topology in args.topologies:
-                        for rep in range(args.repeats):
-                            for qi, query in enumerate(queries):
-                                t0 = time.perf_counter()
+                        # Warmups: executed but NOT recorded.  Primes GPU/caches
+                        # with distinct queries so the measured sample's
+                        # repeat-0 prefixes stay cold.
+                        for w, wq in enumerate(warmup_queries):
+                            try:
+                                http_post_json(endpoint, {
+                                    "query": wq,
+                                    "top_k": args.top_k,
+                                    "mode": mode,
+                                    "sphp": sphp,
+                                }, timeout=args.timeout)
+                                n_warmup_ok += 1
+                            except Exception as e:
+                                n_warmup_err += 1
+                                print(f"    [warmup] {mode}/{variant} w={w} "
+                                      f"failed: {e}", file=sys.stderr)
+
+                        # Measured: N queries, each R times back-to-back.
+                        for query in measured_queries:
+                            for rep in range(args.repeats):
                                 rec: Dict[str, Any] = {
                                     "run_id": run_id,
                                     "timestamp": _now_iso(),
-                                    "topology": topology,
+                                    "query_id": None,
+                                    "query": query,
                                     "rtt_ms": rtt,
                                     "loss_pct": loss,
                                     "mode": mode,
-                                    "repeat": rep,
-                                    "query_index": qi,
-                                    "query": query,
+                                    "variant": variant,
+                                    "repeat_index": rep,
                                     "top_k": args.top_k,
                                     "netem_applied": netem_applied,
                                 }
@@ -371,13 +558,11 @@ def main() -> None:
                                         "query": query,
                                         "top_k": args.top_k,
                                         "mode": mode,
+                                        "sphp": sphp,
                                     }, timeout=args.timeout)
-                                    rec["query_id"] = res.get("query_id")
-                                    rec["timings"] = res.get("timings", {})
-                                    rec["token_count"] = res.get("token_count")
-                                    rec["decode_tps"] = res.get("decode_tps")
-                                    rec["client_total_ms"] = round(
-                                        (time.perf_counter() - t0) * 1000.0, 2)
+                                    rec = build_record(
+                                        run_id, rtt, loss, mode, variant,
+                                        rep, query, res, netem_applied)
                                     n_ok += 1
                                 except Exception as e:
                                     rec["error"] = str(e)
@@ -385,43 +570,28 @@ def main() -> None:
 
                                 jsonl_f.write(json.dumps(rec) + "\n")
                                 jsonl_f.flush()
-                                cells.setdefault(
-                                    (topology, rtt, loss, mode), []).append(rec)
+                                arms.setdefault(arm_key, []).append(rec)
 
                 clear_netem(dry_run=False)
     finally:
         jsonl_f.close()
 
     # ------------------------------------------------------------------
-    # Summary per factorial cell
+    # Summary per (tier, mode, variant) arm
     # ------------------------------------------------------------------
     summary_rows: List[Dict[str, Any]] = []
-    for (topology, rtt, loss, mode), recs in cells.items():
-        ok_recs = [r for r in recs if "error" not in r]
-        ttft_vals = [r["timings"].get("ttft_ms", 0.0) for r in ok_recs]
-        total_vals = [r["timings"].get("total_ms", 0.0) for r in ok_recs]
-        ttft = summarize(ttft_vals)
-        total = summarize(total_vals)
-        summary_rows.append({
-            "topology": topology,
+    for (rtt, loss, mode, variant), recs in arms.items():
+        row = summarize_arm(recs)
+        row = {
             "rtt_ms": rtt,
             "loss_pct": loss,
             "mode": mode,
-            "n": ttft["n"],
-            "n_errors": len(recs) - len(ok_recs),
-            "ttft_p50_ms": ttft["p50"],
-            "ttft_p95_ms": ttft["p95"],
-            "ttft_mean_ms": ttft["mean"],
-            "ttft_min_ms": ttft["min"],
-            "ttft_max_ms": ttft["max"],
-            "total_p50_ms": total["p50"],
-            "total_p95_ms": total["p95"],
-            "total_mean_ms": total["mean"],
-            "total_min_ms": total["min"],
-            "total_max_ms": total["max"],
-        })
+            "variant": variant,
+            **row,
+        }
+        summary_rows.append(row)
     summary_rows.sort(key=lambda r: (r["rtt_ms"], r["loss_pct"],
-                                     r["mode"], r["topology"]))
+                                     r["mode"], r["variant"]))
 
     # Write CSV.
     if summary_rows:
@@ -437,16 +607,20 @@ def main() -> None:
         "generated_at": _now_iso(),
         "gateway_url": args.gateway_url,
         "queries_file": queries_path,
-        "n_queries": len(queries),
-        "topologies": args.topologies,
+        "n_queries_total": len(all_queries),
+        "query_sample": args.query_sample,
+        "seed": args.seed,
+        "warmups": args.warmups,
         "rtt_tiers": args.rtt_tiers,
         "loss_tiers": args.loss_tiers,
         "modes": args.modes,
+        "sphp_axis": args.sphp_axis,
         "repeats": args.repeats,
-        "warmups": args.warmups,
         "top_k": args.top_k,
         "n_ok": n_ok,
         "n_errors": n_err,
+        "n_warmup_ok": n_warmup_ok,
+        "n_warmup_errors": n_warmup_err,
         "summary": summary_rows,
     }
     with open(json_path, "w", encoding="utf-8") as f:
@@ -456,18 +630,26 @@ def main() -> None:
     # Console summary
     # ------------------------------------------------------------------
     print("\n" + "=" * 78)
-    print(f"SUMMARY  (ok={n_ok} errors={n_err})")
+    print(f"SUMMARY  (measured ok={n_ok} errors={n_err} | "
+          f"warmup ok={n_warmup_ok} errors={n_warmup_err})")
     print("=" * 78)
-    hdr = (f"{'rtt':>4} {'loss':>4} {'mode':<7} {'topo':<5} "
-           f"{'n':>4} {'ttft p50':>9} {'ttft p95':>9} "
-           f"{'total p50':>10} {'total p95':>10}")
+    hdr = (f"{'rtt':>4} {'loss':>4} {'mode':<7} {'variant':<8} "
+           f"{'n':>4} {'ttft mean':>10} {'ttft p50':>9} {'ttft p95':>9} "
+           f"{'ttft std':>9} {'total mean':>11} {'total p95':>10} "
+           f"{'r0 ttft':>8} {'warm ttft':>10} {'sphp hit':>9} {'mean ovl':>9}")
     print(hdr)
     print("-" * len(hdr))
     for r in summary_rows:
+        hit = r["sphp_hit_rate"]
+        ovl = r["mean_overlap"]
+        hit_s = f"{hit:.3f}" if hit is not None else "-"
+        ovl_s = f"{ovl:.3f}" if ovl is not None else "-"
         print(f"{r['rtt_ms']:>4} {r['loss_pct']:>4} {r['mode']:<7} "
-              f"{r['topology']:<5} {r['n']:>4} "
-              f"{r['ttft_p50_ms']:>9.1f} {r['ttft_p95_ms']:>9.1f} "
-              f"{r['total_p50_ms']:>10.1f} {r['total_p95_ms']:>10.1f}")
+              f"{r['variant']:<8} {r['n']:>4} "
+              f"{r['ttft_mean']:>10.1f} {r['ttft_p50']:>9.1f} {r['ttft_p95']:>9.1f} "
+              f"{r['ttft_std']:>9.1f} {r['total_mean']:>11.1f} {r['total_p95']:>10.1f} "
+              f"{r['ttft_repeat0_mean']:>8.1f} {r['ttft_warm_mean']:>10.1f} "
+              f"{hit_s:>9} {ovl_s:>9}")
     print("-" * len(hdr))
     print(f"\nJSONL   : {jsonl_path}")
     print(f"CSV     : {csv_path}")
