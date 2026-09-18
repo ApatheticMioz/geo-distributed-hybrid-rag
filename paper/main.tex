@@ -698,12 +698,55 @@ $\approx$0.82~s reflect the decode phase's share of the budget, which
 placement---and SPHP---leave intact.
 
 \subsection{Live Policy Demonstration}
-% TODO-LIVE-DEMO: fill from analysis/results/live_policy_demo_summary.json
 The cost model is not only retrospective: at deployment time it reads the
 fitted parameters, predicts P2 and P2-SPHP TTFT for the \emph{current}
 network regime, and selects the argmin placement. We demonstrate this live:
 under each netem regime the policy selects a placement, executes live
-queries, and logs the predicted versus realized TTFT.
+queries, and logs the predicted versus realized TTFT. In the demonstration
+the policy selects P2-SPHP at \emph{every} regime, consistent with the
+offline crossover analysis. Each regime serves five fresh seed-42 queries
+three times back-to-back (repeat~0 is the cold-prefix reference; repeats
+1--2 are warm), after two unrecorded warmups, at $k{=}10$; selection uses
+the steady-state (warm) fit.
+
+Table~\ref{tab:livepolicy} reports the outcome. In the warm state the
+realized mean TTFT of the selected placement tracks its prediction to
+within 4.5--8.6\% across all four regimes---inside the 15\% tolerance
+RQ~3 asks of the policy, and comparable to the regime-level validation
+errors of the fit itself. In the cold state the model \emph{overestimates}
+absolute TTFT by 25--36\%: fresh contexts in the demo realized
+2.1--2.4~s against cold predictions of $\approx$3.3~s. The error is
+conservative and leaves the argmin unchanged (the cold fit also selects
+P2-SPHP), but its direction is informative: the campaign's cold reference
+carries the prefix-cache pressure of a sustained 1{,}200-request run,
+whereas the demo's lighter history evicts less, so realized cold cost
+lands below the fitted worst case. The live run therefore re-confirms the
+paper's central operational finding from the policy side: a single-shot
+deployment serving only fresh contexts runs at $\approx$3$\times$
+steady-state TTFT regardless of placement, and a placement policy must
+condition on cache state---which the fitted model carries as explicit
+per-state parameters.
+
+\begin{table}[t]
+\centering
+\caption{Live policy demonstration: predicted vs.\ realized TTFT of the
+selected placement (P2-SPHP at every regime), warm cache state.
+$n{=}5$ queries $\times$ 2 warm repeats per regime; $\epsilon$ is the
+absolute prediction error.}
+\label{tab:livepolicy}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{l rrr}
+\toprule
+\textbf{RTT} & \textbf{Predicted} & \textbf{Realized} & $\boldsymbol{\epsilon}$\\
+ & (ms) & (ms) & \\
+\midrule
+0 ms  & 759.0 & 716.6 &  5.6\%\\
+15 ms & 766.5 & 731.7 &  4.5\%\\
+40 ms & 779.0 & 827.7 &  6.2\%\\
+80 ms & 799.0 & 730.2 &  8.6\%\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Summary of Gains}
 SPHP reduces cold-prefix TTFT by 17.4\% (95\%~CI $[-20.1,-14.3]\%$)
