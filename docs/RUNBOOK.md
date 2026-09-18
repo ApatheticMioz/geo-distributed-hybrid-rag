@@ -47,6 +47,23 @@ curl -s http://10.8.0.2:8000/health     # expect "role":"hybrid_retrieval_gatewa
 `schtasks /End /TN pdc_gateway`; Qdrant via
 `docker compose -f systems\node_b\docker-compose.yml up -d`.
 
+Gateway restart contract (learned 2026-09-19, cost several fake "hangs"):
+
+- **Launch only via the scheduled task.** A uvicorn started from an
+  interactive ssh session (or `Start-Process` from one) is reaped with the
+  session, or blocks forever on its next log write once the ssh pipe dies —
+  the process looks "hung in startup" (CPU frozen right after
+  `BM25 retriever initialized`) but the GPU, Qdrant, and the venv are fine.
+- **`netstat :8000 LISTENING` is not readiness** — uvicorn binds the socket
+  before the lifespan runs. `/health` returning `{"status":"ok","node":"B"}`
+  is the only readiness signal.
+- **Qdrant need not be up for boot**: the gateway's Qdrant client connects
+  lazily (constructor does no I/O), so startup completes without it; only
+  queries fail. After Qdrant restarts, wait for `All shards are ready` on
+  its `/readyz` before measuring.
+- **First query after a gateway restart can 500** (once) — fire 2 throwaway
+  warmup queries before any measured window.
+
 ---
 
 ## 3. Latency campaign
