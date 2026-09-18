@@ -1,0 +1,3 @@
+rtt_ms,loss_pct,mode,variant,n,n_errors,ttft_mean,ttft_p50,ttft_p95,ttft_std,total_mean,total_p95,ttft_repeat0_mean,ttft_warm_mean,sphp_hit_rate,mean_overlap
+15,0,hybrid,baseline,6,0,1914.47,1718.55,3339.94,1170.65,2295.8,3700.63,3062.39,766.56,,
+15,0,hybrid,sphp,6,0,573.35,562.38,628.35,40.61,1005.42,1289.51,580.86,565.84,1.0,0.7333
