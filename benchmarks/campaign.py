@@ -15,10 +15,13 @@ where:
   * variant is the SPHP axis: with ``--sphp-axis``, mode=hybrid runs two
     variants per tier (``baseline`` sphp=false and ``sphp`` sphp=true);
     dense/sparse run once (no variant).
-  * query is a seeded sample of N+W queries drawn from the queries file.
-    The first W are per-arm warmups (executed but NOT recorded, so the
-    measured sample's prefixes stay cold for repeat 0); the remaining N are
-    the measured sample.
+  * query is a per-arm disjoint sample.  A pool of n_arms*(N+W) distinct
+    queries is drawn from the queries file with a seeded RNG, and arm i is
+    handed the disjoint slice pool[i*(N+W):(i+1)*(N+W)].  The first W of each
+    slice are that arm's warmups (executed but NOT recorded); the remaining N
+    are measured.  Because every arm gets a disjoint slice, no query is ever
+    seen by two arms, so no arm's repeat-0 prefixes are pre-cached by an
+    earlier arm (repeat 0 stays a true cold reference).
   * repeat is the back-to-back repeat index (0..R-1) per measured query.
     No cache is flushed (the engine has no flush endpoint), so repeat 0 is
     the cold-prefix reference and repeats 1..R-1 are warm.
@@ -122,20 +125,68 @@ def resolve_queries_path(path: str) -> str:
     return path  # let load_queries raise a clear error
 
 
-def sample_queries(queries: List[str], n: int, warmups: int, seed: int) -> List[str]:
-    """Shuffle all queries with a seeded RNG and take the first N+WARMUPS.
+def build_arm_query_plan(
+    all_queries: List[str],
+    arms: List[Tuple[int, int, str, str]],
+    n: int,
+    warmups: int,
+    seed: int,
+) -> List[Dict[str, Any]]:
+    """Assign each arm a DISJOINT slice of a seeded query pool.
 
-    The first WARMUPS of the returned list are the per-arm warmups (executed
-    but not recorded); the remaining N are the measured sample.  Because the
-    warmups are drawn from a disjoint prefix of the shuffled order, they do
-    not prime the measured sample's prefixes, keeping repeat 0 cold.  A fixed
-    seed makes the sample reproducible across reruns.
+    A pool of ``len(arms) * (n + warmups)`` distinct queries is drawn from
+    ``all_queries`` with ``random.Random(seed)`` (a seeded shuffle, so the
+    assignment is reproducible across reruns).  Arm ``i`` is handed the
+    disjoint slice ``pool[i*(n+warmups) : (i+1)*(n+warmups)]``; the first
+    ``warmups`` of that slice are the arm's warmups (executed but not
+    recorded) and the remaining ``n`` are the measured sample.
+
+    Because every arm receives a disjoint slice, no query is ever seen by two
+    arms, so no arm's repeat-0 prefixes are pre-cached by an earlier arm.
+
+    Fails fast (raises ``ValueError``) if the query file holds fewer than
+    ``len(arms) * (n + warmups)`` distinct queries.
+
+    Returns one dict per arm (in arm order) with keys:
+      ``rtt_ms, loss_pct, mode, variant, warmups, measured,
+      pool_start, pool_end``
+    where ``warmups``/``measured`` are the query lists and ``pool_start``/
+    ``pool_end`` are the half-open index range into the shuffled pool the arm
+    consumes (for dry-run auditability).
     """
-    k = min(n + warmups, len(queries))
+    n_arms = len(arms)
+    per_arm = n + warmups
+    required = n_arms * per_arm
+    available = len(all_queries)
+    if available < required:
+        raise ValueError(
+            f"not enough distinct queries for per-arm disjoint sampling: "
+            f"required {required} (n_arms={n_arms} x (N={n} + W={warmups})), "
+            f"but the queries file has only {available}. "
+            f"Add at least {required - available} more distinct queries to the "
+            f"file, or lower --query-sample/--warmups."
+        )
+
     rng = random.Random(seed)
-    shuffled = list(queries)
-    rng.shuffle(shuffled)
-    return shuffled[:k]
+    pool = list(all_queries)
+    rng.shuffle(pool)
+
+    plan: List[Dict[str, Any]] = []
+    for i, (rtt, loss, mode, variant) in enumerate(arms):
+        start = i * per_arm
+        end = start + per_arm
+        slice_ = pool[start:end]
+        plan.append({
+            "rtt_ms": rtt,
+            "loss_pct": loss,
+            "mode": mode,
+            "variant": variant,
+            "warmups": slice_[:warmups],
+            "measured": slice_[warmups:end],
+            "pool_start": start,
+            "pool_end": end,
+        })
+    return plan
 
 
 def percentile(values: List[float], p: float) -> float:
@@ -296,20 +347,36 @@ def sphp_flag_for_variant(variant: str) -> bool:
     return variant == "sphp"
 
 
+def build_arm_list(args: argparse.Namespace) -> List[Tuple[int, int, str, str]]:
+    """Return the full ordered arm list: (rtt, loss, mode, variant).
+
+    Order is regime-major (rtt x loss), then mode, then variant — the same
+    order the runner executes arms in.  Used both to size the per-arm query
+    pool and to drive the dry-run plan so the two always agree.
+    """
+    arms: List[Tuple[int, int, str, str]] = []
+    for rtt in args.rtt_tiers:
+        for loss in args.loss_tiers:
+            for mode in args.modes:
+                for variant in variants_for_mode(mode, args.sphp_axis):
+                    arms.append((rtt, loss, mode, variant))
+    return arms
+
+
 # ---------------------------------------------------------------------------
 # Plan / dry-run
 # ---------------------------------------------------------------------------
 def print_plan(args: argparse.Namespace, all_queries: List[str],
-               measured_queries: List[str], warmup_queries: List[str]) -> None:
+               arm_plan: List[Dict[str, Any]]) -> None:
     n_regimes = len(args.rtt_tiers) * len(args.loss_tiers)
     n_variants_per_mode = {
         m: len(variants_for_mode(m, args.sphp_axis)) for m in args.modes
     }
     n_variants_per_regime = sum(n_variants_per_mode[m] for m in args.modes)
-    n_arms = n_regimes * n_variants_per_regime
-    # Actual per-arm counts (the sample is capped by the file size).
-    n_measured_per_arm = len(measured_queries) * args.repeats
-    n_warmups_per_arm = len(warmup_queries)
+    n_arms = len(arm_plan)
+    per_arm = args.query_sample + args.warmups
+    n_measured_per_arm = len(arm_plan[0]["measured"]) * args.repeats
+    n_warmups_per_arm = len(arm_plan[0]["warmups"])
     n_total_per_arm = n_warmups_per_arm + n_measured_per_arm
     n_measured = n_arms * n_measured_per_arm
     n_warmups = n_arms * n_warmups_per_arm
@@ -323,13 +390,9 @@ def print_plan(args: argparse.Namespace, all_queries: List[str],
     print(f"  gateway      : {args.gateway_url}")
     print(f"  queries file : {args.queries} ({len(all_queries)} queries total)")
     print(f"  query sample : N={args.query_sample} measured + W={args.warmups} warmups "
-          f"(seed={args.seed})")
-    if len(measured_queries) < args.query_sample:
-        print(f"  WARNING      : only {len(all_queries)} queries available; "
-              f"sampled {len(measured_queries)} measured + "
-              f"{len(warmup_queries)} warmups (need {args.query_sample} + "
-              f"{args.warmups} distinct). Add more queries to the file to "
-              f"reach the full N.")
+          f"per arm (seed={args.seed})")
+    print(f"  query pool   : {n_arms} arms x {per_arm} = {n_arms * per_arm} "
+          f"distinct queries (disjoint per arm)")
     print(f"  rtt tiers    : {args.rtt_tiers} ms")
     print(f"  loss tiers   : {args.loss_tiers} %")
     print(f"  modes        : {args.modes}")
@@ -341,12 +404,14 @@ def print_plan(args: argparse.Namespace, all_queries: List[str],
     print(f"  variants/regime: {n_variants_per_regime} "
           f"({', '.join(f'{m}={n_variants_per_mode[m]}' for m in args.modes)})")
     print(f"  arms         : {n_arms} (regime x mode x variant)")
-    print(f"  measured req : {n_measured}  (arms x {len(measured_queries)} x R)")
-    print(f"  warmup req   : {n_warmups}  (arms x {len(warmup_queries)})")
+    print(f"  measured req : {n_measured}  (arms x {len(arm_plan[0]['measured'])} x R)")
+    print(f"  warmup req   : {n_warmups}  (arms x {len(arm_plan[0]['warmups'])})")
     print(f"  total req    : {n_total}  (arms x (W + N x R))")
     print(f"  shaped regimes (netem apply/clear): {n_shaped}")
     print("-" * 78)
     print("  Plan (netem would be applied/cleared for shaped regimes only):")
+    print("  Each arm consumes a DISJOINT slice of the shuffled query pool, so")
+    print("  no query is shared across arms (repeat 0 stays cold per arm).")
     for rtt in args.rtt_tiers:
         for loss in args.loss_tiers:
             shaped = not (rtt == 0 and loss == 0)
@@ -354,9 +419,13 @@ def print_plan(args: argparse.Namespace, all_queries: List[str],
             print(f"    regime rtt={rtt:>3}ms loss={loss}%  [{tag}]")
             for mode in args.modes:
                 for variant in variants_for_mode(mode, args.sphp_axis):
+                    arm = next(a for a in arm_plan
+                               if (a["rtt_ms"], a["loss_pct"], a["mode"],
+                                   a["variant"]) == (rtt, loss, mode, variant))
                     print(f"        mode={mode:<7} variant={variant:<8}  "
-                          f"-> {len(warmup_queries)} warmups + "
-                          f"{len(measured_queries)} x {args.repeats} measured")
+                          f"-> queries[{arm['pool_start']}:{arm['pool_end']}]  "
+                          f"({len(arm['warmups'])} warmups + "
+                          f"{len(arm['measured'])} x {args.repeats} measured)")
     print("-" * 78)
     print("  DRY RUN complete. No network calls, no netem, no files were made.")
 
@@ -468,16 +537,25 @@ def main() -> None:
         print(f"ERROR: no queries loaded from {queries_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Seeded sample of N+WARMUPS queries; first W are warmups, next N measured.
-    sampled = sample_queries(all_queries, args.query_sample, args.warmups,
-                             args.seed)
-    warmup_queries = sampled[:args.warmups]
-    measured_queries = sampled[args.warmups:args.warmups + args.query_sample]
+    # Build the full arm list FIRST, then assign each arm a disjoint slice of a
+    # seeded query pool (fail fast if the file cannot supply n_arms*(N+W)).
+    arms = build_arm_list(args)
+    try:
+        arm_plan = build_arm_query_plan(
+            all_queries, arms, args.query_sample, args.warmups, args.seed)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+    # Index the plan by arm key for O(1) lookup in the run loop.
+    arm_plan_by_key = {
+        (a["rtt_ms"], a["loss_pct"], a["mode"], a["variant"]): a
+        for a in arm_plan
+    }
 
     endpoint = args.gateway_url.rstrip("/") + "/query/benchmark"
 
     if args.dry_run:
-        print_plan(args, all_queries, measured_queries, warmup_queries)
+        print_plan(args, all_queries, arm_plan)
         return
 
     # Health check (fail fast if the gateway is down).
@@ -517,12 +595,17 @@ def main() -> None:
                     for variant in variants_for_mode(mode, args.sphp_axis):
                         sphp = sphp_flag_for_variant(variant)
                         arm_key = (rtt, loss, mode, variant)
+                        arm = arm_plan_by_key[arm_key]
+                        warmup_queries = arm["warmups"]
+                        measured_queries = arm["measured"]
                         print(f"  mode={mode:<7} variant={variant:<8} "
-                              f"(sphp={sphp})")
+                              f"(sphp={sphp})  "
+                              f"queries[{arm['pool_start']}:{arm['pool_end']}]")
 
-                        # Warmups: executed but NOT recorded.  Primes GPU/caches
-                        # with distinct queries so the measured sample's
-                        # repeat-0 prefixes stay cold.
+                        # Warmups: executed but NOT recorded.  This arm's
+                        # warmups are disjoint from every other arm's queries,
+                        # so they prime the engine without pre-caching this
+                        # arm's measured prefixes (repeat 0 stays cold).
                         for w, wq in enumerate(warmup_queries):
                             try:
                                 http_post_json(endpoint, {
