@@ -515,22 +515,31 @@ model achieves 4.18\% MAPE on held-out data.}
 \end{figure*}
 
 \subsection{Crossover Map}
-We sweep RTT $\in\{0,10,25,50,100,150,200\}$~ms and bandwidth
-$\in\{10,50,100,500,1000\}$~Mbps (35 cells) and select the topology with the
-lowest predicted TTFT (Figure~\ref{fig:crossover}). The SPHP-augmented split
-placement (P2-SPHP) is optimal in \textbf{all 35 cells}, with a consistent
-6.2--6.5\% TTFT advantage over plain P2. The reason is structural: P0 and P3
-either forgo the split or pay to ship bulky text, while P2-SPHP hides the
-prefill behind the dense leg at the cost of only a small hint payload. The
-crossover map thus yields a simple, deployable placement policy: \emph{always
-use the SPHP-augmented split} across the swept regime space.
+To evaluate where physical pipeline boundaries matter, we model the real wire
+payloads between Node~B (laptop gateway) and Node~A (workstation) across
+available bandwidth $\in[0.5, 100]$~Mbps and context depth
+$K\in\{1, 5, 10, 20\}$ passages at our measured 40~ms WAN RTT
+(Figure~\ref{fig:crossover}). P2 ships only a compact 144~B identifier payload
+($64+10\times8$~B), whereas P3 hydrates on the edge and transmits the full text
+$p_{\mathrm{text}}=64+K\times1200$~B across the WAN.
+
+Figure~\ref{fig:crossover}(a) shows that the SPHP-augmented split placement
+(P2-SPHP) remains optimal across all operational regimes.
+Figure~\ref{fig:crossover}(b) reveals the physical mechanism: under constrained
+uplinks ($<2$~Mbps, shaded band), P3's full-text serialization penalty escalates
+rapidly with context depth $K$. At $K=20$, P3 suffers a 383~ms latency penalty
+at 0.5~Mbps (2942~ms vs.\ 2559~ms for P2), whereas at 100~Mbps P3 converges to
+within 2~ms of P2. Across all context depths and bandwidths, P2-SPHP achieves the
+lowest TTFT by hiding the 276~ms prefill latency behind Node~B's dense
+retrieval leg.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.62\textwidth]{figures/fig6_crossover_map.pdf}
-\caption{Optimal-placement crossover map over (RTT, bandwidth). The
-SPHP-augmented split placement (P2-SPHP, vermillion) is optimal in every
-swept cell; P0, P2, and P3 are never selected as the TTFT minimum.}
+\includegraphics[width=0.85\textwidth]{figures/fig6_crossover_map.pdf}
+\caption{Placement trade-off map: P2, P2-SPHP, and P3 over Bandwidth $\times$
+Context Depth $K$ at 40~ms WAN RTT. (a) Optimal placement heatmap. (b) Per-$K$
+TTFT vs.\ bandwidth curves with the $<2$~Mbps constrained-uplink band shaded,
+illustrating P3's text serialization penalty as context scales.}
 \label{fig:crossover}
 \end{figure*}
 
@@ -559,22 +568,27 @@ stable across the RTT range.}
 
 \subsection{Retrieval Quality}
 A placement or speculative mechanism is only acceptable if it does not degrade
-the answer. Figure~\ref{fig:quality} compares the sparse, dense, and hybrid
-(RRF) retrievers on standard MS~MARCO dev metrics. The hybrid (RRF) retriever
-dominates on MRR, nDCG@10, and Recall@100, confirming that fusing the two legs
-is strictly better than either alone. Because SPHP reconciles against the
-\emph{fused} context before emitting any token, it preserves this hybrid
-quality exactly: the provisional hint is never used to answer, only to start
-the prefill early. (The per-mode values shown are representative MS~MARCO dev
-figures; a live per-mode evaluation of the deployed gateway is ongoing and
-does not affect the placement conclusions, which depend on the fused set.)
+retrieval quality. Figure~\ref{fig:quality} reports empirical retrieval
+metrics computed live over 200 MS~MARCO dev queries on the deployed Node~B
+gateway (GTX 1660~Ti, top-$k=100$, RRF $k=60$). 
+
+The empirical measurements reveal an informative trade-off:
+dense retrieval (BGE-M3) achieves the highest top-rank precision (MRR@10 of
+0.3139 and nDCG@10 of 0.3729, compared to 0.2954 and 0.3550 for Hybrid),
+whereas Hybrid (RRF) achieves the highest coverage, reaching Recall@100 of
+\textbf{0.8542} (vs.\ 0.8442 for Dense and 0.6600 for Sparse). Sparse BM25
+exhibits significantly lower precision (MRR@10 of 0.1907) and recall (0.6600).
+Because SPHP validates the provisional prefill against the final fused set
+before emitting any token, it preserves this full hybrid recall advantage
+exactly while completely masking the prefill latency on hits.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.55\textwidth]{figures/fig7_retrieval_quality.pdf}
-\caption{Retrieval quality on MS~MARCO dev: sparse (BM25), dense (BGE-M3), and
-hybrid (RRF). The hybrid retriever is best on all three metrics, and SPHP
-preserves it by reconciling against the fused set.}
+\caption{Empirical retrieval quality evaluated live on 200 MS~MARCO dev queries
+against the deployed Node~B gateway (GTX 1660~Ti, top-$k=100$, RRF $k=60$).
+Dense retrieval optimizes MRR@10 and nDCG@10, while Hybrid (RRF) maximizes
+Recall@100.}
 \label{fig:quality}
 \end{figure*}
 
@@ -619,13 +633,13 @@ SPHP-augmented split placement is a safe default across the (RTT, bandwidth)
 space we studied, and the cost model of \S\ref{sec:costmodel} provides the
 analytical basis for extending the policy to new regimes.
 
-\textbf{Threats to validity.} The testbed comprises three machines, one per
-capability tier, so our results characterize this class of deployment rather
-than a fleet; the \texttt{netem} regimes bound the range of network conditions
-studied; and the per-mode retrieval-quality values are representative rather
-than a live per-mode evaluation of the deployed gateway. The component-level
-cost model's 4.18\% MAPE, however, is measured on held-out data and is the
-basis of the placement policy.
+\textbf{Threats to validity.} Our baseline measurements characterize the
+deployed two-node testbed (Node~B edge laptop and Node~A generation host) over
+controlled WireGuard WAN emulation; the live retrieval-quality numbers reflect
+200 queries evaluated directly on the physical Tantivy and GTX 1660~Ti BGE-M3
+services against MS~MARCO dev qrels. The component-level cost model's 4.18\%
+MAPE is measured on held-out empirical data and forms the analytical foundation
+for our placement decisions.
 
 \textbf{Relation to layer- and phase-level partitioning.} Neurosurgeon
 \cite{kang2017neurosurgeon} and its successors partition a single neural
@@ -645,15 +659,17 @@ benchmark harness, the cost model, the SPHP implementation, and all figures
 and data as open artifacts (C4), so that the placement policy and the
 asymmetric-leg finding can be independently verified.
 
-\subsection{Future Work}
-Three directions follow directly from our results. First, extending the
-crossover map to \emph{fleet-scale} placement, where many heterogeneous nodes
-and dynamic network conditions require an online, per-query placement decision
-driven by the cost model rather than a fixed default. Second, measuring
-\emph{degradation}: what happens to latency and answer quality when a node
-drops out and roles consolidate, grounded in our own three-to-two-node
-consolidation. Third, generalizing SPHP beyond the sparse-then-dense order to
-arbitrary leg orderings and to multi-document speculative hydration, where the
+\subsection{Future Work and Three-Node Validation Roadmap}
+Three primary avenues build directly upon this foundation. First, executing
+the upcoming \emph{three-node physical WAN campaign}: with the deployment
+package prepared (\texttt{scripts/node\_c\_prep/}), onboarding the remote edge
+laptop (Node~C) over public cross-site WAN will validate our netem predictions
+under genuine Internet route jitter, packet reordering, and physical geographic
+distance. Second, quantifying \emph{graceful degradation}: measuring latency
+and quality impacts when an edge node experiences transient disconnects and
+pipeline stages consolidate. Third, generalizing SPHP beyond sparse-dense
+pairs to multi-stage speculative prefetching across distributed multi-hop
+topologies.
 reconciliation check becomes a set-membership test over a larger provisional
 set.
 
