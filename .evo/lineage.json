@@ -1,7 +1,7 @@
 {
   "version": "2026.1",
   "rootId": "baseline",
-  "currentHeadId": "cand_1789595229489_63uw",
+  "currentHeadId": "cand_1789669961347_ditq",
   "nodes": [
     {
       "id": "baseline",
@@ -363,12 +363,26 @@
         "node_B/implementation/generated/hybrid_coordination_pb2_grpc.py"
       ],
       "metrics": {
-        "fitness": null,
-        "status": "pending",
+        "fitness": 50,
+        "status": "accepted",
         "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789596087236_k7um",
-        "snapshotCount": 7
+        "snapshotCount": 7,
+        "evalCommand": "node_A/implementation/.venv/bin/python -m py_compile node_A/implementation/src/main.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
       },
-      "timestamp": "2026-09-16T22:01:27.237Z"
+      "timestamp": "2026-09-16T22:01:27.237Z",
+      "updatedAt": "2026-09-16T22:31:04.986Z"
     },
     {
       "id": "cand_1789596813289_urlu",
@@ -379,12 +393,144 @@
       ],
       "metrics": {
         "fitness": null,
-        "status": "pending",
+        "status": "accepted",
         "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789596813289_urlu",
         "snapshotCount": 1
       },
-      "timestamp": "2026-09-16T22:13:33.289Z"
+      "timestamp": "2026-09-16T22:13:33.289Z",
+      "updatedAt": "2026-09-16T22:24:59.704Z"
+    },
+    {
+      "id": "cand_1789667281944_vd8j",
+      "parentId": "cand_1789596087236_k7um",
+      "hypothesis": "Fixing the KeyError in main() by reading the actual evaluation keys (test_macro_mape_pct / test_component_mape_pct) will let analysis/cost_model.py run to completion (exit 0) and regenerate all three output files in analysis/results/.",
+      "filesModified": [
+        "analysis/cost_model.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789667281944_vd8j",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 analysis/cost_model.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-17T17:48:01.945Z",
+      "updatedAt": "2026-09-17T17:48:18.508Z"
+    },
+    {
+      "id": "cand_1789668210607_l8za",
+      "parentId": "cand_1789667281944_vd8j",
+      "hypothesis": "Creating analysis/figures.py (matplotlib IEEE-styled, colorblind-safe, vector PDF) that reads the three data sources and emits 6 non-empty PDFs into paper/figures/ will make `python3 analysis/figures.py` exit 0 with all 6 PDFs present and non-empty.",
+      "filesModified": [
+        "analysis/figures.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789668210607_l8za",
+        "snapshotCount": 0,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 analysis/figures.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-17T18:03:30.608Z",
+      "updatedAt": "2026-09-17T18:06:47.289Z"
+    },
+    {
+      "id": "cand_1789668666631_cy5v",
+      "parentId": "cand_1789668210607_l8za",
+      "hypothesis": "Fixing fig6 (drop extent, integer ticks with distinct RTT/BW labels), fig3 (y-tick stage names + outside annotations for narrow bars + bottom=0.18), fig4 (bottom margin), and fig8 (MAPE box to bottom-right) will make `python3 analysis/figures.py` exit 0 with all 6 non-empty PDFs and no clipped/squashed text.",
+      "filesModified": [
+        "analysis/figures.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789668666631_cy5v",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 analysis/figures.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-17T18:11:06.632Z",
+      "updatedAt": "2026-09-17T18:13:32.243Z"
+    },
+    {
+      "id": "cand_1789669961347_ditq",
+      "parentId": "cand_1789668666631_cy5v",
+      "hypothesis": "Widening the Client column in fig2_topologies (col_x 1.9->2.6) and adding wrap=False to the cell text will stop '• Query' from wrapping letter-by-letter, and `python3 analysis/figures.py` will regenerate fig2_topologies.pdf cleanly (exit 0, non-empty).",
+      "filesModified": [
+        "analysis/figures.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789669961347_ditq",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 analysis/figures.py",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-17T18:32:41.348Z",
+      "updatedAt": "2026-09-17T18:35:30.015Z"
+    },
+    {
+      "id": "cand_1789717630452_5uxv",
+      "parentId": "cand_1789669961347_ditq",
+      "hypothesis": "Replacing the single shared t_dense with per-node hardware heterogeneity (Edge GPU 2.25s / Edge CPU 8.5s / Cloud 0.45s), adding the missing P1 centralized topology, sweeping K in [1,5,10,20] x BW in [0.25..1000] Mbps, and adding generate_context_scaling() will break the flat P2-SPHP-everywhere degeneracy and produce real crossover boundaries where P0, P1, P2-SPHP, and P3 each own an operational regime; verification = `python3 analysis/cost_model.py` exits 0 and the exported JSON shows >=3 distinct optimal_topology values plus a non-flat sphp_speedup curve.",
+      "filesModified": [
+        "analysis/cost_model.py"
+      ],
+      "metrics": {
+        "fitness": null,
+        "status": "pending",
+        "snapshotDir": "/home/apath/Work/PDC/Project/.evo/snapshots/cand_1789717630452_5uxv",
+        "snapshotCount": 1
+      },
+      "timestamp": "2026-09-18T07:47:10.453Z"
     }
   ],
-  "updatedAt": "2026-09-16T22:13:33.289Z"
+  "updatedAt": "2026-09-18T07:47:10.454Z"
 }
