@@ -6,34 +6,43 @@ Generates IEEE-styled vector PDFs into ``paper/figures/``:
 
   * fig1_arch.pdf             -- System architecture: Client / Node B (Edge
                                   Gateway) / Node A (Cloud) with data-flow arrows
-                                  and per-stage timing annotations.
+                                  and warm steady-state timing annotations.
   * fig2_topologies.pdf       -- Placement topology taxonomy (P0, P1, P2,
                                   P2-SPHP, P3) as a component-placement matrix.
-  * fig3_sphp_timeline.pdf    -- Gantt/timeline: SPHP speculative prefill overlap
-                                 vs. baseline serialized P2 pipeline.
-  * fig4_stage_breakdown.pdf  -- Stacked bar of per-stage latencies across the
-                                 four network conditions.
-  * fig5_ttft_vs_rtt.pdf      -- TTFT vs. WAN RTT (0/10/30/50/100 ms), P2 vs. P2-SPHP.
-  * fig6_crossover_map.pdf    -- Placement trade-off map over (Bandwidth x context
-                                  depth K): optimal-topology heatmap plus P2 /
-                                  P2-SPHP / P3 TTFT curves at the 40 ms WAN RTT.
-  * fig7_retrieval_quality.pdf-- MRR@10 / nDCG@10 / Recall@100: Sparse vs. Dense vs.
-                                  Hybrid, from the live 200-query Node B evaluation.
-  * fig8_cost_model_parity.pdf-- Predicted vs. measured TTFT parity scatter with
-                                 +/-10% error bands.
+  * fig3_sphp_timeline.pdf    -- Measured-mechanism timeline: SPHP speculative
+                                 prefill overlap vs. serialized P2, driven by
+                                 the campaign-fitted WARM stage components, with
+                                 the measured cold/warm TTFT deltas annotated.
+  * fig4_stage_breakdown.pdf  -- TTFT composition (retrieval barrier + fusion +
+                                 prefill residual) per RTT tier, cold vs. warm.
+  * fig5_ttft_vs_rtt.pdf      -- MEASURED TTFT vs. WAN RTT, baseline vs. SPHP,
+                                 cold and warm panels, bootstrap-95% CIs.
+  * fig6_crossover_map.pdf    -- Placement scenario curves over (RTT, BW):
+                                 TTFT vs RTT per topology (warm + cold SPHP
+                                 pair) and TTFT vs BW showing the hydrated-text
+                                 serialization crossover.
+  * fig7_retrieval_quality.pdf-- MRR@10 / nDCG@10 / Recall@100 / Recall@1000:
+                                 Sparse vs. Dense vs. Hybrid, seeded 500-query
+                                 live evaluation on Node B.
+  * fig8_cost_model_parity.pdf-- Regime-level parity: predicted vs. observed
+                                 per-tier mean TTFT (cold/warm x P2/SPHP),
+                                 +/-10% bands, LOTO MAPE annotations.
 
 Data sources
 ------------
-  * benchmarks/results_matrix_gpu.json   (empirical stage timings, N=50 per tier)
-  * analysis/results/crossover_analysis.csv
-  * analysis/results/cost_model_validation.json
-  * analysis/results/live_retrieval_quality.json (200 live MS MARCO dev queries,
-    Node B hybrid gateway)
+  * benchmarks/campaigns/campaign_*.jsonl  (freshest campaign; measured record)
+  * analysis/results/cost_model_validation.json (campaign-fitted parameters,
+    regime-level LOTO validation)
+  * analysis/results/crossover_analysis.json (+ _cold.json; model sweeps)
+  * analysis/results/live_retrieval_quality.json (seeded 500-query quality)
 
 Styling
 -------
-IEEE / colorblind-safe (Okabe-Ito) palette, vector PDF output, clean sans-serif
-typography, no clipped labels (``bbox_inches="tight"``).
+Validated colorblind-safe palette (CVD dE >= 9.2 all-pairs on the first three
+slots; the two sub-3:1 hues carry in-figure value labels as relief), one axis
+per panel, vector PDF, clean sans-serif, no clipped labels. Single-column
+figures are 3.5 in wide and full-width figures 7.16 in wide so 8 pt fonts
+remain >= 8 pt at print size.
 """
 
 from __future__ import annotations
@@ -49,62 +58,78 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
+from matplotlib.ticker import NullFormatter
 from matplotlib.patches import Patch, FancyBboxPatch, FancyArrowPatch
-from matplotlib.colors import ListedColormap
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 _HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = _HERE.parent
-BENCH_FILE = PROJECT_ROOT / "benchmarks" / "results_matrix_gpu.json"
-CROSSOVER_FILE = _HERE / "results" / "crossover_analysis.csv"
+CAMPAIGN_GLOB = PROJECT_ROOT / "benchmarks" / "campaigns" / "campaign_*.jsonl"
+CROSSOVER_FILE = _HERE / "results" / "crossover_analysis.json"
+CROSSOVER_COLD_FILE = _HERE / "results" / "crossover_analysis_cold.json"
 VALIDATION_FILE = _HERE / "results" / "cost_model_validation.json"
 LIVE_QUALITY_FILE = _HERE / "results" / "live_retrieval_quality.json"
 FIG_DIR = PROJECT_ROOT / "paper" / "figures"
 
-# Make the cost model importable (same directory).
 sys.path.insert(0, str(_HERE))
-from cost_model import PlacementCostModel, fit_model_from_benchmark  # noqa: E402
-
+from cost_model import PlacementCostModel  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# IEEE / colorblind-safe styling
+# Palette (validated: dataviz six-checks, light surface #ffffff)
 # ---------------------------------------------------------------------------
-# Okabe-Ito colorblind-safe palette.
-OKABE_ITO = {
-    "blue": "#0072B2",
-    "orange": "#E69F00",
-    "green": "#009E73",
-    "vermillion": "#D55E00",
-    "purple": "#CC79A7",
-    "skyblue": "#56B4E9",
-    "yellow": "#F0E442",
-    "black": "#000000",
-    "gray": "#8C8C8C",
+PALETTE = {
+    "blue":    "#2a78d6",   # slot 1
+    "orange":  "#eb6834",   # slot 2
+    "aqua":    "#1baf7a",   # slot 3
+    "yellow":  "#eda100",   # slot 4
+    "magenta": "#e87ba4",   # slot 5
+    "green":   "#008300",   # slot 6
+    "violet":  "#4a3aa7",   # slot 7
+    "red":     "#e34948",   # slot 8
+}
+INK = {
+    "primary":   "#0b0b0b",
+    "secondary": "#52514e",
+    "muted":     "#898781",
+    "grid":      "#e1e0d9",
+    "axis":      "#c3c2b7",
 }
 
-# Semantic color assignments (kept consistent across figures).
-C_SPARSE = OKABE_ITO["blue"]
-C_DENSE = OKABE_ITO["orange"]
-C_FUSION = OKABE_ITO["green"]
-C_PREFILL = OKABE_ITO["vermillion"]
-C_DECODE = OKABE_ITO["purple"]
-C_P2 = OKABE_ITO["blue"]
-C_SPHP = OKABE_ITO["vermillion"]
-C_P0 = OKABE_ITO["skyblue"]
-C_P3 = OKABE_ITO["green"]
+# Variant/topology entities (fixed across all figures).
+C_P2 = PALETTE["blue"]
+C_SPHP = PALETTE["orange"]
+C_P3 = PALETTE["aqua"]
+C_P0 = PALETTE["yellow"]
+
+# Pipeline-stage entities (fixed across all figures).
+C_SPARSE = PALETTE["blue"]
+C_DENSE = PALETTE["orange"]
+C_FUSION = PALETTE["aqua"]
+C_PREFILL = PALETTE["violet"]
+C_DECODE = PALETTE["magenta"]
+C_WAN = INK["muted"]        # transport is chrome, not a data series
+
+# Retrieval-quality modes (fixed across all figures).
+C_MODE_SPARSE, C_MODE_DENSE, C_MODE_HYBRID = C_SPARSE, C_DENSE, C_FUSION
 
 rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial"],
-    "font.size": 9,
-    "axes.titlesize": 10,
-    "axes.labelsize": 9,
+    "font.size": 8,
+    "axes.titlesize": 9,
+    "axes.labelsize": 8,
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
     "legend.fontsize": 8,
     "axes.linewidth": 0.8,
+    "axes.edgecolor": INK["axis"],
+    "axes.labelcolor": INK["primary"],
+    "xtick.color": INK["secondary"],
+    "ytick.color": INK["secondary"],
+    "text.color": INK["primary"],
+    "axes.titlelocation": "left",
     "lines.linewidth": 1.6,
     "lines.markersize": 5,
     "figure.dpi": 150,
@@ -112,19 +137,20 @@ rcParams.update({
     "pdf.fonttype": 42,          # TrueType -> editable text in vector PDF
     "ps.fonttype": 42,
     "axes.grid": True,
-    "grid.linewidth": 0.4,
-    "grid.alpha": 0.4,
-    "grid.color": "#cccccc",
-    "figure.constrained_layout.use": False,
+    "grid.linewidth": 0.5,
+    "grid.color": INK["grid"],
+    "grid.alpha": 1.0,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
 })
 
-# Topology -> color for the crossover heatmap.
-TOPO_COLORS = {
-    "P0": C_P0,
-    "P2": C_P2,
-    "P2-SPHP": C_SPHP,
-    "P3": C_P3,
-}
+# Print widths (inches): \columnwidth = 3.5, \textwidth = 7.16.
+COL_W = 3.5
+FULL_W = 7.16
+
+
+def _style_axes(ax: plt.Axes) -> None:
+    ax.set_axisbelow(True)
 
 
 def _save(fig: plt.Figure, name: str) -> Path:
@@ -136,28 +162,34 @@ def _save(fig: plt.Figure, name: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Data loading
+# Data loading & statistics
 # ---------------------------------------------------------------------------
-def load_benchmark() -> dict:
-    with open(BENCH_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+def newest_campaign() -> Path:
+    candidates = sorted(CAMPAIGN_GLOB.parent.glob(CAMPAIGN_GLOB.name))
+    if not candidates:
+        raise FileNotFoundError(f"no campaign JSONL under {CAMPAIGN_GLOB.parent}")
+    return candidates[-1]
+
+
+def load_campaign() -> list[dict]:
+    records = []
+    with open(newest_campaign(), "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            if r.get("error") or not isinstance(r.get("ttft_ms"), (int, float)):
+                continue
+            records.append(r)
+    if not records:
+        raise ValueError(f"no usable records in {newest_campaign()}")
+    return records
 
 
 def load_crossover() -> list[dict]:
-    rows = []
     with open(CROSSOVER_FILE, "r", encoding="utf-8") as f:
-        for r in csv.DictReader(f):
-            rows.append({
-                "rtt_ms": float(r["rtt_ms"]),
-                "bw_mbps": float(r["bw_mbps"]),
-                "ttft_p0_ms": float(r["ttft_p0_ms"]),
-                "ttft_p2_ms": float(r["ttft_p2_ms"]),
-                "ttft_p2_sphp_ms": float(r["ttft_p2_sphp_ms"]),
-                "ttft_p3_ms": float(r["ttft_p3_ms"]),
-                "sphp_speedup_pct": float(r["sphp_speedup_pct"]),
-                "optimal_topology": r["optimal_topology"],
-            })
-    return rows
+        return json.load(f)
 
 
 def load_validation() -> dict:
@@ -166,23 +198,60 @@ def load_validation() -> dict:
 
 
 def load_live_quality() -> dict:
-    """Live per-mode retrieval quality from the 200-query Node B evaluation."""
     with open(LIVE_QUALITY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def fit_model() -> PlacementCostModel:
-    model, _ = fit_model_from_benchmark(BENCH_FILE)
-    return model
+def model_from_validation(state: str) -> PlacementCostModel:
+    """Rebuild the fitted PlacementCostModel for a cache state."""
+    p = load_validation()["cache_states"][state]["fitted_params"]
+    return PlacementCostModel(
+        t_sparse_base_ms=p["t_sparse_base_ms"],
+        t_dense_base_ms=p["t_dense_base_ms"],
+        t_fusion_base_ms=p["t_fusion_base_ms"],
+        t_prefill_base_ms=p["t_prefill_base_ms"],
+        decode_tok_per_sec=p["decode_tok_per_sec"],
+        sphp_hit_rate=p["sphp_hit_rate_measured"],
+        t_sphp_miss_penalty_ms=p["t_sphp_miss_penalty_ms"],
+    )
+
+
+def boot_ci(xs: list[float], iters: int = 2000, seed: int = 42) -> tuple[float, float]:
+    """Percentile bootstrap 95% CI of the mean (seeded, deterministic)."""
+    arr = np.asarray(xs, dtype=float)
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(arr), size=(iters, len(arr)))
+    means = arr[idx].mean(axis=1)
+    lo, hi = np.percentile(means, [2.5, 97.5])
+    return float(lo), float(hi)
+
+
+def boot_ci_rel(a: list[float], b: list[float], iters: int = 2000, seed: int = 42):
+    """Bootstrap 95% CI of the relative delta (mean(a)-mean(b))/mean(b), in %."""
+    arr_a = np.asarray(a, dtype=float)
+    arr_b = np.asarray(b, dtype=float)
+    rng = np.random.default_rng(seed)
+    ia = rng.integers(0, len(arr_a), size=(iters, len(arr_a)))
+    ib = rng.integers(0, len(arr_b), size=(iters, len(arr_b)))
+    rel = ((arr_a[ia].mean(axis=1) - arr_b[ib].mean(axis=1))
+           / arr_b[ib].mean(axis=1) * 100.0)
+    lo, hi = np.percentile(rel, [2.5, 97.5])
+    return float(lo), float(hi), float(rel.mean())
+
+
+def _tier_means(records: list[dict], value_key: str = "ttft_ms") -> tuple[list[float], list[list[float]]]:
+    tiers = sorted({float(r["rtt_ms"]) for r in records})
+    values = [[r[value_key] for r in records if float(r["rtt_ms"]) == t] for t in tiers]
+    return tiers, values
 
 
 # ---------------------------------------------------------------------------
 # Fig 1 -- System architecture
 # ---------------------------------------------------------------------------
-def fig1_arch(model: PlacementCostModel) -> Path:
-    fig, ax = plt.subplots(figsize=(8.2, 4.6))
+def fig1_arch(model_warm: PlacementCostModel) -> Path:
+    fig, ax = plt.subplots(figsize=(FULL_W, 3.9))
     ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6)
+    ax.set_ylim(0, 6.6)
     ax.axis("off")
 
     def box(x, y, w, h, title, items, fc, ec):
@@ -190,55 +259,62 @@ def fig1_arch(model: PlacementCostModel) -> Path:
                            boxstyle="round,pad=0.0,rounding_size=0.12",
                            linewidth=1.3, edgecolor=ec, facecolor=fc, zorder=2)
         ax.add_patch(p)
-        ax.text(x + w / 2, y + h - 0.18, title, ha="center", va="top",
-                fontsize=9, fontweight="bold", color=ec, zorder=3)
-        top = y + h - 0.44
-        step = (h - 0.55) / max(len(items), 1)
+        ax.text(x + w / 2, y + h - 0.16, title, ha="center", va="top",
+                fontsize=8.5, fontweight="bold", color=ec, zorder=3)
+        top = y + h - 0.50
+        step = (h - 0.66) / max(len(items), 1)
         for i, it in enumerate(items):
             ax.text(x + 0.12, top - i * step, "• " + it, ha="left", va="top",
-                    fontsize=7, color="black", zorder=3)
+                    fontsize=8, color=INK["primary"], zorder=3)
 
     # Client
     box(0.2, 2.0, 1.7, 2.0, "Client",
-        ["User query", "Receives streamed tokens"],
-        "#F0EAF3", OKABE_ITO["purple"])
+        ["User query", "Streamed tokens"],
+        "#F0EAF3", PALETTE["violet"])
 
-    # Node B (Edge Gateway)
-    box(3.0, 1.0, 3.0, 4.0, "Node B — Edge Gateway",
-        ["Tantivy BM25 (8.84M)", "BGE-M3 Dense (GPU)", "RRF Fusion",
-         f"t_sparse ≈ {model.t_sparse_base_ms:.0f} ms",
-         f"t_dense ≈ {model.t_dense_base_ms:.0f} ms"],
-        "#EAF3FB", OKABE_ITO["blue"])
+    # Node B (Edge Gateway) — boxes span y 0.8..4.8; arrows route above/below.
+    box(3.0, 0.8, 2.9, 4.0, "Node B — Edge Gateway",
+        ["Tantivy BM25 sparse (8.84M)",
+         "BGE-M3 dense + Qdrant (GPU)",
+         "RRF fusion",
+         f"t_sparse ≈ {model_warm.t_sparse_base_ms:.0f} ms (warm)",
+         f"t_dense ≈ {model_warm.t_dense_base_ms:.0f} ms (warm)"],
+        "#EAF3FB", C_P2)
 
-    # Node A (Cloud / Workstation)
-    box(7.3, 1.0, 2.5, 4.0, "Node A — Cloud / Workstation",
-        ["SQLite hydration (8.84M)", "SPHP speculative prefill",
-         "vLLM LLaMA-3-8B AWQ",
-         f"t_prefill ≈ {model.t_prefill_base_ms:.0f} ms"],
-        "#FBEFEA", OKABE_ITO["vermillion"])
+    # Node A (Generation Host)
+    box(7.15, 0.8, 2.7, 4.0, "Node A — Generation",
+        ["Local corpus hydration",
+         "SPHP speculative prefill",
+         "vLLM Qwen3.8-27B (W4A16)",
+         f"t_prefill ≈ {model_warm.t_prefill_base_ms:.0f} ms (warm)"],
+        "#FDF0E8", C_SPHP)
 
-    def arrow(x1, y1, x2, y2, label, color, ls="-", dy=0.0, rad=0.0):
+    def arrow(x1, y1, x2, y2, label, color, ls="-", dy=0.0, rad=0.0,
+              label_dy=None, fs=8):
         a = FancyArrowPatch(
             (x1, y1), (x2, y2),
             arrowstyle="-|>", mutation_scale=14,
             linewidth=1.4, color=color, linestyle=ls, zorder=4,
             connectionstyle=f"arc3,rad={rad}" if rad else "arc3,rad=0")
         ax.add_patch(a)
-        ax.text((x1 + x2) / 2, (y1 + y2) / 2 + dy, label, ha="center",
-                va="bottom", fontsize=7, color=color, zorder=5)
+        ly = (y1 + y2) / 2 + dy if label_dy is None else label_dy
+        ax.text((x1 + x2) / 2, ly, label, ha="center",
+                va="bottom", fontsize=fs, color=color, zorder=5)
 
-    # Client -> Node B
-    arrow(1.9, 3.0, 3.0, 3.0, "Query", OKABE_ITO["black"], dy=0.10)
-    # Node B -> Node A (WAN, gRPC stream)
-    arrow(6.0, 3.7, 7.3, 3.7,
-          "SparseHint / FusedContext\n(gRPC stream · WireGuard WAN)",
-          OKABE_ITO["blue"], ls="--", dy=0.12)
-    # Node A -> Client (token stream, curved below)
-    arrow(8.5, 1.0, 1.0, 2.0, "Token stream (streamed back)",
-          OKABE_ITO["vermillion"], ls=":", dy=-0.30, rad=-0.35)
+    # Query: client -> Node B (horizontal, through the free gap).
+    arrow(1.9, 3.0, 3.0, 3.0, "Query", INK["primary"], dy=0.10)
+
+    # Retrieval context: Node B -> Node A, routed ABOVE both boxes.
+    arrow(4.4, 4.9, 7.6, 4.9,
+          "SparseHint / FusedContext  (gRPC stream · WireGuard)",
+          C_P2, ls="--", label_dy=4.98)
+
+    # Token stream: Node A -> client, routed BELOW the boxes.
+    arrow(8.4, 0.75, 1.9, 1.9, "Token stream (streamed back)",
+          C_SPHP, ls=":", rad=-0.25, label_dy=0.02, fs=8)
 
     ax.set_title("Geo-Distributed Hybrid RAG: System Architecture",
-                 fontsize=10, pad=8)
+                 fontsize=9, pad=8)
     return _save(fig, "fig1_arch.pdf")
 
 
@@ -246,38 +322,34 @@ def fig1_arch(model: PlacementCostModel) -> Path:
 # Fig 2 -- Placement topology taxonomy
 # ---------------------------------------------------------------------------
 def fig2_topologies() -> Path:
-    # (name, short description, [Client stages, Edge stages, Cloud stages])
     topologies = [
         ("P0", "Colocated",
          [["Query"], [], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
-        ("P1", "Gateway + all on A",
+        ("P1", "All stages on A",
          [["Query"], ["Gateway"], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
-        ("P2", "Retrieval B / Gen A",
+        ("P2", "Retrieval B,\nGen A",
          [["Query"], ["Sparse", "Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
-        ("P2-SPHP", "SPHP speculative prefill",
+        ("P2-SPHP", "SPHP spec.\nprefill",
          [["Query"], ["Sparse", "Dense", "Fusion"], ["Hydrate", "Spec. Prefill", "Decode"]]),
-        ("P3", "Retrieval+Hydrate B",
+        ("P3", "Retrieval +\nHydrate B",
          [["Query"], ["Sparse", "Dense", "Fusion", "Hydrate"], ["Prefill", "Decode"]]),
     ]
     col_titles = ["", "Client", "Edge (Node B)", "Cloud (Node A)"]
-    # Client column is deliberately the widest data column so short items
-    # such as "• Query" never wrap or clip letter-by-letter.
     col_x = [0, 1.4, 4.0, 6.8, 10.0]
-    col_fc = ["white", "#F2F2F2", "#EAF3FB", "#FBEFEA"]
-    col_ec = ["gray", OKABE_ITO["gray"], OKABE_ITO["blue"], OKABE_ITO["vermillion"]]
+    col_fc = ["white", "#F2F2F2", "#EAF3FB", "#FDF0E8"]
+    col_ec = [INK["muted"], INK["muted"], C_P2, C_SPHP]
 
     n_rows = len(topologies)
-    row_h = 0.95
+    row_h = 1.2
     header_h = 0.55
     total_h = header_h + n_rows * row_h
 
-    fig, ax = plt.subplots(figsize=(8.2, total_h * 0.92 + 0.6))
+    fig, ax = plt.subplots(figsize=(FULL_W, total_h * 0.92 + 0.6))
     ax.set_xlim(0, 10)
     ax.set_ylim(0, total_h)
     ax.axis("off")
 
-    def cell(x0, x1, y0, y1, title, items, fc, ec,
-             title_fs=8, item_fs=6.5):
+    def cell(x0, x1, y0, y1, title, items, fc, ec, title_fs=8, item_fs=7):
         p = FancyBboxPatch((x0, y0), x1 - x0, y1 - y0,
                            boxstyle="round,pad=0.0,rounding_size=0.06",
                            linewidth=0.9, edgecolor=ec, facecolor=fc, zorder=2)
@@ -289,359 +361,299 @@ def fig2_topologies() -> Path:
             top = y1 - 0.32
             step = (y1 - y0 - 0.40) / max(len(items), 1)
             for i, it in enumerate(items):
-                # Center each item horizontally in its cell so short labels
-                # (e.g. "• Query") never clip or wrap at the left edge.
                 ax.text((x0 + x1) / 2, top - i * step, "• " + it, ha="center",
-                        va="top", fontsize=item_fs, color="black", zorder=3)
+                        va="top", fontsize=item_fs, color=INK["primary"], zorder=3)
 
-    # Header row.
     y_top = total_h
     for j, ct in enumerate(col_titles):
         cell(col_x[j], col_x[j + 1], y_top - header_h, y_top,
              ct, [], col_fc[j], col_ec[j], title_fs=8)
 
-    # Data rows.
     for i, (name, desc, cells) in enumerate(topologies):
         y1 = y_top - header_h - i * row_h
         y0 = y1 - row_h
-        # Label cell: topology name (bold) + short description.
         cell(col_x[0], col_x[1], y0, y1, name, [desc], "white",
-             OKABE_ITO["black"], title_fs=8, item_fs=5.5)
+             INK["primary"], title_fs=8, item_fs=6)
         for j, items in enumerate(cells):
             cell(col_x[j + 1], col_x[j + 2], y0, y1, "", items,
-                 col_fc[j + 1], col_ec[j + 1], item_fs=6.5)
+                 col_fc[j + 1], col_ec[j + 1], item_fs=7)
 
-    ax.set_title("Placement Topology Taxonomy (P0–P3)", fontsize=10, pad=8)
+    ax.set_title("Placement Topology Taxonomy (P0–P3)", fontsize=9, pad=8)
     return _save(fig, "fig2_topologies.pdf")
 
 
 # ---------------------------------------------------------------------------
-# Fig 3 -- SPHP speculative prefill timeline (Gantt)
+# Fig 3 -- SPHP speculative prefill timeline (measured-mechanism Gantt)
 # ---------------------------------------------------------------------------
-def fig3_sphp_timeline(model: PlacementCostModel) -> Path:
+def _sphp_deltas(campaign: list[dict]) -> dict:
+    """Measured per-state SPHP TTFT deltas (relative %) with CIs."""
+    out = {}
+    for state in ("cold", "warm"):
+        recs = [r for r in campaign
+                if (r.get("repeat_index", 0) == 0) == (state == "cold")]
+        base = [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"]
+        sphp = [r["ttft_ms"] for r in recs if r.get("variant") == "sphp"]
+        lo, hi, rel = boot_ci_rel(sphp, base)
+        out[state] = {"rel_pct": rel, "ci": (lo, hi),
+                      "base_mean": float(np.mean(base)),
+                      "sphp_mean": float(np.mean(sphp))}
+    return out
+
+
+def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> Path:
     rtt, bw, top_k = 40.0, 100.0, 10
 
-    sparse = model.t_sparse_base_ms
-    dense = model.t_dense_base_ms
-    fusion = model.t_fusion_base_ms
-    prefill = model.t_prefill_base_ms
-    hydrate = model.t_hydrate_per_doc_ms * min(top_k, 5)
+    sparse = model_warm.t_sparse_base_ms
+    dense = model_warm.t_dense_base_ms
+    fusion = model_warm.t_fusion_base_ms
+    prefill = model_warm.t_prefill_base_ms  # residual: includes hydration
 
-    hint_payload = model.query_bytes + 5 * model.doc_id_bytes
-    fused_payload = model.query_bytes + top_k * model.doc_id_bytes
-    wan_hint = model.wan_delay_ms(hint_payload, rtt, bw)
-    wan_fused = model.wan_delay_ms(fused_payload, rtt, bw)
+    wan_hint = model_warm.wan_delay_ms(model_warm.query_bytes + 5 * model_warm.doc_id_bytes, rtt, bw)
+    wan_fused = model_warm.wan_delay_ms(model_warm.query_bytes + top_k * model_warm.doc_id_bytes, rtt, bw)
 
-    # ---- Baseline P2 (fully serialized) ----
+    # ---- (a) Baseline P2: serialized ----
     base = [
-        ("Retrieval (Sparse ∥ Dense)", 0.0, max(sparse, dense), C_DENSE),
-        ("Fusion (RRF)", max(sparse, dense), fusion, C_FUSION),
-        ("WAN: fused context", max(sparse, dense) + fusion, wan_fused, C_P2),
-        ("Hydrate", max(sparse, dense) + fusion + wan_fused, hydrate, C_SPARSE),
-        ("Prefill (TTFT)", max(sparse, dense) + fusion + wan_fused + hydrate, prefill, C_PREFILL),
+        ("Dense leg (BGE-M3)", 0.0, dense, C_DENSE),
+        ("Sparse leg (BM25)", 0.0, sparse, C_SPARSE),
+        ("WAN: fused context", dense + fusion, wan_fused, C_WAN),
+        ("Prefill (incl. hydrate)", dense + fusion + wan_fused, prefill, C_PREFILL),
     ]
-    base_ttft = max(sparse, dense) + fusion + wan_fused + hydrate + prefill
+    base_ttft = dense + fusion + wan_fused + prefill
 
-    # ---- SPHP (speculative prefill overlaps the dense leg) ----
-    spec_hydrate_start = sparse + wan_hint
-    spec_prefill_start = spec_hydrate_start + hydrate
+    # ---- (b) P2-SPHP: speculative prefill overlaps the dense leg ----
+    spec_prefill_start = sparse + wan_hint
     spec_prefill_end = spec_prefill_start + prefill
     fused_arrival = dense + fusion + wan_fused
     sphp_ttft = max(fused_arrival, spec_prefill_end)
 
     sphp = [
-        ("Sparse leg", 0.0, sparse, C_SPARSE),
-        ("Dense leg", 0.0, dense, C_DENSE),
-        ("WAN: sparse hint", sparse, wan_hint, C_P2),
-        ("Provisional hydrate", spec_hydrate_start, hydrate, C_SPARSE),
-        ("Speculative prefill", spec_prefill_start, prefill, C_PREFILL),
-        ("WAN: fused context", dense + fusion, wan_fused, C_P2),
+        ("Dense leg (BGE-M3)", 0.0, dense, C_DENSE),
+        ("Sparse leg (BM25)", 0.0, sparse, C_SPARSE),
+        ("WAN: sparse hint", sparse, wan_hint, C_WAN),
+        ("Provisional prefill", spec_prefill_start, prefill, C_PREFILL),
     ]
 
     fig, (ax_base, ax_sphp) = plt.subplots(
-        2, 1, figsize=(6.5, 4.2), sharex=True,
-        gridspec_kw={"hspace": 0.35},
+        2, 1, figsize=(FULL_W, 4.0), sharex=True,
+        gridspec_kw={"hspace": 0.42},
     )
-    # Extra bottom margin so the summary line clears the "Time (ms)" axis.
-    fig.subplots_adjust(bottom=0.18)
 
-    def draw_gantt(ax, bars, ttft, title):
+    def draw_gantt(ax, bars, ttft, title, provisional_idx=None):
         n = len(bars)
         names = []
         for i, (label, start, dur, color) in enumerate(bars):
             y = n - 1 - i
             names.append(label)
+            alpha = 0.55 if i == provisional_idx else 1.0
+            hatch = "//" if i == provisional_idx else None
             ax.barh(y, dur, left=start, height=0.6, color=color,
-                    edgecolor="white", linewidth=0.5, zorder=3)
-            if dur >= 300.0:
-                # Wide enough: label inside the bar.
-                ax.text(start + dur / 2.0, y, label, va="center", ha="center",
-                        fontsize=7, color="white", zorder=4, clip_on=False)
+                    alpha=alpha, hatch=hatch, edgecolor="white",
+                    linewidth=0.5, zorder=3)
+            if dur >= 250.0:
+                ax.text(start + dur / 2.0, y, f"{label}  ({dur:.0f} ms)",
+                        va="center", ha="center", fontsize=8,
+                        color="white" if alpha == 1.0 else INK["primary"],
+                        zorder=4)
             else:
-                # Narrow bar: place the label outside (to the right) with an
-                # arrow so it is never clipped.
-                ax.annotate(label, xy=(start + dur, y),
-                            xytext=(start + dur + 40.0, y),
-                            va="center", ha="left", fontsize=7,
-                            color=color, zorder=4, clip_on=False,
+                ax.annotate(f"{label} ({dur:.1f} ms)", xy=(start + dur, y),
+                            xytext=(start + dur + 15.0, y),
+                            va="center", ha="left", fontsize=8,
+                            color=color, zorder=4,
                             arrowprops=dict(arrowstyle="-", color=color,
                                             lw=0.6, shrinkA=0, shrinkB=0))
-        ax.axvline(ttft, color=OKABE_ITO["black"], linestyle="--",
+        ax.axvline(ttft, color=INK["primary"], linestyle="--",
                    linewidth=1.0, zorder=2)
-        ax.text(ttft, n - 0.2, f" TTFT={ttft:.0f} ms",
-                va="bottom", ha="left", fontsize=7,
-                color=OKABE_ITO["black"])
-        # Stage names on the y-axis ticks (one per bar).
+        ax.text(ttft, n - 0.10, f"TTFT={ttft:.0f} ms ",
+                va="bottom", ha="right", fontsize=8, color=INK["primary"])
+        # Bars are drawn at y = n-1-i in draw order; reverse the tick labels
+        # to match, so each stage name sits beside its own bar.
         ax.set_yticks(range(n))
-        ax.set_yticklabels(names, fontsize=7)
+        ax.set_yticklabels(list(reversed(names)), fontsize=8)
         ax.set_title(title, loc="left", fontsize=9)
-        # Extra headroom on the right so outside labels are not clipped.
-        ax.set_xlim(0, max(b[1] + b[2] for b in bars) * 1.30)
-        ax.set_ylim(-0.6, n + 0.4)
+        ax.set_xlim(0, max(b[1] + b[2] for b in bars) * 1.22)
+        ax.set_ylim(-0.6, n + 0.75)
+        _style_axes(ax)
 
     draw_gantt(ax_base, base, base_ttft,
-              f"(a) Baseline P2 — serialized  (RTT={rtt:.0f} ms, BW={bw:.0f} Mbps)")
+               f"(a) Baseline P2 — serialized (RTT={rtt:.0f} ms, BW={bw:.0f} Mbps, warm fit)")
     draw_gantt(ax_sphp, sphp, sphp_ttft,
-              "(b) P2-SPHP — speculative prefill overlaps the dense leg")
+               "(b) P2-SPHP — provisional prefill overlaps the dense leg (kept on hit)",
+               provisional_idx=3)
 
     ax_sphp.set_xlabel("Time (ms)")
-    ax_base.set_ylabel("Pipeline stage")
-    ax_sphp.set_ylabel("Pipeline stage")
 
-    # Annotate the overlap saving.
-    saving = base_ttft - sphp_ttft
-    fig.text(0.99, 0.01,
-             f"SPHP saves {saving:.0f} ms ({100 * saving / base_ttft:.1f}%) of TTFT "
-             f"by overlapping prefill with the dense leg.",
-             ha="right", va="bottom", fontsize=7, color=OKABE_ITO["gray"],
+    # Measured deltas from the campaign (honest numbers, not the schematic's).
+    d = _sphp_deltas(campaign)
+    cold, warm = d["cold"], d["warm"]
+    fig.text(0.99, -0.045,
+             f"Measured TTFT delta vs. baseline (h = {model_warm.sphp_hit_rate:.2f} measured): "
+             f"cold {cold['rel_pct']:+.1f}% [95% CI {cold['ci'][0]:+.1f}, {cold['ci'][1]:+.1f}%], "
+             f"warm {warm['rel_pct']:+.1f}% [CI {warm['ci'][0]:+.1f}, {warm['ci'][1]:+.1f}%]",
+             ha="right", va="top", fontsize=8, color=INK["secondary"],
              style="italic")
 
     return _save(fig, "fig3_sphp_timeline.pdf")
 
 
 # ---------------------------------------------------------------------------
-# Fig 4 -- Per-stage latency breakdown (stacked bar)
+# Fig 4 -- TTFT composition per RTT tier (cold vs. warm)
 # ---------------------------------------------------------------------------
-def fig4_stage_breakdown(bench: dict) -> Path:
-    tiers = ["delay_0ms", "delay_15ms", "delay_40ms", "delay_80ms"]
-    labels = ["LAN\n(0 ms)", "Edge\n(+15 ms)", "WAN\n(+40 ms)", "WAN\n(+80 ms)"]
+def fig4_stage_breakdown(campaign: list[dict]) -> Path:
+    tiers_all = sorted({float(r["rtt_ms"]) for r in campaign})
+    tier_labels = [f"{int(t)}" for t in tiers_all]
 
-    def mean(vals):
-        return float(np.mean(vals)) if vals else 0.0
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 3.0), sharey=False)
+    panels = [("cold", "(a) Cold prefix (repeat 0)"), ("warm", "(b) Warm (repeats 1+)")]
 
-    stages = {}
-    for tier in tiers:
-        runs = bench.get(tier, [])
-        t = [r["timings"] for r in runs]
-        sparse = mean([x["sparse_ms"] for x in t])
-        dense = mean([x["dense_ms"] for x in t])
-        fusion = mean([x["fusion_ms"] for x in t])
-        ttft = mean([x["ttft_ms"] for x in t])
-        decode = mean([x["decode_ms"] for x in t])
-        # Prefill = TTFT residual after the (parallel) retrieval + fusion.
-        prefill = max(ttft - max(sparse, dense) - fusion, 0.0)
-        stages[tier] = {
-            "Sparse": sparse,
-            "Dense": dense,
-            "Fusion": fusion,
-            "Prefill": prefill,
-            "Decode": decode,
-        }
+    for ax, (state, title) in zip(axes, panels):
+        recs = [r for r in campaign
+                if r.get("variant") == "baseline"
+                and (r.get("repeat_index", 0) == 0) == (state == "cold")]
+        stages = {"Retrieval (max of Sparse ∥ Dense)": [],
+                  "Fusion (RRF)": [],
+                  "Prefill (incl. hydrate)": []}
+        for t in tiers_all:
+            tr = [r for r in recs if float(r["rtt_ms"]) == t]
+            sparse = float(np.mean([r["sparse_ms"] for r in tr]))
+            dense = float(np.mean([r["dense_ms"] for r in tr]))
+            fusion = float(np.mean([r["fusion_ms"] for r in tr]))
+            ttft = float(np.mean([r["ttft_ms"] for r in tr]))
+            stages["Retrieval (max of Sparse ∥ Dense)"].append(max(sparse, dense))
+            stages["Fusion (RRF)"].append(fusion)
+            stages["Prefill (incl. hydrate)"].append(max(ttft - max(sparse, dense) - fusion, 0.0))
 
-    order = ["Sparse", "Dense", "Fusion", "Prefill", "Decode"]
-    colors = [C_SPARSE, C_DENSE, C_FUSION, C_PREFILL, C_DECODE]
+        colors = [C_SPARSE, C_FUSION, C_PREFILL]
+        x = np.arange(len(tiers_all))
+        width = 0.58
+        bottom = np.zeros(len(tiers_all))
+        for (label, vals), color in zip(stages.items(), colors):
+            vals = np.array(vals)
+            ax.bar(x, vals, width, bottom=bottom, color=color,
+                   edgecolor="white", linewidth=0.8, label=label)
+            for xi, (v, b) in enumerate(zip(vals, bottom)):
+                if v > 300:
+                    ax.text(xi, b + v / 2.0, f"{v:.0f}", ha="center", va="center",
+                            fontsize=8, color="white")
+            bottom += vals
 
-    x = np.arange(len(tiers))
-    width = 0.6
-    bottom = np.zeros(len(tiers))
+        ax.set_xticks(x)
+        ax.set_xticklabels(tier_labels)
+        ax.set_xlabel("WAN RTT (ms)")
+        ax.set_title(title, loc="left", fontsize=9)
+        ax.set_ylim(0, bottom.max() * 1.12)
+        _style_axes(ax)
 
-    fig, ax = plt.subplots(figsize=(6.0, 3.6))
-    # Extra bottom margin so the footnote clears the x-tick condition labels.
-    fig.subplots_adjust(bottom=0.20)
-    for stage, color in zip(order, colors):
-        vals = np.array([stages[t][stage] for t in tiers])
-        ax.bar(x, vals, width, bottom=bottom, color=color,
-               edgecolor="white", linewidth=0.5, label=stage)
-        # Value labels inside tall-enough segments.
-        for xi, (v, b) in enumerate(zip(vals, bottom)):
-            if v > 40:
-                ax.text(xi, b + v / 2.0, f"{v:.0f}", ha="center", va="center",
-                        fontsize=6.5, color="white")
-        bottom += vals
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.set_ylabel("Mean latency (ms)")
-    ax.set_title("Per-Stage Latency Breakdown by Network Condition")
-    ax.legend(loc="upper left", ncol=2, framealpha=0.9,
-              title="Stage", title_fontsize=8)
-    ax.set_ylim(0, bottom.max() * 1.05)
-
-    fig.text(0.99, 0.01,
-             "Sparse and Dense legs execute in parallel; the retrieval phase "
-             "duration is max(Sparse, Dense).",
-             ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
-             style="italic")
-
+    axes[0].set_ylabel("Mean TTFT (ms)")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.10),
+               ncol=3, frameon=False, fontsize=8)
     return _save(fig, "fig4_stage_breakdown.pdf")
 
 
 # ---------------------------------------------------------------------------
-# Fig 5 -- TTFT vs. WAN RTT (P2 vs. P2-SPHP)
+# Fig 5 -- MEASURED TTFT vs. WAN RTT (cold / warm; baseline vs. SPHP)
 # ---------------------------------------------------------------------------
-def fig5_ttft_vs_rtt(model: PlacementCostModel) -> Path:
-    rtt_tiers = [0, 10, 30, 50, 100]
-    bw = 100.0
+def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
 
-    p2 = [model.predict_ttft_p2(rtt, bw) for rtt in rtt_tiers]
-    sphp = [model.predict_ttft_p2_sphp(rtt, bw) for rtt in rtt_tiers]
+    for ax, (state, title) in zip(axes, [("cold", "(a) Cold prefix (repeat 0)"),
+                                         ("warm", "(b) Warm (repeats 1+)")]):
+        recs = [r for r in campaign
+                if (r.get("repeat_index", 0) == 0) == (state == "cold")]
+        tiers, base_vals = _tier_means([r for r in recs if r.get("variant") == "baseline"])
+        _, sphp_vals = _tier_means([r for r in recs if r.get("variant") == "sphp"])
 
-    fig, ax = plt.subplots(figsize=(5.6, 3.6))
-    ax.plot(rtt_tiers, p2, marker="o", color=C_P2, label="P2 (baseline)")
-    ax.plot(rtt_tiers, sphp, marker="s", color=C_SPHP, label="P2-SPHP")
+        base_mean = [float(np.mean(v)) for v in base_vals]
+        base_ci = [boot_ci(v) for v in base_vals]
+        sphp_mean = [float(np.mean(v)) for v in sphp_vals]
+        sphp_ci = [boot_ci(v) for v in sphp_vals]
 
-    # Shade the SPHP saving region.
-    ax.fill_between(rtt_tiers, sphp, p2, color=C_SPHP, alpha=0.12,
-                    label="SPHP TTFT saving")
+        ax.errorbar(tiers, base_mean,
+                    yerr=[[m - c[0] for m, c in zip(base_mean, base_ci)],
+                          [c[1] - m for m, c in zip(base_mean, base_ci)]],
+                    marker="o", color=C_P2, capsize=3, label="P2 baseline")
+        ax.errorbar(tiers, sphp_mean,
+                    yerr=[[m - c[0] for m, c in zip(sphp_mean, sphp_ci)],
+                          [c[1] - m for m, c in zip(sphp_mean, sphp_ci)]],
+                    marker="s", color=C_SPHP, capsize=3, label="P2-SPHP")
 
-    ax.set_xlabel("WAN RTT (ms)")
-    ax.set_ylabel("TTFT (ms)")
-    ax.set_title("Time-to-First-Token vs. WAN RTT  (BW = 100 Mbps)")
-    ax.set_xticks(rtt_tiers)
-    ax.legend(loc="upper left", framealpha=0.9)
+        if state == "cold":
+            lo, hi, rel = boot_ci_rel(
+                [r["ttft_ms"] for r in recs if r.get("variant") == "sphp"],
+                [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"])
+            ax.annotate(f"SPHP delta {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
+                        xy=(0.28, 0.04), xycoords="axes fraction",
+                        fontsize=7.5, color=INK["secondary"])
+        else:
+            ax.annotate("delta within noise at every tier",
+                        xy=(0.32, 0.05), xycoords="axes fraction",
+                        fontsize=7.5, color=INK["secondary"])
 
-    # Annotate the max saving.
-    max_save = max(p - s for p, s in zip(p2, sphp))
-    ax.annotate(f"up to {max_save:.0f} ms saved",
-                xy=(100, sphp[-1]), xytext=(55, sphp[-1] + 60),
-                fontsize=7, color=OKABE_ITO["black"],
-                arrowprops=dict(arrowstyle="->", color=OKABE_ITO["gray"], lw=0.8))
+        ax.set_xticks(tiers)
+        ax.set_xlabel("WAN RTT (ms)")
+        ax.set_title(title, loc="left", fontsize=9)
+        ax.legend(loc="upper right", frameon=False)
+        _style_axes(ax)
 
+    axes[0].set_ylabel("TTFT (ms)")
     return _save(fig, "fig5_ttft_vs_rtt.pdf")
 
 
 # ---------------------------------------------------------------------------
-# Fig 6 -- Placement trade-off map over (Bandwidth x context depth K)
+# Fig 6 -- Placement scenario curves over (RTT, BW)
 # ---------------------------------------------------------------------------
-def fig6_crossover_map(model: PlacementCostModel) -> Path:
-    """Physical placement trade-off grounded in the real Node A (workstation)
-    <-> Node B (laptop) WAN link.
+def fig6_crossover_map(model_warm: PlacementCostModel,
+                       model_cold: PlacementCostModel) -> Path:
+    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
 
-    Compares the three split placements, using the fitted model's stage
-    parameters and the exact wire payloads:
-      * P2       -- 144 B of doc IDs (query 64 B + 10 x 8 B) over the WAN
-      * P2-SPHP  -- speculative prefill (104 B sparse hint + 144 B fused)
-      * P3       -- hydrated text p_text = 64 + K*1200 B over the WAN
-    across bandwidth (0.5-100 Mbps) and context depth K (1/5/10/20 passages).
-    Under a constrained uplink (< 2 Mbps) or large K, P3's serialization delay
-    makes P2 / P2-SPHP dominant.
-    """
-    rtt = 40.0  # measured WAN RTT (delay_40ms tier)
+    # (a) TTFT vs RTT at 100 Mbps — warm solid, cold dashed; log y so the
+    # warm cluster (≈800-950 ms) and cold band (≈3.3-3.6 s) both resolve.
+    rtts = np.linspace(0, 200, 50)
+    ax_a.plot(rtts, [model_warm.predict_ttft_p2(r, 100.0) for r in rtts],
+              color=C_P2, label="P2 (warm)")
+    ax_a.plot(rtts, [model_warm.predict_ttft_p2_sphp(r, 100.0) for r in rtts],
+              color=C_SPHP, label="P2-SPHP (warm)")
+    ax_a.plot(rtts, [model_warm.predict_ttft_p3(r, 100.0) for r in rtts],
+              color=C_P3, label="P3 (warm)")
+    ax_a.plot(rtts, [model_cold.predict_ttft_p2(r, 100.0) for r in rtts],
+              color=C_P2, linestyle="--", alpha=0.55, label="P2 (cold)")
+    ax_a.plot(rtts, [model_cold.predict_ttft_p2_sphp(r, 100.0) for r in rtts],
+              color=C_SPHP, linestyle="--", alpha=0.55, label="P2-SPHP (cold)")
+    ax_a.set_yscale("log")
+    ax_a.set_yticks([800, 1000, 2000, 4000])
+    ax_a.set_yticklabels(["800", "1000", "2000", "4000"])
+    ax_a.yaxis.set_minor_formatter(NullFormatter())
+    ax_a.set_ylim(700, 4500)
+    ax_a.set_xlabel("WAN RTT (ms)")
+    ax_a.set_ylabel("Modelled TTFT (ms)")
+    ax_a.set_title("(a) TTFT vs. RTT (BW = 100 Mbps)", loc="left", fontsize=9)
+    ax_a.legend(loc="center right", frameon=False, fontsize=7)
+    ax_a.annotate("SPHP optimal at every measured regime;\nP3 ≈ P2 (payloads are tiny)",
+                  xy=(0.04, 0.30), xycoords="axes fraction",
+                  fontsize=8, color=INK["secondary"], va="center")
+    _style_axes(ax_a)
 
-    def ttft_p2(bw, k):
-        retrieval = max(model.t_sparse_base_ms, model.t_dense_base_ms)
-        payload = 144  # query(64) + 10 doc_ids(8)
-        wan = model.wan_delay_ms(payload, rtt, bw)
-        hydrate = model.t_hydrate_per_doc_ms * k
-        return retrieval + model.t_fusion_base_ms + wan + hydrate + model.t_prefill_base_ms
-
-    def ttft_p2_sphp(bw, k):
-        retrieval = max(model.t_sparse_base_ms, model.t_dense_base_ms)
-        hint_payload = 64 + 5 * 8  # 104 B sparse hint
-        fused_payload = 144
-        wan_hint = model.wan_delay_ms(hint_payload, rtt, bw)
-        wan_fused = model.wan_delay_ms(fused_payload, rtt, bw)
-        hydrate = model.t_hydrate_per_doc_ms * k
-        t_prefill_start = model.t_sparse_base_ms + wan_hint + hydrate
-        t_prefill_finish = t_prefill_start + model.t_prefill_base_ms
-        t_fused_arrival = model.t_dense_base_ms + model.t_fusion_base_ms + wan_fused
-        ttft_hit = max(t_fused_arrival, t_prefill_finish)
-        ttft_miss = ttft_p2(bw, k) + 5.0
-        return model.sphp_hit_rate * ttft_hit + (1 - model.sphp_hit_rate) * ttft_miss
-
-    def ttft_p3(bw, k):
-        retrieval = max(model.t_sparse_base_ms, model.t_dense_base_ms)
-        hydrate = model.t_hydrate_per_doc_ms * k
-        payload = 64 + k * 1200  # hydrated text p_text
-        wan = model.wan_delay_ms(payload, rtt, bw)
-        return retrieval + model.t_fusion_base_ms + hydrate + wan + model.t_prefill_base_ms
-
-    k_vals = [1, 5, 10, 20]
-    bw_grid = [0.5, 1, 2, 5, 10, 25, 50, 100]
-
-    def best_topo(bw, k):
-        opts = {"P2": ttft_p2(bw, k),
-                "P2-SPHP": ttft_p2_sphp(bw, k),
-                "P3": ttft_p3(bw, k)}
-        return min(opts, key=opts.get)
-
-    # ---- Panel (a): optimal-topology heatmap over (BW x K) ----
-    topo_index = {"P2": 0, "P2-SPHP": 1, "P3": 2}
-    grid = np.zeros((len(bw_grid), len(k_vals)))
-    for i, bw in enumerate(bw_grid):
-        for j, k in enumerate(k_vals):
-            grid[i, j] = topo_index[best_topo(bw, k)]
-
-    cmap = ListedColormap([TOPO_COLORS[t] for t in ["P2", "P2-SPHP", "P3"]])
-
-    fig = plt.figure(figsize=(9.0, 4.6))
-    gs = fig.add_gridspec(2, 3, width_ratios=[1.0, 1.0, 1.0],
-                          wspace=0.42, hspace=0.55)
-
-    ax_h = fig.add_subplot(gs[:, 0])
-    im = ax_h.imshow(grid, cmap=cmap, vmin=-0.5, vmax=2.5,
-                     aspect="auto", origin="lower", interpolation="nearest")
-    for i, bw in enumerate(bw_grid):
-        for j, k in enumerate(k_vals):
-            ax_h.text(j, i, best_topo(bw, k), ha="center", va="center",
-                      fontsize=6, color="white",
-                      bbox=dict(boxstyle="round,pad=0.12", fc="none",
-                                ec="white", alpha=0.6))
-    ax_h.set_xticks(range(len(k_vals)))
-    ax_h.set_xticklabels([f"K={k}" for k in k_vals])
-    ax_h.set_yticks(range(len(bw_grid)))
-    ax_h.set_yticklabels([f"{b:g}" for b in bw_grid])
-    ax_h.set_xlabel("Context depth K (passages)")
-    ax_h.set_ylabel("Bandwidth (Mbps)")
-    ax_h.set_title("(a) Optimal placement", loc="left", fontsize=9)
-    handles = [Patch(color=TOPO_COLORS[t], label=t)
-               for t in ["P2", "P2-SPHP", "P3"]]
-    ax_h.legend(handles=handles, loc="upper center",
-                bbox_to_anchor=(0.5, -0.16), ncol=3, frameon=False, fontsize=7)
-
-    # ---- Panel (b): TTFT-vs-bandwidth curves, one small multiple per K ----
-    bw_curve = np.logspace(np.log10(0.5), np.log10(100), 60)
-    for j, k in enumerate(k_vals):
-        row, col = divmod(j, 2)
-        ax_c = fig.add_subplot(gs[row, 1 + col])
-        ax_c.axvspan(0.5, 2.0, color=OKABE_ITO["vermillion"], alpha=0.08,
-                     zorder=0)
-        ax_c.plot(bw_curve, [ttft_p2(b, k) for b in bw_curve],
-                  color=C_P2, label="P2 (144 B IDs)")
-        ax_c.plot(bw_curve, [ttft_p2_sphp(b, k) for b in bw_curve],
-                  color=C_SPHP, label="P2-SPHP")
-        ax_c.plot(bw_curve, [ttft_p3(b, k) for b in bw_curve],
-                  color=C_P3, label="P3 (64+K*1200 B)")
-        ax_c.set_xscale("log")
-        ax_c.set_xlim(0.5, 100)
-        ax_c.set_xticks([0.5, 1, 2, 10, 100])
-        ax_c.set_xticklabels(["0.5", "1", "2", "10", "100"])
-        ax_c.set_title(f"(b) K={k}", loc="left", fontsize=8)
-        if row == 1:
-            ax_c.set_xlabel("Bandwidth (Mbps)")
-        if col == 0:
-            ax_c.set_ylabel("TTFT (ms)")
-        if j == 0:
-            ax_c.legend(loc="upper left", framealpha=0.9, fontsize=6)
-
-    fig.suptitle("Placement Crossover Map: P2 / P2-SPHP / P3 over "
-                 "(Bandwidth x K)  (RTT = 40 ms, Node A <-> Node B)",
-                 fontsize=10)
-    fig.text(0.99, 0.01,
-             "Shaded band: constrained uplink (< 2 Mbps). P3's hydrated-text "
-             "serialization delay makes P2 / P2-SPHP dominant at low BW or large K.",
-             ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
-             style="italic")
+    # (b) TTFT vs BW at 80 ms RTT — the only real crossover is serialization.
+    bws = np.logspace(np.log10(0.5), np.log10(1000), 80)
+    ax_b.plot(bws, [model_warm.predict_ttft_p2(80.0, b) for b in bws],
+              color=C_P2, label="P2")
+    ax_b.plot(bws, [model_warm.predict_ttft_p2_sphp(80.0, b) for b in bws],
+              color=C_SPHP, label="P2-SPHP")
+    ax_b.plot(bws, [model_warm.predict_ttft_p3(80.0, b) for b in bws],
+              color=C_P3, label="P3 (hydrated text)")
+    ax_b.set_xscale("log")
+    ax_b.set_xlim(0.5, 1000)
+    ax_b.set_xticks([0.5, 1, 2, 5, 10, 100, 1000])
+    ax_b.set_xticklabels(["0.5", "1", "2", "5", "10", "100", "1000"])
+    ax_b.set_xlabel("Bandwidth (Mbps)")
+    ax_b.set_ylabel("Modelled TTFT (ms)")
+    ax_b.set_title("(b) TTFT vs. bandwidth (RTT = 80 ms, warm)", loc="left", fontsize=9)
+    ax_b.legend(loc="upper right", frameon=False, fontsize=7)
+    ax_b.annotate("P3 serialization penalty\n(6 KB hydrated text)",
+                  xy=(1.15, model_warm.predict_ttft_p3(80.0, 1.15)),
+                  xytext=(6.0, 900.0), fontsize=8, color=C_P3,
+                  arrowprops=dict(arrowstyle="->", color=C_P3, lw=0.8))
+    _style_axes(ax_b)
 
     return _save(fig, "fig6_crossover_map.pdf")
 
@@ -650,108 +662,108 @@ def fig6_crossover_map(model: PlacementCostModel) -> Path:
 # Fig 7 -- Retrieval quality (Sparse vs. Dense vs. Hybrid)
 # ---------------------------------------------------------------------------
 def fig7_retrieval_quality() -> Path:
-    # Live empirical quality from the 200-query MS MARCO dev evaluation run
-    # against the deployed Node B hybrid gateway (GTX 1660 Ti).
     live = load_live_quality()
     m = live["metrics"]
-    n_queries = live.get("n_queries", 200)
+    n_queries = live.get("n_queries", 500)
 
-    metrics = ["MRR@10", "nDCG@10", "Recall@100"]
-    sparse = [m["sparse"]["mrr@10"], m["sparse"]["ndcg@10"], m["sparse"]["recall@100"]]
-    dense = [m["dense"]["mrr@10"], m["dense"]["ndcg@10"], m["dense"]["recall@100"]]
-    hybrid = [m["hybrid"]["mrr@10"], m["hybrid"]["ndcg@10"], m["hybrid"]["recall@100"]]
+    metrics = [("mrr@10", "MRR@10"), ("ndcg@10", "nDCG@10"),
+               ("recall@100", "Recall@100"), ("recall@1000", "Recall@1000")]
+    modes = [("sparse", "Sparse (BM25)", C_MODE_SPARSE, "o"),
+             ("dense", "Dense (BGE-M3)", C_MODE_DENSE, "s"),
+             ("hybrid", "Hybrid (RRF)", C_MODE_HYBRID, "D")]
 
-    x = np.arange(len(metrics))
-    width = 0.26
+    # Grouped dot plot (Cleveland): three marker rows per metric; value
+    # labels sit beside their own dot, so labels can never collide.
+    fig, ax = plt.subplots(figsize=(COL_W, 2.9))
+    offsets = {"sparse": 0.24, "dense": 0.0, "hybrid": -0.24}
+    for mode, label, color, marker in modes:
+        for yi, (key, _) in enumerate(metrics):
+            if key not in m[mode]:
+                continue
+            v = m[mode][key]
+            y = yi + offsets[mode]
+            ax.scatter([v], [y], marker=marker, color=color, s=26,
+                       zorder=3, label=label if yi == 0 else None)
+            ax.text(v + 0.018, y, f"{v:.2f}", va="center", ha="left",
+                    fontsize=6.0, color=INK["secondary"])
 
-    fig, ax = plt.subplots(figsize=(5.6, 3.6))
-    ax.bar(x - width, sparse, width, color=C_SPARSE,
-           edgecolor="white", linewidth=0.5, label="Sparse (BM25)")
-    ax.bar(x, dense, width, color=C_DENSE,
-           edgecolor="white", linewidth=0.5, label="Dense (BGE-M3)")
-    ax.bar(x + width, hybrid, width, color=C_FUSION,
-           edgecolor="white", linewidth=0.5, label="Hybrid (RRF)")
+    # Sparse is retrieved at k<=100: its Recall@1000 slot is a cap, not a score.
+    ax.annotate("sparse: k ≤ 100", xy=(0.055, 3 - 0.24), xycoords="data",
+                fontsize=6.0, color=INK["muted"], va="center")
 
-    for xi, (s, d, h) in enumerate(zip(sparse, dense, hybrid)):
-        ax.text(xi - width, s + 0.01, f"{s:.2f}", ha="center", fontsize=6.5)
-        ax.text(xi, d + 0.01, f"{d:.2f}", ha="center", fontsize=6.5)
-        ax.text(xi + width, h + 0.01, f"{h:.2f}", ha="center", fontsize=6.5)
+    ax.set_yticks(range(len(metrics)))
+    ax.set_yticklabels([lbl for _, lbl in metrics], fontsize=7)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 1.0)
+    ax.set_xlabel("Score")
+    ax.set_ylim(3.55, -0.55)
+    ax.set_title("Retrieval Quality", loc="left", fontsize=9)
+    ax.legend(loc="upper left", frameon=False, fontsize=6.0,
+              handletextpad=0.2, borderaxespad=0.2)
+    ax.grid(axis="y", visible=False)
+    _style_axes(ax)
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(metrics)
-    ax.set_ylabel("Score")
-    ax.set_ylim(0, 1.0)
-    ax.set_title("Retrieval Quality: Sparse vs. Dense vs. Hybrid")
-    ax.legend(loc="upper left", framealpha=0.9)
-
-    fig.text(0.99, 0.01,
-             f"{n_queries} MS MARCO dev queries evaluated live on Node B "
-             "(GTX 1660 Ti); RRF k=60, top_k=100.",
-             ha="right", va="bottom", fontsize=6.5, color=OKABE_ITO["gray"],
+    fig.text(0.99, -0.04,
+             f"{n_queries} seeded MS MARCO dev queries (seed 42), live on Node B; RRF k=60.",
+             ha="right", va="top", fontsize=6.5, color=INK["secondary"],
              style="italic")
 
     return _save(fig, "fig7_retrieval_quality.pdf")
 
 
 # ---------------------------------------------------------------------------
-# Fig 8 -- Cost-model parity (predicted vs. measured TTFT)
+# Fig 8 -- Regime-level cost-model parity
 # ---------------------------------------------------------------------------
-def fig8_cost_model_parity(model: PlacementCostModel, bench: dict) -> Path:
-    delay_map = {
-        "delay_0ms": 0.0,
-        "delay_15ms": 15.0,
-        "delay_40ms": 40.0,
-        "delay_80ms": 80.0,
-    }
-    bw = 100.0
-
-    predicted, measured = [], []
-    for tier, rtt in delay_map.items():
-        for r in bench.get(tier, []):
-            t = r["timings"]
-            pred = model.predict_ttft_p2(rtt, bw)
-            predicted.append(pred)
-            measured.append(t["ttft_ms"])
-
-    predicted = np.array(predicted)
-    measured = np.array(measured)
-
-    fig, ax = plt.subplots(figsize=(5.2, 4.6))
-    ax.scatter(measured, predicted, s=18, alpha=0.55, color=C_P2,
-               edgecolor="none", label="Per-query (P2 model)")
-
-    lo = np.minimum(measured, predicted)
-    hi = np.maximum(measured, predicted)
-    ax.fill_between(np.r_[measured, measured[::-1]],
-                    np.r_[lo, hi[::-1]],
-                    color=C_P2, alpha=0.08)
-
-    # Perfect-prediction diagonal and +/-10% error bands.
-    lim = max(measured.max(), predicted.max()) * 1.05
-    ax.plot([0, lim], [0, lim], color=OKABE_ITO["black"], linestyle="-",
-            linewidth=1.0, label="y = x (perfect)")
-    xs = np.linspace(0, lim, 2)
-    ax.plot(xs, 0.9 * xs, color=OKABE_ITO["gray"], linestyle="--",
-            linewidth=0.8, label="±10% band")
-    ax.plot(xs, 1.1 * xs, color=OKABE_ITO["gray"], linestyle="--",
-            linewidth=0.8)
-
-    ax.set_xlabel("Measured TTFT (ms)")
-    ax.set_ylabel("Predicted TTFT (ms)")
-    ax.set_title("Cost-Model Parity: Predicted vs. Measured TTFT")
-    ax.set_xlim(0, lim)
-    ax.set_ylim(0, lim)
-    ax.legend(loc="upper left", framealpha=0.9)
-
-    # Report the component-level MAPE from the validation file.
-    # Placed bottom-right so it does not collide with the top-left legend.
+def fig8_cost_model_parity(campaign: list[dict]) -> Path:
     val = load_validation()
-    ax.text(0.55, 0.15,
-            f"component MAPE = {val.get('test_component_mape_pct', 'n/a')}%\n"
-            f"macro MAPE = {val.get('test_macro_mape_pct', 'n/a')}%",
-            transform=ax.transAxes, va="bottom", ha="left", fontsize=7,
+
+    fig, ax = plt.subplots(figsize=(COL_W, 3.3))
+
+    for state, marker, fill in (("cold", "o", True), ("warm", "D", False)):
+        recs = [r for r in campaign
+                if (r.get("repeat_index", 0) == 0) == (state == "cold")]
+        model = model_from_validation(state)
+        for variant, pred_fn, color, label in (
+            ("baseline", lambda r: model.predict_ttft_p2(float(r["rtt_ms"])),
+             C_P2, f"P2 ({state})"),
+            ("sphp", lambda r: model.predict_ttft_p2_sphp(float(r["rtt_ms"])),
+             C_SPHP, f"P2-SPHP ({state})"),
+        ):
+            vrecs = [r for r in recs if r.get("variant") == variant]
+            tiers, vals = _tier_means(vrecs)
+            pred = [pred_fn({"rtt_ms": t}) for t in tiers]
+            obs = [float(np.mean(v)) for v in vals]
+            ax.scatter(obs, pred, marker=marker,
+                       facecolor=color if fill else "white",
+                       edgecolor=color, linewidth=1.2, s=34,
+                       zorder=3, label=label)
+
+    lim_lo, lim_hi = 600.0, 4200.0
+    xs = np.linspace(lim_lo, lim_hi, 2)
+    ax.plot(xs, xs, color=INK["primary"], linewidth=1.0, label="y = x")
+    ax.plot(xs, 0.9 * xs, color=INK["muted"], linestyle="--", linewidth=0.8,
+            label="±10%")
+    ax.plot(xs, 1.1 * xs, color=INK["muted"], linestyle="--", linewidth=0.8)
+    ax.set_xlim(lim_lo, lim_hi)
+    ax.set_ylim(lim_lo, lim_hi)
+
+    rv = {s: val["cache_states"][s]["regime_validation"] for s in ("cold", "warm")}
+    ax.text(0.03, 0.97,
+            f"regime MAPE (LOTO): "
+            f"P2 {rv['cold']['P2']['regime_mape_pct']:.1f}% cold / "
+            f"{rv['warm']['P2']['regime_mape_pct']:.1f}% warm\n"
+            f"SPHP {rv['cold']['P2-SPHP']['regime_mape_pct']:.1f}% cold / "
+            f"{rv['warm']['P2-SPHP']['regime_mape_pct']:.1f}% warm",
+            transform=ax.transAxes, va="top", ha="left", fontsize=6.8,
+            color=INK["secondary"],
             bbox=dict(boxstyle="round,pad=0.3", fc="white",
-                      ec=OKABE_ITO["gray"], alpha=0.9))
+                      ec=INK["axis"], alpha=0.9))
+
+    ax.set_xlabel("Observed tier-mean TTFT (ms)")
+    ax.set_ylabel("Predicted tier-mean TTFT (ms)")
+    ax.set_title("Cost-Model Parity (regime level)", loc="left", fontsize=9)
+    ax.legend(loc="lower right", frameon=False, fontsize=6.2)
+    _style_axes(ax)
 
     return _save(fig, "fig8_cost_model_parity.pdf")
 
@@ -766,19 +778,19 @@ def main() -> None:
     print("ICDCS PAPER: GENERATING PUBLICATION FIGURES ->", FIG_DIR)
     print("=" * 64)
 
-    bench = load_benchmark()
-    crossover = load_crossover()
-    model = fit_model()
+    campaign = load_campaign()
+    model_warm = model_from_validation("warm")
+    model_cold = model_from_validation("cold")
 
     outputs = [
-        fig1_arch(model),
+        fig1_arch(model_warm),
         fig2_topologies(),
-        fig3_sphp_timeline(model),
-        fig4_stage_breakdown(bench),
-        fig5_ttft_vs_rtt(model),
-        fig6_crossover_map(model),
+        fig3_sphp_timeline(model_warm, campaign),
+        fig4_stage_breakdown(campaign),
+        fig5_ttft_vs_rtt(campaign),
+        fig6_crossover_map(model_warm, model_cold),
         fig7_retrieval_quality(),
-        fig8_cost_model_parity(model, bench),
+        fig8_cost_model_parity(campaign),
     ]
 
     print("\nGenerated figures:")
@@ -787,7 +799,6 @@ def main() -> None:
         status = "OK" if size > 0 else "EMPTY!"
         print(f"  [{status}] {p}  ({size} bytes)")
 
-    # Final verification.
     missing = [p for p in outputs if not p.exists() or p.stat().st_size == 0]
     if missing:
         print("\nERROR: some figures missing or empty:", missing)
