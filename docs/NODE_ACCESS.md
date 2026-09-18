@@ -69,7 +69,13 @@ The dense-retrieval + RRF-fusion gateway. Reached over SSH from this WSL host.
 The `pdc_gateway` task runs `start_gateway.bat` (repo root), which `cd`s to
 `D:\FAST\Semester6\NLP\Project_Laptop\systems\node_b\implementation` and starts
 uvicorn on `:8000`. The task runs the `.bat` by its fixed path, so a repo
-restructure does not require a `schtasks` change.
+restructure does not require a `schtasks` change. (Verified 2026-09-19: the
+task action on B was found still pointing at the pre-restructure
+`node_B\scripts\gateway_task.bat` and was repointed to
+`D:\FAST\Semester6\NLP\Project_Laptop\start_gateway.bat` — `schtasks /Run`
+had been failing silently with `Last Result=1`. If `/Run` appears to do
+nothing, check the task's *Task To Run* with `schtasks /Query /TN
+pdc_gateway /V`.)
 
 **Health check:** `curl.exe -s http://127.0.0.1:8000/health` → JSON with
 `"role":"hybrid_retrieval_gateway"`.
