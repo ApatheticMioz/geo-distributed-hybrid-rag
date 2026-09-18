@@ -1,15 +1,265 @@
 {
-  "train_samples": 100,
-  "test_samples": 100,
-  "fitted_params": {
-    "t_sparse_base_ms": 119.9,
-    "t_dense_base_ms": 2255.93,
-    "t_fusion_base_ms": 0.0201,
-    "t_prefill_base_ms": 275.58,
-    "decode_tok_per_sec": 78.65
+  "generator": "analysis/cost_model.py (campaign-driven refit)",
+  "campaign": "/home/apath/Work/PDC/Project/benchmarks/campaigns/campaign_20260918T130756Z.jsonl",
+  "n_records": 1200,
+  "n_cold": 400,
+  "n_warm": 800,
+  "top_k_measured": [
+    10
+  ],
+  "regimes_measured_ms": [
+    0.0,
+    15.0,
+    40.0,
+    80.0
+  ],
+  "decode": {
+    "warm_median_tok_per_sec": 35.18,
+    "cold_median_tok_per_sec": 35.56,
+    "n_tps_used": 800,
+    "n_tps_excluded_degenerate": 0,
+    "exclusion_band": [
+      1.0,
+      500.0
+    ]
   },
-  "test_macro_mape_pct": 29.48,
-  "test_component_mape_pct": 4.18,
-  "test_r2": -0.0329,
-  "target_met": true
+  "cache_states": {
+    "cold": {
+      "n_p2": 200,
+      "n_sphp": 200,
+      "fitted_params": {
+        "t_sparse_base_ms": 1711.29,
+        "t_dense_base_ms": 2680.85,
+        "t_fusion_base_ms": 0.0175,
+        "t_prefill_base_ms": 850.71,
+        "decode_tok_per_sec": 35.18,
+        "sphp_hit_rate_measured": 0.84,
+        "t_sphp_miss_penalty_ms": 2697.8
+      },
+      "sphp_measurement": {
+        "n": 200,
+        "measured_hit_rate": 0.84,
+        "hit_rate_wilson95": [
+          0.7829,
+          0.8843
+        ],
+        "per_tier_hit_rate": {
+          "0": 0.8,
+          "15": 0.9,
+          "40": 0.84,
+          "80": 0.82
+        },
+        "miss_penalty_ms": 2697.8,
+        "n_miss_used_for_penalty": 31
+      },
+      "regime_validation": {
+        "P2": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 3518.5,
+              "observed_mean_ms": 3633.6,
+              "ape_pct": 3.17
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 3540.7,
+              "observed_mean_ms": 3569.7,
+              "ape_pct": 0.81
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 3557.7,
+              "observed_mean_ms": 3555.7,
+              "ape_pct": 0.06
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 3582.6,
+              "observed_mean_ms": 3544.6,
+              "ape_pct": 1.07
+            }
+          ],
+          "regime_mape_pct": 1.28,
+          "regime_r2": -2.2672
+        },
+        "P2-SPHP": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 3176.2,
+              "observed_mean_ms": 2948.2,
+              "ape_pct": 7.73
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 3323.7,
+              "observed_mean_ms": 2892.1,
+              "ape_pct": 14.92
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 3274.5,
+              "observed_mean_ms": 2996.8,
+              "ape_pct": 9.27
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 3289.0,
+              "observed_mean_ms": 2982.1,
+              "ape_pct": 10.29
+            }
+          ],
+          "regime_mape_pct": 10.55,
+          "regime_r2": -62.1645
+        }
+      },
+      "component_residual_check": {
+        "n": 200,
+        "mape_pct": 3.02,
+        "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+      },
+      "sphp_branch_check": {
+        "hit_branch": {
+          "n": 168,
+          "mape_pct": 7.38
+        },
+        "miss_branch": {
+          "n": 31,
+          "mape_pct": 75.84
+        },
+        "note": "branch-conditional form check with per-record measured components"
+      }
+    },
+    "warm": {
+      "n_p2": 400,
+      "n_sphp": 400,
+      "fitted_params": {
+        "t_sparse_base_ms": 74.8,
+        "t_dense_base_ms": 190.8,
+        "t_fusion_base_ms": 0.0192,
+        "t_prefill_base_ms": 633.27,
+        "decode_tok_per_sec": 35.18,
+        "sphp_hit_rate_measured": 0.84,
+        "t_sphp_miss_penalty_ms": 193.6
+      },
+      "sphp_measurement": {
+        "n": 400,
+        "measured_hit_rate": 0.84,
+        "hit_rate_wilson95": [
+          0.8009,
+          0.8727
+        ],
+        "per_tier_hit_rate": {
+          "0": 0.8,
+          "15": 0.9,
+          "40": 0.84,
+          "80": 0.82
+        },
+        "miss_penalty_ms": 193.6,
+        "n_miss_used_for_penalty": 62
+      },
+      "regime_validation": {
+        "P2": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 830.2,
+              "observed_mean_ms": 817.9,
+              "ape_pct": 1.5
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 837.3,
+              "observed_mean_ms": 815.8,
+              "ape_pct": 2.64
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 851.0,
+              "observed_mean_ms": 817.1,
+              "ape_pct": 4.16
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 851.0,
+              "observed_mean_ms": 875.0,
+              "ape_pct": 2.75
+            }
+          ],
+          "regime_mape_pct": 2.76,
+          "regime_r2": 0.076
+        },
+        "P2-SPHP": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 761.1,
+              "observed_mean_ms": 738.9,
+              "ape_pct": 3.0
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 779.4,
+              "observed_mean_ms": 778.1,
+              "ape_pct": 0.18
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 781.9,
+              "observed_mean_ms": 842.2,
+              "ape_pct": 7.16
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 781.1,
+              "observed_mean_ms": 896.8,
+              "ape_pct": 12.9
+            }
+          ],
+          "regime_mape_pct": 5.81,
+          "regime_r2": -0.2015
+        }
+      },
+      "component_residual_check": {
+        "n": 400,
+        "mape_pct": 11.3,
+        "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+      },
+      "sphp_branch_check": {
+        "hit_branch": {
+          "n": 336,
+          "mape_pct": 14.84
+        },
+        "miss_branch": {
+          "n": 62,
+          "mape_pct": 14.77
+        },
+        "note": "branch-conditional form check with per-record measured components"
+      }
+    }
+  },
+  "rtt_sensitivity": {
+    "warm_baseline_tier_means_ms": {
+      "0": 817.9,
+      "15": 815.8,
+      "40": 817.1,
+      "80": 875.0
+    },
+    "warm_slope_ms_per_ms": 0.729,
+    "note": "measured TTFT response to netem RTT; the analytical wan term (rtt/2 per modelled crossing) is an upper bound on this response"
+  },
+  "legacy_reconciliation": {
+    "old_paper_macro_mape_pct": 23.73,
+    "old_artifact_macro_mape_pct": 29.48,
+    "resolution": "Both figures were produced by the pre-refit fitter against the deprecated llama3-awq results_matrix_gpu.json with a per-query validation protocol. The generator has since been re-baselined to qwen3.8-27b and every number re-measured under bidirectional netem; per-query R^2/MAPE is not a meaningful target for a population-mean model. Both figures are obsolete and superseded by the regime-level leave-one-tier-out validation in cache_states.*.regime_validation."
+  }
 }

@@ -1,0 +1,64 @@
+{
+  "run_id": "20260918T125349Z",
+  "generated_at": "2026-09-18T12:54:17Z",
+  "gateway_url": "http://10.8.0.2:8000",
+  "queries_file": "benchmarks/queries/latency_dev60_seed42.txt",
+  "n_queries_total": 60,
+  "query_sample": 3,
+  "seed": 42,
+  "warmups": 1,
+  "rtt_tiers": [
+    15
+  ],
+  "loss_tiers": [
+    0
+  ],
+  "modes": [
+    "hybrid"
+  ],
+  "sphp_axis": true,
+  "repeats": 2,
+  "top_k": 10,
+  "n_ok": 12,
+  "n_errors": 0,
+  "n_warmup_ok": 2,
+  "n_warmup_errors": 0,
+  "summary": [
+    {
+      "rtt_ms": 15,
+      "loss_pct": 0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "n": 6,
+      "n_errors": 0,
+      "ttft_mean": 1914.47,
+      "ttft_p50": 1718.55,
+      "ttft_p95": 3339.94,
+      "ttft_std": 1170.65,
+      "total_mean": 2295.8,
+      "total_p95": 3700.63,
+      "ttft_repeat0_mean": 3062.39,
+      "ttft_warm_mean": 766.56,
+      "sphp_hit_rate": null,
+      "mean_overlap": null
+    },
+    {
+      "rtt_ms": 15,
+      "loss_pct": 0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "n": 6,
+      "n_errors": 0,
+      "ttft_mean": 573.35,
+      "ttft_p50": 562.38,
+      "ttft_p95": 628.35,
+      "ttft_std": 40.61,
+      "total_mean": 1005.42,
+      "total_p95": 1289.51,
+      "ttft_repeat0_mean": 580.86,
+      "ttft_warm_mean": 565.84,
+      "sphp_hit_rate": 1.0,
+      "mean_overlap": 0.7333
+    }
+  ]
+}
