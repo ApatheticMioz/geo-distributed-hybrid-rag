@@ -1,0 +1,50 @@
+{
+  "title": "SPHP answer-level cost — baseline vs speculative hit path",
+  "generated_utc": "2026-09-18T15:10:58Z",
+  "generator": "eval/answer_compare.py",
+  "provenance": {
+    "gateway": "http://10.8.0.2:8000",
+    "queries_file": "/home/apath/Work/PDC/data/msmarco/queries.dev.tsv",
+    "qrels_file": "/home/apath/Work/PDC/data/msmarco/qrels.dev.small.tsv",
+    "sampling": "seeded random sample (seed=42), limit=200",
+    "top_k": 10,
+    "rrf_k": 60,
+    "run_file": "/tmp/answers_sphp_200.jsonl"
+  },
+  "n_queries": 200,
+  "sphp_hit_rate": 0.835,
+  "measured_hit_rate_note": "Measured hit rate replaces the previously assumed h=0.60.",
+  "agreement": {
+    "hits": {
+      "n": 167,
+      "em_mean": 0.0419,
+      "token_f1_mean": 0.4222,
+      "len_ratio_mean": 1.0852,
+      "em_exact_matches": 7
+    },
+    "misses": {
+      "n": 33,
+      "em_mean": 0.1212,
+      "token_f1_mean": 0.5859,
+      "len_ratio_mean": 0.9417,
+      "em_exact_matches": 4
+    },
+    "unknown_hit": 0,
+    "all": {
+      "n": 200,
+      "em_mean": 0.055,
+      "token_f1_mean": 0.4492,
+      "len_ratio_mean": 1.0616,
+      "em_exact_matches": 11
+    }
+  },
+  "ttft_ms": {
+    "baseline_mean": 3506.3,
+    "sphp_mean": 775.0
+  },
+  "findings": [
+    "Measured SPHP hit rate: 83.50% over 200 queries.",
+    "Hit-path answer agreement with baseline: EM=0.0419, token-F1=0.4222 (n=167 hits).",
+    "Miss-path answers use the reconciled fused context and are expected to agree with baseline; deviations there indicate a SPHP bug."
+  ]
+}
