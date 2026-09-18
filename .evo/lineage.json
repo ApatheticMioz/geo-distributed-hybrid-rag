@@ -1,7 +1,7 @@
 {
   "version": "2026.1",
   "rootId": "baseline",
-  "currentHeadId": "cand_1789669961347_ditq",
+  "currentHeadId": "cand_1789747566764_3ypb",
   "nodes": [
     {
       "id": "baseline",
@@ -530,7 +530,129 @@
         "snapshotCount": 1
       },
       "timestamp": "2026-09-18T07:47:10.453Z"
+    },
+    {
+      "id": "cand_1789734535405_w73v",
+      "parentId": "cand_1789669961347_ditq",
+      "hypothesis": "Bidirectional netem: apply.sh splits RTT_MS/LOSS_PCT in half per direction (eth4 egress root netem + ifb0 ingress netem via u32 mirred redirect); clear.sh tears down ifb0/ingress/root/ifb module idempotently; show.sh displays both directions; validate.sh checks ping delta against FULL RTT_MS with +/-30% tolerance and fails loudly if egress lacks netem. All scripts: set -euo pipefail + root check.",
+      "filesModified": [
+        "scripts/netem/apply.sh",
+        "scripts/netem/clear.sh",
+        "scripts/netem/show.sh",
+        "scripts/netem/validate.sh"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789734535405_w73v",
+        "snapshotCount": 4,
+        "evalCommand": "cd /home/apath/Work/PDC/Project/scripts/netem && bash -n apply.sh && bash -n clear.sh && bash -n show.sh && bash -n validate.sh && bash apply.sh 15 5 2>&1 | grep -q \"must be run as root\" && bash clear.sh 2>&1 | grep -q \"must be run as root\" && bash show.sh 2>&1 | grep -q \"must be run as root\" && bash validate.sh 15 2>&1 | grep -q \"must be run as root\" && echo \"ALL CHECKS PASSED: syntax OK + root guard active in all 4 scripts\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-18T12:28:55.437Z",
+      "updatedAt": "2026-09-18T12:35:58.644Z"
+    },
+    {
+      "id": "cand_1789735257886_qhpc",
+      "parentId": "cand_1789734535405_w73v",
+      "hypothesis": "Upgrading benchmarks/campaign.py to the final-matrix design (paper RTT tiers 0/15/40/80, --sphp-axis two-variant hybrid, seeded N+W query sampling with per-arm warmups, per-query R back-to-back repeats, flattened per-record JSONL, and per-(tier,mode,variant) summary CSV/JSON) will make the runner reproduce the paper's 4-regime SPHP on/off matrix with 1240 total requests for the default final-matrix command; verified by py_compile + a --dry-run plan printout showing 8 arms x (5 warmups + 150 measured).",
+      "filesModified": [
+        "benchmarks/campaign.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789735257886_qhpc",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 -m py_compile benchmarks/campaign.py && python3 benchmarks/campaign.py --dry-run --rtt-tiers 0 15 40 80 --loss-tiers 0 --modes hybrid --sphp-axis --query-sample 50 --seed 42 --warmups 5 --repeats 3 >/dev/null && python3 -c \"\nimport sys; sys.path.insert(0,'benchmarks')\nfrom campaign import sample_queries, load_queries, resolve_queries_path, summarize_arm, build_record\nq = load_queries(resolve_queries_path('benchmarks/queries50.txt'))\ns1 = sample_queries(q,50,5,42); s2 = sample_queries(q,50,5,42); s3 = sample_queries(q,50,5,7)\nassert s1==s2 and s1!=s3\nwarm,meas = s1[:5], s1[5:55]\nassert not (set(warm)&set(meas)) and set(s1).issubset(set(q))\nrecs=[]\nfor qi,b in enumerate([100.0,200.0]):\n    for rep in range(3):\n        recs.append({'ttft_ms':b+rep*10,'total_ms':b+500+rep*10,'repeat_index':rep,'sphp_hit':(qi==0),'sphp_overlap':0.8 if qi==0 else 0.2})\nrecs.append({'error':'boom','repeat_index':0})\ns=summarize_arm(recs)\nassert s['n']==6 and s['n_errors']==1 and s['sphp_hit_rate']==0.5 and abs(s['mean_overlap']-0.5)<1e-9\nassert s['ttft_repeat0_mean']==150.0 and s['ttft_warm_mean']==165.0 and s['ttft_mean']==160.0\nres={'query_id':'x','query':'q','top_k':10,'mode':'hybrid','timings':{'sparse_ms':1,'dense_ms':2,'fusion_ms':3,'ttft_ms':4,'decode_ms':5,'total_ms':6,'simulated_wan_ms':7,'sphp_hit':True,'sphp_overlap':0.8,'wasted_prefill_ms':0.0},'token_count':10,'decode_tps':50.0,'sphp':True,'sphp_hit':True,'sphp_overlap':0.8,'wasted_prefill_ms':0.0}\nr=build_record('run1',40,0,'hybrid','sphp',0,'q',res,True)\nfor f in ['query_id','query','rtt_ms','loss_pct','mode','variant','repeat_index','timestamp','sparse_ms','dense_ms','fusion_ms','ttft_ms','decode_ms','total_ms','simulated_wan_ms','token_count','decode_tps','sphp_hit','sphp_overlap','wasted_prefill_ms']:\n    assert f in r, f\nprint('ALL CHECKS PASSED')\n\"",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-18T12:40:57.897Z",
+      "updatedAt": "2026-09-18T12:49:40.388Z"
+    },
+    {
+      "id": "cand_1789736423208_s3e1",
+      "parentId": "cand_1789735257886_qhpc",
+      "hypothesis": "Changing per-arm query sampling from a single shared seeded sample to disjoint per-arm slices (sample a pool of n_arms*(N+W) distinct queries with random.Random(seed); arm i gets pool[i*(N+W):(i+1)*(N+W)], first W = warmups, remaining N = measured) will eliminate cross-arm prefix-cache contamination so every arm's repeat_index=0 is cold; verified by py_compile + a 2-tier x hybrid x --sphp-axis x --query-sample 3 --warmups 1 dry-run showing 4 arms with DISJOINT query-index ranges + a --query-sample 100000 dry-run that fails fast with the required-vs-available message.",
+      "filesModified": [
+        "benchmarks/campaign.py"
+      ],
+      "metrics": {
+        "fitness": 50,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789736423208_s3e1",
+        "snapshotCount": 1,
+        "evalCommand": "cd /home/apath/Work/PDC/Project && python3 -m py_compile benchmarks/campaign.py && python3 - <<'PY'\nimport importlib.util, subprocess, sys, re\nspec = importlib.util.spec_from_file_location('campaign','benchmarks/campaign.py')\nm = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n\n# --- Check 1: dry-run 1 -> 4 arms with DISJOINT index ranges ---\nout = subprocess.run(\n    [sys.executable,'benchmarks/campaign.py','--dry-run','--rtt-tiers','0','15',\n     '--loss-tiers','0','--modes','hybrid','--sphp-axis','--query-sample','3',\n     '--warmups','1','--seed','42'],\n    capture_output=True, text=True).stdout\nranges = re.findall(r'queries\\[(\\d+):(\\d+)\\]', out)\nassert len(ranges)==4, f\"expected 4 arms, got {len(ranges)}: {ranges}\"\nspans = [(int(a),int(b)) for a,b in ranges]\n# disjoint & contiguous\nfor i in range(len(spans)):\n    for j in range(i+1,len(spans)):\n        a0,a1=spans[i]; b0,b1=spans[j]\n        assert not (a0<=b0<a1 or b0<=a0<b1), f\"overlap: {spans[i]} vs {spans[j]}\"\nassert spans==[(0,4),(4,8),(8,12),(12,16)], f\"unexpected spans {spans}\"\nprint(\"CHECK1 OK: 4 arms, disjoint ranges\", spans)\n\n# --- Check 2: dry-run 2 (N=100000) fails fast with required-vs-available ---\ntry:\n    m2 = importlib.util.module_from_spec(spec); spec.loader.exec_module(m2)\n    sys.argv = ['campaign.py','--dry-run','--rtt-tiers','0','15','--loss-tiers','0',\n                '--modes','hybrid','--sphp-axis','--query-sample','100000',\n                '--warmups','1','--seed','42']\n    m2.main()\n    raise AssertionError(\"main() did NOT fail fast (no SystemExit)\")\nexcept SystemExit as e:\n    assert e.code==1, f\"expected exit 1, got {e.code}\"\nprint(\"CHECK2 OK: fail-fast SystemExit code=1\")\n\n# --- Check 3: per-arm slices are truly disjoint query sets (unit-level) ---\narms = m.build_arm_list(type('A',(),dict(rtt_tiers=[0,15],loss_tiers=[0],\n        modes=['hybrid'],sphp_axis=True))())\nplan = m.build_arm_query_plan(['q%d'%i for i in range(20)], arms, 3, 1, 42)\nallq=[]\nfor a in plan:\n    allq += a['warmups'] + a['measured']\nassert len(allq)==16 and len(set(allq))==16, \"arm slices not disjoint\"\nprint(\"CHECK3 OK: 16 distinct queries across 4 arms (no overlap)\")\nprint(\"ALL CHECKS PASSED\")\nPY",
+        "evalMetrics": {
+          "exitCode": 0,
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "throughput": null,
+          "latencyMs": null,
+          "opsPerSec": null,
+          "memoryMb": null
+        },
+        "exitCode": 0,
+        "passed": true
+      },
+      "timestamp": "2026-09-18T13:00:23.219Z",
+      "updatedAt": "2026-09-18T13:06:37.706Z"
+    },
+    {
+      "id": "cand_1789746421746_fiu0",
+      "parentId": "cand_1789736423208_s3e1",
+      "hypothesis": "Creating scripts/policy_demo.py (a live regime-level placement-policy demo for paper RQ3) that reuses campaign.py's gateway request pattern + netem apply/clear mechanism and the warm-fitted PlacementCostModel will yield a stdlib-only script that passes py_compile and --help, with per-regime disjoint seeded query slices, argmin variant selection, fail-fast HTTP, and guaranteed netem clear in a finally block.",
+      "filesModified": [
+        "scripts/policy_demo.py"
+      ],
+      "metrics": {
+        "fitness": null,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789746421746_fiu0",
+        "snapshotCount": 0
+      },
+      "timestamp": "2026-09-18T15:47:01.751Z",
+      "updatedAt": "2026-09-18T15:57:25.275Z"
+    },
+    {
+      "id": "cand_1789747566764_3ypb",
+      "parentId": "cand_1789746421746_fiu0",
+      "hypothesis": "Adding repeat-based cache-state matching to scripts/policy_demo.py (R back-to-back repeats per recorded query, repeat_index field, load both warm+cold models, per-state realized-vs-predicted error in summary) will make the demo's realized TTFT comparable to the correct cache-state prediction (warm for repeats>=1, cold for repeat 0), reducing the ~280% abs_error mismatch to a state-matched comparison.",
+      "filesModified": [
+        "scripts/policy_demo.py"
+      ],
+      "metrics": {
+        "fitness": null,
+        "status": "accepted",
+        "snapshotDir": "\\\\wsl.localhost\\Ubuntu\\home\\apath\\Work\\PDC\\Project\\.evo\\snapshots\\cand_1789747566764_3ypb",
+        "snapshotCount": 1
+      },
+      "timestamp": "2026-09-18T16:06:06.776Z",
+      "updatedAt": "2026-09-18T16:11:39.834Z"
     }
   ],
-  "updatedAt": "2026-09-18T07:47:10.454Z"
+  "updatedAt": "2026-09-18T16:11:39.840Z"
 }
