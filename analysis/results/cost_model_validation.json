@@ -8,8 +8,8 @@
     "t_prefill_base_ms": 275.58,
     "decode_tok_per_sec": 78.65
   },
-  "test_macro_mape_pct": 23.73,
+  "test_macro_mape_pct": 29.48,
   "test_component_mape_pct": 4.18,
-  "test_r2": -0.1,
+  "test_r2": -0.0329,
   "target_met": true
 }
