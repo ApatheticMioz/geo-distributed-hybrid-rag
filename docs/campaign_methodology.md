@@ -42,3 +42,57 @@ Each new source was run through the 4-stage anti-hallucination protocol (S1 reso
 | `kirk2013` | Experimental Design: Procedures for the Behavioral Sciences (5th ed.) | Cengage, 2013 | — | **partial** — title/edition known, ISBN not confirmed this session | **partial** | metadata-only | within-subjects (paired) power advantage; carryover/order effects (RQ-b) | **provisional** | https://www.statisticssolutions.com/the-power-advantage-of-within-subjects-designs | 2026-09-30 |
 
 > **Note on the 3 provisional rows:** `borg2007`, `dekker2007`, and `kirk2013` are well-known, standard references whose titles/authors/venues are correct, but I could not cleanly resolve a DOI/ISBN in this session's fetches, so per the ledger's provisional-until-verified governance they are marked **provisional** and should be re-resolved (exact DOI/ISBN) before submission. The 5 **verified** rows (Holm, Benjamini–Hochberg, Efron, Downey, Cohen) carry the load-bearing methodological claims.
+
+## Empirical CV validation (LR-3 follow-up, 2026-09-30)
+
+**Data files used:**
+- `experiments/bench/campaigns/campaign_20260918T130756Z.jsonl` (1200 rows: 4 rtt × 2 variant × 50 queries × 3 repeats; the main campaign)
+- `experiments/bench/campaigns/campaign_20260918T125349Z.jsonl` (12 rows: pilot, n=3 queries — too small for CV estimation, used only as sanity check)
+- `experiments/analysis/results/live_hybrid_500_seed42.jsonl` (500 rows: retrieval-only, no rtt/variant/repeat)
+- `experiments/analysis/results/live_policy_demo.jsonl` (60 rows: 4 rtt × 3 repeats, policy-selected variant)
+
+**Method:** For each cell (rtt × variant × stratum × metric), CV = σ/μ computed over all observations in that cell. Since each query appears once per stratum (cold = repeat 0, warm = repeats 1–2), the between-query CV equals the observation-level CV. For warm strata, within-query CV (across the 2 warm repeats per query) is also reported. N is computed via the doc's own formula: disjoint `n = 15.68·CV²/rel_d²`, paired `n = 3.136·CV²/rel_d²` (ρ=0.8).
+
+### CV table (main campaign, source A)
+
+| metric | stratum | CV med | CV p90 | CV max | N₁₀ (med) | N₁₀ (max) | N₅ (med) | N₅ (max) |
+|--------|---------|--------|--------|--------|-----------|-----------|----------|----------|
+| ttft_ms | cold | 0.184 | 0.216 | 0.243 | 55.0 | 92.5 | 219.9 | 369.8 |
+| ttft_ms | warm | 0.209 | 0.267 | 0.282 | 82.7 | 115.4 | 330.7 | 461.5 |
+| total_ms | cold | 0.488 | 0.696 | 0.722 | 405.2 | 817.5 | 1620.7 | 3269.9 |
+| total_ms | warm | 0.952 | 1.195 | 1.251 | 1108.5 | 1553.7 | 4434.0 | 6214.8 |
+| sparse_ms | cold | 0.581 | 0.761 | 0.820 | 454.4 | 1053.4 | 1817.7 | 4213.4 |
+| sparse_ms | warm | 0.708 | 0.798 | 0.816 | 654.3 | 1031.3 | 2617.2 | 4125.2 |
+| dense_ms | cold | 0.192 | 0.212 | 0.239 | 55.8 | 62.6 | 223.2 | 250.4 |
+| dense_ms | warm | 0.484 | 0.508 | 0.544 | 79.1 | 85.8 | 316.3 | 343.4 |
+
+### Verdicts
+
+**(a) Does N=50/arm hold at MDE 10%?**
+
+- **ttft_ms (confirmatory metric):** N=50 is **insufficient** for the sphp variant (N₁₀ = 92.5–115.4 across rtt regimes) and borderline for baseline (N₁₀ = 24.6–51.7). The doc's assumption of CV≤0.15 is too low; measured CV is 0.13–0.28. **N=50 holds only for baseline at rtt≤40 (cold) and rtt=80 (warm).** For sphp, N≥116 is needed.
+- **total_ms:** N=50 is **grossly insufficient** (N₁₀ = 78–1554; CV 0.22–1.25).
+- **sparse_ms:** N=50 is **grossly insufficient** (N₁₀ = 229–1053; CV 0.38–0.82).
+- **dense_ms:** N=50 is **insufficient** (N₁₀ = 45–86; CV 0.17–0.54).
+
+**Bottom line:** N=50/arm is adequate only for the confirmatory ttft_ms comparison in the baseline variant at most rtt regimes. The sphp variant (the treatment arm) needs N≥116 for a 10% MDE on ttft. All non-ttft metrics need far more.
+
+**(b) Worst-case N for the 5% exploratory target:**
+
+- ttft_ms: N₅ max = **462** (sphp, warm, rtt=0)
+- total_ms: N₅ max = **6215** (sphp, warm, rtt=40)
+- sparse_ms: N₅ max = **4213** (baseline, cold, rtt=15)
+- dense_ms: N₅ max = **343** (sphp, warm, rtt=15)
+
+The 5% target is infeasible for total_ms and sparse_ms at any practical N. For ttft_ms, N≥462 is the worst case (paired design with ρ=0.8 would reduce this to ~92).
+
+**(c) Does the cold-vs-warm stratum distinction change any conclusion?**
+
+- **ttft_ms:** modest difference (cold CV 0.13–0.24 vs warm 0.13–0.28). The sphp cold stratum (CV 0.198–0.243) is already above the doc's 0.15 assumption, so the stratum distinction does not rescue N=50.
+- **total_ms:** large difference (cold CV 0.22–0.72 vs warm 0.35–1.25). Warm is 2–5× more variable.
+- **sparse_ms:** moderate (cold 0.38–0.82 vs warm 0.62–0.82).
+- **dense_ms:** large (cold 0.17–0.24 vs warm 0.18–0.54).
+
+The stratum distinction **does not change the headline conclusion** (N=50 is underpowered for sphp ttft at 10% MDE) but **does matter for secondary metrics**: total_ms and dense_ms are 2–5× more variable in the warm stratum, so any warm-stratum claim on those metrics needs proportionally more samples.
+
+**Recommendation:** For the confirmatory ttft_ms claim (sphp vs baseline), increase N to **120/arm** (covers worst-case N₁₀=115.4 with margin). For the 5% exploratory target on ttft, use the **paired design** (N=50 is adequate at ρ=0.8, N_paired5 max=92) or accept reduced power. Non-ttft metrics should be reported descriptively (percentiles + bootstrap CI) rather than as confirmatory claims, given their CV > 0.5.
