@@ -112,7 +112,7 @@ hardware exists. Yet, to the best of our knowledge, the literature cannot
 answer: \emph{where should each stage of a hybrid RAG pipeline run, under which
 network conditions, and what exactly is lost when the topology degrades?}
 DNN partitioning is studied at the layer level
-\cite{kang2017neurosurgeon,hung2020cloudedge,zhang2021cloudedge} and LLM
+\cite{kang2017neurosurgeon,teerapittayanon2017ddnn,banitalebi2021autosplit} and LLM
 serving splits model \emph{phases} across machines, but a measurement study of
 \emph{which pipeline stage runs on which machine} in a multi-node hybrid RAG
 deployment is missing.
@@ -125,7 +125,7 @@ regime. Our contributions are:
 \item \textbf{C1 (Measurement).} A cache-state-aware factorial measurement of
 hybrid RAG placement on commodity heterogeneous hardware (RTX~3090 + GTX~1660~Ti)
 over a WireGuard link shaped by \emph{bidirectional} \texttt{netem}
-\cite{donenfeld2017wireguard,hemminger2000netem} across four WAN regimes, with
+\cite{donenfeld2017wireguard,netem2024} across four WAN regimes, with
 seeded disjoint query slices, warmup discard, three repeats, and percentile +
 bootstrap-CI reporting. We show that (i) TTFT is flat across 0--80~ms of RTT
 (slope 0.73~ms/ms), because the P2 boundary ships only identifier-sized
@@ -210,11 +210,11 @@ retrieval legs (\S\ref{sec:characterization}).
 
 \subsection{Edge--Cloud and Geo-Distributed Systems}
 Hybrid cloud--edge inference partitions a network between a device and a
-server \cite{kang2017neurosurgeon,hung2020cloudedge,zhang2021cloudedge}, and
+server \cite{kang2017neurosurgeon,teerapittayanon2017ddnn,banitalebi2021autosplit}, and
 datacenter-scale serving systems study phase and memory management
-\cite{kwon2023vllm,zaharia2016datacenter}. Secure point-to-point tunnels such
+\cite{kwon2023vllm,barroso2009datacenter}. Secure point-to-point tunnels such
 as WireGuard \cite{donenfeld2017wireguard} and kernel traffic control
-(\texttt{tc}/\texttt{netem}) \cite{hemminger2000netem} provide the transport
+(\texttt{tc}/\texttt{netem}) \cite{netem2024} provide the transport
 and the controlled-WAN substrate we use. Energy and policy considerations for
 distributed deep learning \cite{strubell2019energy} motivate placing expensive
 stages where hardware and power are cheapest. Our work is the first to bring
@@ -295,7 +295,7 @@ and it is the quantity our placement policy optimizes.
 
 \subsection{Network Control}
 To study placement under controlled WAN conditions we shape the link with
-Linux \texttt{netem} \cite{hemminger2000netem} \emph{bidirectionally}: a
+Linux \texttt{netem} \cite{netem2024} \emph{bidirectionally}: a
 delaying qdisc on Node~A's egress interface applies $\mathrm{rtt}/2$ of
 propagation to outbound packets, and an ingress redirect
 (\texttt{ifb}) applies $\mathrm{rtt}/2$ to inbound packets, so that an
