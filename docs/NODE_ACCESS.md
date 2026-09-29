@@ -6,11 +6,12 @@ files listed at the bottom.
 
 ## 0. Topology at a glance
 
-| Node | Role | WireGuard IP | SSH alias (from WSL) | Service | Port |
-|------|------|--------------|----------------------|---------|------|
-| A | Generation host (vLLM Qwen3.8-27B) | `10.8.0.1` | — (this WSL host) | gRPC `GenerationOrchestrator` | `50052` |
-| B | Dense + fusion gateway (BGE-M3/Qdrant + RRF) | `10.8.0.2` | `node-b` / `node-b-lan` | HTTP FastAPI gateway | `8000` |
-| C | Sparse retrieval (Tantivy) + user-facing tier | `10.8.0.3` | `node-c` | FastAPI gateway + local Tantivy | `8000` |
+| Node | Role | WireGuard IP | Tailscale IP / Alias | SSH alias (from WSL) | Service | Port |
+|------|------|--------------|----------------------|----------------------|---------|------|
+| A | Generation host (vLLM Qwen3.8-27B) | `10.8.0.1` | `100.92.1.107` (`pc`) | — (this WSL host: `pc-wg`) | gRPC `GenerationOrchestrator` | `50052` |
+| B | Dense + fusion gateway (BGE-M3/Qdrant + RRF) | `10.8.0.2` | `100.99.79.108` (`laptop`) | `laptop` (Tailscale) / `laptop-wg` / `laptop-lan` | HTTP FastAPI gateway | `8000` |
+| C | Sparse retrieval (Tantivy) + user-facing tier | `10.8.0.3` | Friend's Tailscale (`friend-laptop`) | `friend-laptop` / `friend-wg` | FastAPI gateway + local Tantivy | `8000` |
+
 
 ---
 
@@ -49,13 +50,16 @@ The dense-retrieval + RRF-fusion gateway. Reached over SSH from this WSL host.
 | Item | Value |
 |------|-------|
 | WireGuard IP | `10.8.0.2` |
-| SSH alias (WireGuard) | `node-b` → `10.8.0.2` |
-| SSH alias (LAN) | `node-b-lan` → `192.168.0.142` |
+| Tailscale IP | `100.99.79.108` |
+| SSH alias (Default / Tailscale) | `laptop` → `100.99.79.108` |
+| SSH alias (WireGuard) | `laptop-wg` → `10.8.0.2` (legacy: `node-b`) |
+| SSH alias (LAN) | `laptop-lan` → `192.168.0.142` (legacy: `node-b-lan`) |
 | SSH user | `apath` (key `~/.ssh/id_ed25519`) |
-| Remote shell | **Windows PowerShell 5.1** — no `&&`, no `head`/`grep`; use `;` and PowerShell cmdlets |
+| Remote shell | **PowerShell 7.6.6 (`pwsh.exe`)** — supports `&&`, modern pipelines, and cmdlets |
 | Gateway | HTTP FastAPI `src.server:app` on `0.0.0.0:8000` |
 | Qdrant (docker) | container `qdrant_node_b`; ports `6333` (HTTP) / `6334` (gRPC) |
 | Clone root | `D:\FAST\Semester6\NLP\Project_Laptop` |
+
 
 **Gateway lifecycle** — driven by a Windows scheduled task, not a shell:
 
@@ -90,7 +94,11 @@ Sparse-retrieval (Tantivy BM25) + user-facing tier. Clients talk to C, not B.
 | Item | Value |
 |------|-------|
 | WireGuard IP | `10.8.0.3` |
-| SSH alias | `node-c` → `10.8.0.3` (user `apath`) |
+| Tailscale IP | `100.101.11.23` |
+| SSH alias (Default / Tailscale) | `friend-laptop` → `100.101.11.23` (aliases: `friend`, `yurnero`) |
+| SSH alias (WireGuard) | `friend-wg` → `10.8.0.3` (legacy: `node-c`) |
+| SSH user | `Yurnero` (key `~/.ssh/id_ed25519`) |
+| Remote shell | **PowerShell 7 (`pwsh.exe`)** — supports `&&`, modern pipelines, and cmdlets |
 | Gateway | FastAPI on `0.0.0.0:8000` (per `systems/node_c/config.yaml`) |
 | Sparse index | Tantivy BM25, local at C (`data/tantivy_index`) |
 | Dense leg | forwarded to Node B `10.8.0.2:8000` |
@@ -109,7 +117,7 @@ Normal change flow (Node B is the only remote node currently in service):
 
 1. **Edit here** (Node A / this WSL host).
 2. **Commit + push** from this host.
-3. **`ssh node-b`** → `git pull` in the clone root
+3. **`ssh laptop`** (or **`ssh laptop-wg`**) → `git pull` in the clone root
    (`D:\FAST\Semester6\NLP\Project_Laptop`).
 4. **Restart the gateway only if `systems/node_b/` code changed:**
    `schtasks /End /TN pdc_gateway` then `schtasks /Run /TN pdc_gateway`.
@@ -147,7 +155,7 @@ wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh 15 5
 
 ## Ground-truth sources
 
-- `~/.ssh/config` — `node-b` (10.8.0.2), `node-c` (10.8.0.3), `node-b-lan` (192.168.0.142)
+- `~/.ssh/config` — `laptop` (100.99.79.108), `laptop-wg` (10.8.0.2), `laptop-lan` (192.168.0.142), `friend-laptop` / `friend-wg` (10.8.0.3)
 - `scripts/node_a/start_stack.sh`, `scripts/node_a/stop_stack.sh` — orchestrator lifecycle, ports 50052/8001, vLLM 18020
 - `start_gateway.bat` — Node B gateway `:8000`, clone root path
 - `systems/node_b/docker-compose.yml` — Qdrant `qdrant_node_b`, ports 6333/6334
@@ -155,3 +163,4 @@ wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh 15 5
 - `scripts/node_c_prep/NODE_C_CHECKLIST.md` — Node C bring-up, topology table
 - `scripts/netem/apply.sh` (+ `clear.sh`, `show.sh`, `validate.sh`) — root requirement, `eth4`/`ifb0`
 - `docs/B_MIGRATION.md` — one-time restructure cutover, `pdc_gateway` task, clone root
+

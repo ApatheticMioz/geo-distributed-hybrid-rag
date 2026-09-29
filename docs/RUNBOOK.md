@@ -259,15 +259,16 @@ The script always clears netem in a `finally` block, even on failure.
 One-liner (Node A → Node B):
 
 ```bash
-git commit -am "<msg>" && git push && ssh node-b "cd /d D:\FAST\Semester6\NLP\Project_Laptop && git pull"
+git commit -am "<msg>" && git push && ssh laptop "cd D:\FAST\Semester6\NLP\Project_Laptop && git pull"
 ```
 
 Then, **only if `systems/node_b/` code changed**, restart the gateway on B
 (PowerShell): `schtasks /End /TN pdc_gateway` then `schtasks /Run /TN
 pdc_gateway`. Qdrant needs no restart for code-only changes.
 
-Full access details, the one-time `docs/B_MIGRATION.md` cutover, and the
-PowerShell 5.1 constraints are in `docs/NODE_ACCESS.md`.
+Full access details, the one-time `docs/B_MIGRATION.md` cutover, and
+PowerShell 7 (`pwsh.exe`) environment details are in `docs/NODE_ACCESS.md`.
+
 
 ---
 
