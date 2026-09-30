@@ -22,6 +22,7 @@ NC-2..NC-4 targets and are intentionally NOT implemented here.
 """
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -36,7 +37,7 @@ import httpx
 import tantivy
 import yaml
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 # Node A's generation contract (hybrid_coordination.proto) is copied UNEDITED
@@ -446,6 +447,39 @@ async def sphp_hint_dispatch(
     return stream
 
 
+def reciprocal_rank_fusion(
+    sparse_doc_ids: list[str],
+    dense_doc_ids: list[str] | None,
+    k: int = 60,
+) -> list[str]:
+    """
+    Fuse two ranked lists of doc_ids using Reciprocal Rank Fusion (RRF).
+
+    Byte-identical to Node B's fusion.reciprocal_rank_fusion so the fused
+    ranking is gateway-agnostic for the campaign harness.
+
+    Both inputs are expected to be lists ordered by rank (best first).
+    If `dense_doc_ids` is None or empty, only `sparse_doc_ids` is used.
+
+    Returns a list of doc_ids sorted by RRF score descending.
+    """
+    scores: dict[str, float] = {}
+
+    def _add_list(results: list[str]) -> None:
+        for rank, doc_id in enumerate(results, start=1):
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
+
+    if sparse_doc_ids:
+        _add_list(sparse_doc_ids)
+
+    if dense_doc_ids:
+        _add_list(dense_doc_ids)
+
+    # Sort by score descending and return doc_ids
+    fused = sorted(scores.keys(), key=lambda did: scores[did], reverse=True)
+    return fused
+
+
 def fused_reconcile(sparse_ids: list[str], dense_ids: list[str], rrf_k: int) -> list[str]:
     """
     NC-4 — Fused reconciliation (RRF) of the two legs.
@@ -457,7 +491,91 @@ def fused_reconcile(sparse_ids: list[str], dense_ids: list[str], rrf_k: int) -> 
         of Node B's local RRF.
       * Returns the fused doc-id list in rank order.
     """
-    raise NotImplementedError("NC-4: fused reconciliation not yet implemented")
+    return reciprocal_rank_fusion(sparse_ids, dense_ids, rrf_k)
+
+
+# ============================================================================
+# Telemetry + token drain (mirror Node B's /query/benchmark bookkeeping)
+# ============================================================================
+
+# Telemetry is written under data/telemetry/ (gitignored via the root
+# .gitignore `*.jsonl` rule — verified with `git check-ignore`). Node B logs
+# to benchmarks/telemetry.jsonl; C mirrors the same JSONL record shape.
+TELEMETRY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "telemetry"
+
+
+def _write_telemetry(record: dict) -> None:
+    """Append a single JSONL telemetry record (best-effort; never raises)."""
+    try:
+        TELEMETRY_DIR.mkdir(parents=True, exist_ok=True)
+        with open(TELEMETRY_DIR / "telemetry.jsonl", "a", encoding="utf-8") as f_log:
+            f_log.write(json.dumps(record) + "\n")
+    except OSError as exc:
+        logger.warning("Failed to write telemetry record: %s", exc)
+
+
+async def _drain_tokens(
+    stream: SphpStream,
+    query_id: str,
+    t0: float,
+) -> tuple[list[str], dict[str, Any], float]:
+    """
+    Consume Node A's GenerationToken stream until the is_final sentinel.
+
+    Returns (tokens, meta, ttft_ms) where:
+      * tokens is the list of non-final token strings (the answer),
+      * meta carries the SPHP reconciliation fields (sphp_hit /
+        sphp_overlap / wasted_prefill_ms) as reported by Node A on the
+        token messages — mirroring Node B's stream_to_node_a meta
+        bookkeeping,
+      * ttft_ms is the time from t0 to the first token arrival at C.
+    """
+    tokens: list[str] = []
+    meta: dict[str, Any] = {}
+    ttft_ms = 0.0
+    try:
+        async for token in stream._response_iter:
+            if token.sphp_hit:
+                meta["sphp_hit"] = True
+                meta["sphp_overlap"] = round(token.sphp_overlap, 2)
+            elif "sphp_hit" not in meta and token.sphp_overlap > 0:
+                meta["sphp_hit"] = False
+                meta["sphp_overlap"] = round(token.sphp_overlap, 2)
+            if token.wasted_prefill_ms > 0:
+                meta["wasted_prefill_ms"] = round(token.wasted_prefill_ms, 2)
+            if token.is_final:
+                break
+            if token.token:
+                if ttft_ms == 0.0:
+                    ttft_ms = (time.perf_counter() - t0) * 1000.0
+                tokens.append(token.token)
+    except grpc.aio.AioRpcError as exc:
+        logger.error("[%s] Node A gRPC stream failed: %s - %s", query_id, exc.code(), exc.details())
+        tokens.append(f"[ERROR] Node A stream failed: {exc.code()} - {exc.details()}")
+    return tokens, meta, ttft_ms
+
+
+async def _open_final_stream(
+    query_id: str,
+    query_text: str,
+    fused_doc_ids: list[str],
+    t_sparse_ms: float,
+    t_dense_ms: float,
+    t_fusion_ms: float,
+    target: str | None = None,
+    channel: "grpc.aio.Channel | None" = None,
+) -> SphpStream:
+    """
+    Non-SPHP path: open a fresh stream to Node A and send a single final
+    fused-context message (is_sparse_hint=False) — the 3-node analogue of
+    Node B's non-SPHP stream_to_node_a (one message, no hint).
+    """
+    if target is None:
+        target = _NODE_A_TARGET
+    stream = SphpStream(target, channel=channel)
+    await stream._open()
+    stream.send_final(query_id, query_text, fused_doc_ids, t_sparse_ms, t_dense_ms, t_fusion_ms)
+    return stream
 
 
 # ============================================================================
@@ -603,39 +721,130 @@ def create_app(config: dict) -> FastAPI:
     ):
         """
         Main query endpoint (contract mirrors Node B's /query).
-        Skeleton: validates the request, then dispatches the pipeline
-        legs (NC-2..NC-4), which are not yet implemented.
+        Executes mode-aware retrieval (local sparse + dense_forward), fuses
+        with RRF, streams the fused context to Node A, and returns the
+        generated tokens to the client as text/plain with B's X- headers.
         """
         query_id = str(uuid.uuid4())[:8]
         k = req.top_k or int(config["retrieval"]["top_k"])
         query_text = req.query.strip()
         mode, rrf_k = _resolve_mode_and_k(req)
+        delay_seconds = max(simulate_wan_delay_ms or 0, 0) / 1000.0
+
+        t0 = time.perf_counter()
         logger.info(
             "[%s] Pipeline start | mode=%s rrf_k=%d sphp=%s query='%s'",
             query_id, mode, rrf_k, req.sphp, query_text[:60],
         )
 
-        # Pipeline (skeleton order; each leg is an NC-2..NC-4 stub):
-        sparse_ids, t_sparse_ms = await asyncio.to_thread(
-            sparse_retrieve, app.state.index, query_text, k, query_id
+        if delay_seconds > 0:
+            logger.info("[%s] Simulating WAN delay: %.0f ms", query_id, delay_seconds * 1000)
+            await asyncio.sleep(delay_seconds)
+
+        # Mode-aware retrieval (mirrors Node B's _hybrid_retrieve):
+        #   hybrid -> both legs; sparse -> local only; dense -> forward only.
+        run_dense = mode in ("hybrid", "dense")
+        run_sparse = mode in ("hybrid", "sparse")
+
+        dense_future = (
+            asyncio.to_thread(dense_forward, query_text, k, query_id)
+            if run_dense else None
         )
-        dense_ids, t_dense_ms = await asyncio.to_thread(
-            dense_forward, query_text, k, query_id
+        sparse_future = (
+            asyncio.to_thread(sparse_retrieve, app.state.index, query_text, k, query_id)
+            if run_sparse else None
         )
-        fused_ids = await asyncio.to_thread(
-            fused_reconcile, sparse_ids, dense_ids, rrf_k
+
+        if dense_future is not None and sparse_future is not None:
+            (dense_ids, t_dense_ms), (sparse_ids, t_sparse_ms) = await asyncio.gather(
+                dense_future, sparse_future,
+            )
+        elif dense_future is not None:
+            dense_ids, t_dense_ms = await dense_future
+            sparse_ids, t_sparse_ms = [], 0.0
+        elif sparse_future is not None:
+            sparse_ids, t_sparse_ms = await sparse_future
+            dense_ids, t_dense_ms = [], 0.0
+        else:
+            dense_ids, t_dense_ms = [], 0.0
+            sparse_ids, t_sparse_ms = [], 0.0
+
+        # RRF fusion (only meaningful when both legs ran).
+        if mode == "hybrid":
+            fusion_start = time.perf_counter()
+            fused_ids = await asyncio.to_thread(
+                fused_reconcile, sparse_ids, dense_ids, rrf_k
+            )
+            final_ids = fused_ids
+            t_fusion_ms = (time.perf_counter() - fusion_start) * 1000.0
+        else:
+            fused_ids = []
+            final_ids = list(sparse_ids) if mode == "sparse" else list(dense_ids)
+            t_fusion_ms = 0.0
+
+        logger.info(
+            "[%s] %s complete: sparse=%.1fms dense=%.1fms fusion=%.1fms final_docs=%d",
+            query_id, mode, t_sparse_ms, t_dense_ms, t_fusion_ms, len(final_ids),
         )
+
+        if not final_ids:
+            logger.warning("[%s] %s retrieval produced no documents", query_id, mode)
+            return StreamingResponse(
+                iter(["[No relevant documents found]"]),
+                media_type="text/plain",
+            )
+
+        # Generation leg: SPHP (hint already dispatched at t_sparse) or a
+        # single final message on a fresh stream (non-SPHP).
         if req.sphp and mode == "hybrid":
-            await sphp_hint_dispatch(
+            stream = await sphp_hint_dispatch(
                 query_id=query_id,
                 query_text=query_text,
                 sparse_doc_ids=sparse_ids,
                 t_sparse_ms=t_sparse_ms,
                 hint_depth=int(config["retrieval"]["hint_depth"]),
             )
-        # Token streaming to the client (via Node B's P2 path) is part of
-        # NC-3; the skeleton stops here.
-        raise NotImplementedError("NC-3: /query token streaming not yet implemented")
+            stream.send_final(
+                query_id=query_id,
+                query_text=query_text,
+                fused_doc_ids=final_ids,
+                t_sparse_ms=t_sparse_ms,
+                t_dense_ms=t_dense_ms,
+                t_fusion_ms=t_fusion_ms,
+            )
+        else:
+            stream = await _open_final_stream(
+                query_id=query_id,
+                query_text=query_text,
+                fused_doc_ids=final_ids,
+                t_sparse_ms=t_sparse_ms,
+                t_dense_ms=t_dense_ms,
+                t_fusion_ms=t_fusion_ms,
+            )
+
+        tokens, meta, ttft_ms = await _drain_tokens(stream, query_id, t0)
+        t_total_ms = (time.perf_counter() - t0) * 1000.0
+        logger.info("[%s] Pipeline headers ready: %.1f ms", query_id, t_total_ms)
+
+        headers = {
+            "X-Query-Id": query_id,
+            "X-Mode": mode,
+            "X-RRF-K": str(rrf_k),
+            "X-Sparse-Time-Ms": f"{t_sparse_ms:.2f}",
+            "X-Dense-Time-Ms": f"{t_dense_ms:.2f}",
+            "X-Fusion-Time-Ms": f"{t_fusion_ms:.2f}",
+            "X-Fused-Docs-Count": str(len(fused_ids)),
+            "X-Fused-Doc-Ids": ",".join(fused_ids[:10]),
+            "X-Sparse-Doc-Ids": ",".join(sparse_ids[:10]),
+            "X-Dense-Doc-Ids": ",".join(dense_ids[:10]),
+            "X-Simulated-WAN-Ms": str(int(delay_seconds * 1000)),
+        }
+
+        async def token_stream():
+            for tok in tokens:
+                yield tok
+
+        return StreamingResponse(token_stream(), media_type="text/plain", headers=headers)
 
     @app.post("/query/benchmark", response_model=BenchmarkResponse)
     async def benchmark_endpoint(
@@ -646,39 +855,192 @@ def create_app(config: dict) -> FastAPI:
         Synchronous benchmark endpoint (contract mirrors Node B's
         /query/benchmark): complete structured metrics, token counts,
         and decode throughput as JSON for automated evaluation.
-        Skeleton: validates the request, then dispatches the pipeline
-        legs (NC-2..NC-4), which are not yet implemented.
         """
         query_id = str(uuid.uuid4())[:8]
         k = req.top_k or int(config["retrieval"]["top_k"])
         query_text = req.query.strip()
         mode, rrf_k = _resolve_mode_and_k(req)
+        delay_seconds = max(simulate_wan_delay_ms or 0, 0) / 1000.0
+
+        t0 = time.perf_counter()
         logger.info(
             "[%s] Benchmark query start | mode=%s rrf_k=%d sphp=%s query='%s'",
             query_id, mode, rrf_k, req.sphp, query_text[:60],
         )
 
-        # Pipeline (skeleton order; each leg is an NC-2..NC-4 stub):
-        sparse_ids, t_sparse_ms = await asyncio.to_thread(
-            sparse_retrieve, app.state.index, query_text, k, query_id
+        if delay_seconds > 0:
+            logger.info("[%s] Simulating WAN delay: %.0f ms", query_id, delay_seconds * 1000)
+            await asyncio.sleep(delay_seconds)
+
+        # Mode-aware retrieval (mirrors Node B's _hybrid_retrieve).
+        run_dense = mode in ("hybrid", "dense")
+        run_sparse = mode in ("hybrid", "sparse")
+
+        dense_future = (
+            asyncio.to_thread(dense_forward, query_text, k, query_id)
+            if run_dense else None
         )
-        dense_ids, t_dense_ms = await asyncio.to_thread(
-            dense_forward, query_text, k, query_id
+        sparse_future = (
+            asyncio.to_thread(sparse_retrieve, app.state.index, query_text, k, query_id)
+            if run_sparse else None
         )
-        fused_ids = await asyncio.to_thread(
-            fused_reconcile, sparse_ids, dense_ids, rrf_k
-        )
+
+        if dense_future is not None and sparse_future is not None:
+            (dense_ids, t_dense_ms), (sparse_ids, t_sparse_ms) = await asyncio.gather(
+                dense_future, sparse_future,
+            )
+        elif dense_future is not None:
+            dense_ids, t_dense_ms = await dense_future
+            sparse_ids, t_sparse_ms = [], 0.0
+        elif sparse_future is not None:
+            sparse_ids, t_sparse_ms = await sparse_future
+            dense_ids, t_dense_ms = [], 0.0
+        else:
+            dense_ids, t_dense_ms = [], 0.0
+            sparse_ids, t_sparse_ms = [], 0.0
+
+        # RRF fusion (only meaningful when both legs ran).
+        if mode == "hybrid":
+            fusion_start = time.perf_counter()
+            fused_ids = await asyncio.to_thread(
+                fused_reconcile, sparse_ids, dense_ids, rrf_k
+            )
+            final_ids = fused_ids
+            t_fusion_ms = (time.perf_counter() - fusion_start) * 1000.0
+        else:
+            fused_ids = []
+            final_ids = list(sparse_ids) if mode == "sparse" else list(dense_ids)
+            t_fusion_ms = 0.0
+
+        # Retrieval-only fast path: skip generation entirely (mirrors B).
+        if req.retrieval_only:
+            t_end = time.perf_counter()
+            total_ms = (t_end - t0) * 1000.0
+            timings = {
+                "sparse_ms": round(t_sparse_ms, 2),
+                "dense_ms": round(t_dense_ms, 2),
+                "fusion_ms": round(t_fusion_ms, 2),
+                "ttft_ms": 0,
+                "decode_ms": 0,
+                "total_ms": round(total_ms, 2),
+                "simulated_wan_ms": round(delay_seconds * 1000, 2),
+            }
+            logger.info(
+                "[%s] Retrieval-only complete: sparse=%.1fms dense=%.1fms fusion=%.1fms total=%.1fms (no generation)",
+                query_id, t_sparse_ms, t_dense_ms, t_fusion_ms, total_ms,
+            )
+            return BenchmarkResponse(
+                query_id=query_id,
+                query=query_text,
+                top_k=k,
+                mode=mode,
+                rrf_k=rrf_k,
+                timings=timings,
+                fused_doc_ids=fused_ids,
+                sparse_doc_ids=sparse_ids,
+                dense_doc_ids=dense_ids,
+                token_count=0,
+                decode_tps=0,
+                answer_preview="",
+                sphp=False,
+            )
+
+        # Generation leg: SPHP (hint at t_sparse) or single final message.
+        meta: dict[str, Any] = {}
         if req.sphp and mode == "hybrid":
-            await sphp_hint_dispatch(
+            stream = await sphp_hint_dispatch(
                 query_id=query_id,
                 query_text=query_text,
                 sparse_doc_ids=sparse_ids,
                 t_sparse_ms=t_sparse_ms,
                 hint_depth=int(config["retrieval"]["hint_depth"]),
             )
-        # Generation leg (Node A via Node B's P2 path) is part of NC-3;
-        # the skeleton stops here.
-        raise NotImplementedError("NC-3: /query/benchmark generation leg not yet implemented")
+            stream.send_final(
+                query_id=query_id,
+                query_text=query_text,
+                fused_doc_ids=final_ids,
+                t_sparse_ms=t_sparse_ms,
+                t_dense_ms=t_dense_ms,
+                t_fusion_ms=t_fusion_ms,
+            )
+        else:
+            stream = await _open_final_stream(
+                query_id=query_id,
+                query_text=query_text,
+                fused_doc_ids=final_ids,
+                t_sparse_ms=t_sparse_ms,
+                t_dense_ms=t_dense_ms,
+                t_fusion_ms=t_fusion_ms,
+            )
+
+        tokens, meta, ttft_ms = await _drain_tokens(stream, query_id, t0)
+
+        t_end = time.perf_counter()
+        total_ms = (t_end - t0) * 1000.0
+        decode_ms = (t_end - (t0 + ttft_ms / 1000.0)) * 1000.0 if ttft_ms else 0.0
+        token_count = len(tokens)
+        tps = (token_count - 1) / (decode_ms / 1000.0) if (decode_ms > 0 and token_count > 1) else 0.0
+
+        answer = "".join(tokens)
+        preview = answer[:120].replace("\n", " ") + "..." if len(answer) > 120 else answer
+
+        if req.sphp and mode == "hybrid":
+            fused_ids = meta.get("fused_ids", fused_ids)
+            dense_ids = meta.get("dense_ids", dense_ids)
+            t_dense_ms = meta.get("t_dense_ms", t_dense_ms)
+            t_fusion_ms = meta.get("t_fusion_ms", t_fusion_ms)
+
+        timings = {
+            "sparse_ms": round(t_sparse_ms, 2),
+            "dense_ms": round(t_dense_ms, 2),
+            "fusion_ms": round(t_fusion_ms, 2),
+            "ttft_ms": round(ttft_ms, 2),
+            "decode_ms": round(decode_ms, 2),
+            "total_ms": round(total_ms, 2),
+            "simulated_wan_ms": round(delay_seconds * 1000, 2),
+        }
+        if meta.get("sphp_hit") is not None:
+            timings["sphp_hit"] = meta["sphp_hit"]
+            timings["sphp_overlap"] = meta.get("sphp_overlap", 0.0)
+            timings["wasted_prefill_ms"] = meta.get("wasted_prefill_ms", 0.0)
+
+        _write_telemetry({
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "query_id": query_id,
+            "query": query_text,
+            "top_k": k,
+            "mode": mode,
+            "rrf_k": rrf_k,
+            "timings": timings,
+            "fused_docs": fused_ids[:10],
+            "sparse_doc_ids": sparse_ids[:10],
+            "dense_doc_ids": dense_ids[:10],
+            "token_count": token_count,
+            "decode_tps": round(tps, 2),
+            "sphp": req.sphp,
+            "sphp_hit": meta.get("sphp_hit"),
+            "sphp_overlap": meta.get("sphp_overlap"),
+        })
+
+        return BenchmarkResponse(
+            query_id=query_id,
+            query=query_text,
+            top_k=k,
+            mode=mode,
+            rrf_k=rrf_k,
+            timings=timings,
+            fused_doc_ids=fused_ids,
+            sparse_doc_ids=sparse_ids,
+            dense_doc_ids=dense_ids,
+            token_count=token_count,
+            decode_tps=round(tps, 2),
+            answer_preview=preview,
+            answer_full=answer,
+            sphp=req.sphp,
+            sphp_hit=meta.get("sphp_hit"),
+            sphp_overlap=meta.get("sphp_overlap"),
+            wasted_prefill_ms=meta.get("wasted_prefill_ms"),
+        )
 
     return app
 
