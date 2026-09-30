@@ -3,15 +3,15 @@
 # apply.sh — Apply bidirectional WAN emulation (netem) on node_A.
 #
 # Topology:
-#   node_A (this WSL2 VM, iface eth4 = 10.8.0.1/24)  <->  peer 10.8.0.2 (laptop)
-#   WSL2 mirrored networking: eth4 is the WireGuard-path interface.
+#   node_A (this WSL2 VM, iface eth0 = 10.8.0.1/24)  <->  peer 10.8.0.2 (laptop)
+#   WSL2 mirrored networking: eth0 is the WireGuard-path interface.
 #
 # Semantics (TWO-WAY / BIDIRECTIONAL shaping — half-per-direction contract):
 #   RTT_MS is the FULL round-trip target. It is split in half per direction:
-#     - EGRESS  (packets leaving node_A):  eth4 root qdisc
+#     - EGRESS  (packets leaving node_A):  eth0 root qdisc
 #         netem delay (RTT_MS/2)ms loss (LOSS_PCT/2)% [rate RATE]
 #     - INGRESS (packets arriving at node_A): ifb0 root qdisc, fed by the
-#         eth4 ingress qdisc + a u32 filter mirred-redirecting all IP
+#         eth0 ingress qdisc + a u32 filter mirred-redirecting all IP
 #         traffic to ifb0:
 #         netem delay (RTT_MS/2)ms loss (LOSS_PCT/2)% [rate RATE]
 #   Integer division: 15ms -> 7ms per direction (14ms total); 0 stays 0.
@@ -40,7 +40,7 @@ set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: must be run as root (CAP_NET_ADMIN required for tc/ip/modprobe). Use: wsl.exe -u root -e bash $0 ..." >&2; exit 1; }
 
-IFACE="eth4"
+IFACE="eth0"
 IFB="ifb0"
 
 usage() {
@@ -71,7 +71,7 @@ command -v tc >/dev/null 2>&1 || { echo "ERROR: 'tc' not found (install iproute2
 HALF_DELAY=$(( RTT_MS / 2 ))
 HALF_LOSS=$(( LOSS_PCT / 2 ))
 
-# --- EGRESS: root qdisc on eth4 -------------------------------------------------
+# --- EGRESS: root qdisc on eth0 -------------------------------------------------
 if [ -n "$RATE" ]; then
   echo "Applying EGRESS: tc qdisc replace dev ${IFACE} root netem delay ${HALF_DELAY}ms loss ${HALF_LOSS}% rate ${RATE}"
   tc qdisc replace dev "$IFACE" root netem delay "${HALF_DELAY}"ms loss "${HALF_LOSS}"% rate "$RATE"
@@ -80,7 +80,7 @@ else
   tc qdisc replace dev "$IFACE" root netem delay "${HALF_DELAY}"ms loss "${HALF_LOSS}"%
 fi
 
-# --- INGRESS: redirect eth4 ingress -> ifb0, shape on ifb0 root -----------------
+# --- INGRESS: redirect eth0 ingress -> ifb0, shape on ifb0 root -----------------
 modprobe ifb || { echo "ERROR: 'modprobe ifb' failed (ifb module unavailable in this kernel?)" >&2; exit 1; }
 ip link show dev "$IFB" >/dev/null 2>&1 || ip link add dev "$IFB" type ifb
 ip link set dev "$IFB" up

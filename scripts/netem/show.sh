@@ -3,13 +3,13 @@
 # show.sh — Inspect the current bidirectional qdisc (WAN-emulation) state.
 #
 # Topology:
-#   node_A (this WSL2 VM, iface eth4 = 10.8.0.1/24)  <->  peer 10.8.0.2 (laptop)
+#   node_A (this WSL2 VM, iface eth0 = 10.8.0.1/24)  <->  peer 10.8.0.2 (laptop)
 #
 # Semantics (half-per-direction contract):
 #   Displays BOTH directions:
-#     - EGRESS:  tc -s qdisc show dev eth4  (root qdisc = egress netem)
+#     - EGRESS:  tc -s qdisc show dev eth0  (root qdisc = egress netem)
 #     - INGRESS: tc -s qdisc show dev ifb0  (ingress netem, fed by the
-#               eth4 ingress qdisc + u32 mirred-redirect filter)
+#               eth0 ingress qdisc + u32 mirred-redirect filter)
 #   Read-only.
 #
 # Usage:
@@ -24,7 +24,7 @@ set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: must be run as root (CAP_NET_ADMIN required for tc)." >&2; exit 1; }
 
-IFACE="eth4"
+IFACE="eth0"
 IFB="ifb0"
 
 usage() {

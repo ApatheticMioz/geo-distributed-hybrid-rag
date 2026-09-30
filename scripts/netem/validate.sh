@@ -3,10 +3,10 @@
 # validate.sh — Closed-loop check that bidirectional netem produces the expected RTT.
 #
 # Topology:
-#   node_A (this WSL2 VM, iface eth4 = 10.8.0.1/24)  <->  peer 10.8.0.2 (laptop)
+#   node_A (this WSL2 VM, iface eth0 = 10.8.0.1/24)  <->  peer 10.8.0.2 (laptop)
 #
 # Semantics (TWO-WAY shaping — half-per-direction contract):
-#   apply.sh splits RTT_MS in half per direction (eth4 egress root netem +
+#   apply.sh splits RTT_MS in half per direction (eth0 egress root netem +
 #   ifb0 ingress netem), so a ping (request + reply) gains both halves:
 #     shaped_median - baseline_median  ~=  RTT_MS  (within +/-30%)
 #   Tolerance is 30% (was 20%) because the two integer half-delays sum to at
@@ -32,7 +32,7 @@ set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: must be run as root (CAP_NET_ADMIN required for tc)." >&2; exit 1; }
 
-IFACE="eth4"
+IFACE="eth0"
 PEER="10.8.0.2"
 PING_COUNT=5
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
