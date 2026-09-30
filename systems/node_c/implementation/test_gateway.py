@@ -28,8 +28,12 @@ from src.gateway import (  # noqa: E402
     BenchmarkResponse,
     ConfigError,
     QueryRequest,
+    _bm25_query,
+    _escape_lucene,
+    _LUCENE_SPECIALS,
     create_app,
     load_config,
+    sparse_retrieve,
 )
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
@@ -237,3 +241,124 @@ def test_invalid_mode_rejected_400(tmp_path):
         r = client.post("/query", json={"query": "x", "mode": "bogus"})
     assert r.status_code == 400
     assert "Invalid mode" in r.json()["detail"]
+
+
+# ============================================================================
+# NC-2 — sparse leg (Tantivy BM25) against a fixture index
+# ============================================================================
+
+def _build_fixture_index(index_path: Path) -> None:
+    """
+    Build a small multi-doc Tantivy index with a known, discriminative
+    BM25 ordering. Documents share the term 'distributed' with varying
+    frequency so BM25 scores are ordered deterministically:
+
+      d1: 'distributed computing'            (1x distributed)
+      d2: 'distributed distributed systems'  (2x distributed)
+      d3: 'quantum physics'                  (0x distributed)
+
+    For the query 'distributed' the expected rank order is d2 > d1 > d3
+    (d3 only if it matches at all — it does not, so it is excluded).
+    """
+    index_path.mkdir(parents=True, exist_ok=True)
+    sb = tantivy.SchemaBuilder()
+    sb.add_text_field("doc_id", stored=True, tokenizer_name="raw")
+    sb.add_text_field("body", stored=True, tokenizer_name="en_stem")
+    idx = tantivy.Index(sb.build(), path=str(index_path))
+    writer = idx.writer(16 * 1024 * 1024)
+    writer.add_document(tantivy.Document(doc_id=["d1"], body=["distributed computing"]))
+    writer.add_document(tantivy.Document(doc_id=["d2"], body=["distributed distributed systems"]))
+    writer.add_document(tantivy.Document(doc_id=["d3"], body=["quantum physics"]))
+    writer.commit()
+    idx.reload()
+
+
+def _open_fixture_index(index_path: Path) -> "tantivy.Index":
+    return tantivy.Index.open(str(index_path))
+
+
+def test_sparse_topk_order_discriminative(tmp_path):
+    """(a) Discriminative top-k order: BM25 ranks d2 > d1 for 'distributed'."""
+    idx_path = tmp_path / "tantivy_index"
+    _build_fixture_index(idx_path)
+    idx = _open_fixture_index(idx_path)
+
+    results = _bm25_query(idx, "distributed", top_k=10)
+    # Only the two docs containing 'distributed' match; d3 (quantum) is excluded.
+    assert [r["doc_id"] for r in results] == ["d2", "d1"]
+    # Ranks are 1-based and sequential.
+    assert [r["rank"] for r in results] == [1, 2]
+    # Scores are strictly decreasing in rank order.
+    assert results[0]["score"] > results[1]["score"] > 0.0
+
+    # top_k=1 must truncate to the single best doc.
+    top1 = _bm25_query(idx, "distributed", top_k=1)
+    assert [r["doc_id"] for r in top1] == ["d2"]
+    assert top1[0]["rank"] == 1
+
+
+def test_sparse_topk_honored_across_configs(tmp_path):
+    """(b) top_k is honored across two different config values."""
+    idx_path = tmp_path / "tantivy_index"
+    _build_fixture_index(idx_path)
+    idx = _open_fixture_index(idx_path)
+
+    # A query matching all three docs (use a term present in each? none is).
+    # Instead use two queries that each match a known count and assert the
+    # returned list length never exceeds the requested top_k.
+    # 'distributed' matches 2 docs; top_k=1 -> 1, top_k=5 -> 2 (capped by matches).
+    assert len(_bm25_query(idx, "distributed", top_k=1)) == 1
+    assert len(_bm25_query(idx, "distributed", top_k=5)) == 2
+
+    # 'quantum' matches exactly 1 doc; top_k=10 must still return just 1.
+    assert len(_bm25_query(idx, "quantum", top_k=10)) == 1
+
+    # sparse_retrieve returns (doc_ids, elapsed_ms) and respects top_k.
+    ids, ms = sparse_retrieve(idx, "distributed", 1, "q1")
+    assert ids == ["d2"]
+    assert ms >= 0.0
+    ids, ms = sparse_retrieve(idx, "distributed", 5, "q1")
+    assert ids == ["d2", "d1"]
+    assert ms >= 0.0
+
+
+def test_sparse_empty_whitespace_matches_node_b(tmp_path):
+    """(c) Empty / whitespace-only queries match nothing (== Node B behavior)."""
+    idx_path = tmp_path / "tantivy_index"
+    _build_fixture_index(idx_path)
+    idx = _open_fixture_index(idx_path)
+
+    for q in ("", "   ", "  \t "):
+        # _bm25_query must not raise and must return an empty list.
+        assert _bm25_query(idx, q, top_k=10) == []
+        # sparse_retrieve must return an empty id list with a non-negative time.
+        ids, ms = sparse_retrieve(idx, q, 10, "q1")
+        assert ids == []
+        assert ms >= 0.0
+
+    # A real query still returns results (control: the empty case is not
+    # just 'always empty').
+    assert [r["doc_id"] for r in _bm25_query(idx, "distributed", top_k=10)] == ["d2", "d1"]
+
+
+def test_sparse_field_names_identical_to_node_b(tmp_path):
+    """(d) Result field names are byte-identical to Node B's BM25Retriever.query."""
+    idx_path = tmp_path / "tantivy_index"
+    _build_fixture_index(idx_path)
+    idx = _open_fixture_index(idx_path)
+
+    results = _bm25_query(idx, "distributed", top_k=10)
+    assert results, "expected at least one hit"
+    # Node B's BM25Retriever.query returns exactly these four keys.
+    for r in results:
+        assert set(r.keys()) == {"doc_id", "text", "score", "rank"}
+        assert isinstance(r["doc_id"], str)
+        assert isinstance(r["text"], str)
+        assert isinstance(r["score"], float)
+        assert isinstance(r["rank"], int)
+
+    # The Lucene-escape helper must be byte-identical to Node B's: an
+    # apostrophe (a Lucene special) is escaped, ordinary text is untouched.
+    assert _escape_lucene("paula deen's") == "paula deen\\'s"
+    assert _escape_lucene("distributed computing") == "distributed computing"
+    assert _LUCENE_SPECIALS == set('+-!(){}[]^"~*?:/\\\'')

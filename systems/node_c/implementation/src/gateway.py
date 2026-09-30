@@ -24,10 +24,11 @@ NC-2..NC-4 targets and are intentionally NOT implemented here.
 import asyncio
 import logging
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 import tantivy
 import yaml
@@ -111,19 +112,84 @@ def load_config(path: str | Path) -> dict:
 # Pipeline legs — NC-2..NC-4 stubs (contracts only, not implemented yet)
 # ============================================================================
 
-def sparse_retrieve(query: str, top_k: int, query_id: str) -> tuple[list[str], float]:
+# Lucene/Tantivy special characters that must be escaped in a query string
+# before it is handed to tantivy's parse_query. An unescaped special (most
+# notably the apostrophe, e.g. "paula deen's") makes parse_query raise and the
+# /query endpoint return a 500. Escaping each as a literal keeps the query
+# parseable while preserving the intended term.
+# (Byte-identical to Node B's bm25_retriever._LUCENE_SPECIALS.)
+_LUCENE_SPECIALS = set('+-!(){}[]^"~*?:/\\\'')
+
+
+def _escape_lucene(query_text: str) -> str:
+    """
+    Escape Lucene special characters so parse_query treats them as literals.
+
+    Each character in ``_LUCENE_SPECIALS`` is prefixed with a backslash, which
+    is Lucene's escape character. Normal (non-special) characters pass through
+    unchanged, so ordinary queries are unaffected.
+    (Byte-identical to Node B's bm25_retriever._escape_lucene.)
+    """
+    return ''.join('\\' + ch if ch in _LUCENE_SPECIALS else ch for ch in query_text)
+
+
+def _bm25_query(index: "tantivy.Index", query_text: str, top_k: int = 10) -> List[Dict[str, Any]]:
+    """
+    Node C's mirror of Node B's BM25Retriever.query.
+
+    Runs a BM25 search against the (lifespan-loaded) Tantivy index and returns
+    at most ``top_k`` results. The result dicts carry byte-identical field
+    names to Node B's BM25Retriever.query: ``doc_id``, ``text``, ``score``,
+    ``rank``. Empty / whitespace-only queries match nothing and yield ``[]``
+    (same as Node B — parse_query on an empty string produces a no-match query).
+    """
+    searcher = index.searcher()
+    query = index.parse_query(
+        _escape_lucene(query_text), default_field_names=["body"]
+    )
+    search_result = searcher.search(query, top_k)
+    results_list = search_result.hits if hasattr(search_result, "hits") else search_result
+
+    results = []
+    for rank, result in enumerate(results_list, start=1):
+        score, doc_address = result
+        doc = searcher.doc(doc_address)
+        results.append({
+            "doc_id": doc.get_first("doc_id"),
+            "text": doc.get_first("body"),
+            "score": float(score),
+            "rank": rank,
+        })
+    return results
+
+
+def sparse_retrieve(index: "tantivy.Index", query: str, top_k: int, query_id: str) -> tuple[list[str], float]:
     """
     NC-2 — Local Tantivy BM25 sparse leg (the index lives on C).
 
     Contract:
       * Runs against the disk-backed Tantivy index at
-        config['corpus']['tantivy_index_path'] (loaded at startup).
+        config['corpus']['tantivy_index_path'] (loaded at startup and reused
+        here — the index is opened once in lifespan, not per request).
       * Returns (doc_id_list, elapsed_ms) with at most top_k ids,
         ranked by BM25 score — the same return shape as Node B's
         _sparse_retrieve so the campaign harness is gateway-agnostic.
       * Must be safe to run in a worker thread (asyncio.to_thread).
     """
-    raise NotImplementedError("NC-2: local Tantivy sparse leg not yet implemented")
+    if index is None:
+        logger.warning("[%s] BM25 index not available; skipping sparse retrieval", query_id)
+        return [], 0.0
+
+    started = time.perf_counter()
+    results = _bm25_query(index, query, top_k)
+
+    doc_ids = [r["doc_id"] for r in results if r.get("doc_id")]
+    elapsed_ms = (time.perf_counter() - started) * 1000.0
+    logger.info(
+        "[%s] Sparse retrieval: %.1f ms, %d docs",
+        query_id, elapsed_ms, len(doc_ids),
+    )
+    return doc_ids, elapsed_ms
 
 
 def dense_forward(query: str, top_k: int, query_id: str) -> tuple[list[str], float]:
@@ -324,7 +390,7 @@ def create_app(config: dict) -> FastAPI:
 
         # Pipeline (skeleton order; each leg is an NC-2..NC-4 stub):
         sparse_ids, t_sparse_ms = await asyncio.to_thread(
-            sparse_retrieve, query_text, k, query_id
+            sparse_retrieve, app.state.index, query_text, k, query_id
         )
         dense_ids, t_dense_ms = await asyncio.to_thread(
             dense_forward, query_text, k, query_id
@@ -367,7 +433,7 @@ def create_app(config: dict) -> FastAPI:
 
         # Pipeline (skeleton order; each leg is an NC-2..NC-4 stub):
         sparse_ids, t_sparse_ms = await asyncio.to_thread(
-            sparse_retrieve, query_text, k, query_id
+            sparse_retrieve, app.state.index, query_text, k, query_id
         )
         dense_ids, t_dense_ms = await asyncio.to_thread(
             dense_forward, query_text, k, query_id
