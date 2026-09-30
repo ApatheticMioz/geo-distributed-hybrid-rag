@@ -272,3 +272,110 @@
   journal={arXiv preprint arXiv:2505.09388},
   year={2025}
 }
+
+
+% ----------------------------------------------------------------------------
+% 7. Related-work landscape (LR-1 / LR-2a / LR-4) -- novelty-defense neighbors
+%    (ledger-verified; see docs/literature_ledger.md)
+% ----------------------------------------------------------------------------
+
+% --- LR-1: RAG-serving / placement neighbors ---
+@misc{shen2024ragtradeoffs,
+  title         = {Towards Understanding Systems Trade-offs in {RAG} Model Inference},
+  author        = {Shen, Yifan and Umar, Muhammad and Maeng, Seongmin and Suh, Jaewoong and Gupta, Ishan},
+  year          = {2024},
+  eprint        = {2412.11854},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.DC}
+}
+
+@article{janus2025,
+  title   = {Janus: Joint Prefill/Decode Disaggregation with {KV}-Cache-Aware Multi-Cloud Routing for Edge-Adjacent {LLM} Serving},
+  author  = {Aruna and Kaliraj and Sudha and Sureka and others},
+  journal = {EAI Endorsed Transactions on the Internet of Things},
+  year    = {2025},
+  note    = {DOI 10.4108/eetiot.13349}
+}
+
+@inproceedings{speculativerag2025,
+  title     = {Speculative {RAG}: Enhancing Retrieval-Augmented Generation through Drafting},
+  author    = {Wang, Y. and others},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025}
+}
+
+@inproceedings{omnia2025,
+  title     = {Efficient {RAG} Serving through Speculative Scheduling},
+  author    = {Omnia and others},
+  booktitle = {Proceedings of the {ACM} International Conference for High Performance Computing, Networking, Storage and Analysis (HPDC)},
+  year      = {2025},
+  note      = {DOI 10.1145/3806645.3807814}
+}
+
+% --- LR-2a: speculation families (prefetch / client / OS speculation) ---
+@inproceedings{patterson1995informed,
+  title     = {Informed Prefetching and Caching},
+  author    = {Patterson, R. Hugo and Gibson, Garth A. and Ginting, Eka and Stodolsky, Daniel and Zelenka, Jim},
+  booktitle = {Proceedings of the 15th {ACM} Symposium on Operating Systems Principles (SOSP)},
+  year      = {1995},
+  pages     = {79--95}
+}
+
+@inproceedings{padmanabhan1996prefetch,
+  title     = {Using Predictive Prefetching to Improve World Wide Web Latency},
+  author    = {Padmanabhan, Venkata N. and Mogul, Jeffrey C.},
+  booktitle = {Proceedings of the {ACM} Conference on Communications Architectures, Protocols and Applications (SIGCOMM)},
+  year      = {1996},
+  pages     = {22--36}
+}
+
+@inproceedings{wester2009clientspec,
+  title     = {Tolerating Latency in Replicated State Machines through Client Speculation},
+  author    = {Wester, Benjamin and Chen, Peter M. and Cowling, James and Flinn, Jason and Nightingale, Edmund B. and Liskov, Barbara},
+  booktitle = {Proceedings of the 6th USENIX Symposium on Networked Systems Design and Implementation (NSDI)},
+  year      = {2009}
+}
+
+@inproceedings{wester2011ospec,
+  title     = {Operating System Support for Application-Specific Speculation},
+  author    = {Wester, Benjamin and Chen, Peter M. and Flinn, Jason},
+  booktitle = {Proceedings of the 6th European Conference on Computer Systems (EuroSys)},
+  year      = {2011}
+}
+
+% --- LR-4: cost-model / placement-policy families ---
+@inproceedings{patel2024splitwise,
+  title     = {Splitwise: Efficient Generative {LLM} Inference Using Phase Splitting},
+  author    = {Patel, Pratyush and Choukse, Esha and Zhang, Chaojie and Shah, Aashaka and Goiri, {\'I}nigo and Maleki, Saeed and Bianchini, Ricardo},
+  booktitle = {Proceedings of the 51st {ACM}/{IEEE} International Symposium on Computer Architecture (ISCA)},
+  year      = {2024}
+}
+
+@inproceedings{zhong2024distserve,
+  title     = {{DistServe}: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving},
+  author    = {Zhong, Yinmin and Liu, Zhen and Gu, Jinah and Jin, Xuan and Chen, Jian and Park, Minja and Liu, Yibo and Pang, Jiayuan and Sheng, Ying and Han, Song and others},
+  booktitle = {Proceedings of the 17th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2024}
+}
+
+@inproceedings{li2023alpaserve,
+  title     = {AlpaServe: Statistical Multiplexing with Model Parallelism for Deep Learning Serving},
+  author    = {Li, Zhuohan and Zheng, Lianmin and Zhong, Yinmin and Liu, Vincent and Sheng, Ying and Jin, Xin and Huang, Yanping and Chen, Zhifeng and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
+  booktitle = {Proceedings of the 16th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2023},
+  pages     = {663--679}
+}
+
+@inproceedings{gujarati2020clockwork,
+  title     = {Serving {DNNs} like Clockwork: Performance Predictability from the Bottom Up},
+  author    = {Gujarati, Abhinav and Karimi, Reza and others},
+  booktitle = {Proceedings of the 13th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2020}
+}
+
+@article{cao2000mg1kps,
+  title   = {Web Server Performance Modeling Using an {M/G/1/K*PS} Queue},
+  author  = {Cao, Jianhua and Andersson, Mikael and Nyberg, Christian and Kihl, Maria},
+  journal = {IEEE/ACM Transactions on Networking},
+  year    = {2000}
+}
