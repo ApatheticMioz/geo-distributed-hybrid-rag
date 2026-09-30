@@ -14,7 +14,9 @@ Run from systems/node_c/implementation:
     .venv/bin/python -m pytest test_gateway.py -v
 """
 
+import socket
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -450,6 +452,86 @@ def test_dense_forward_degrades_on_transport_error():
     ids, ms = dense_forward("q", 5, "q1", target="http://10.8.0.2:8000", client=client)
     assert ids == []
     assert ms == 0.0
+
+
+def _slow_b_server(delay_s: float) -> tuple[socket.socket, int, threading.Thread]:
+    """
+    A real TCP server that accepts a connection, sleeps ``delay_s`` (simulating
+    a slow-but-healthy Node B dense leg), then returns a valid
+    /query/benchmark JSON body. A real socket (not httpx.MockTransport) is
+    required: httpx only fires ReadTimeout between network events, and a mock
+    handler is a single atomic event that never trips the read timeout.
+    """
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    port = srv.getsockname()[1]
+    srv.listen(1)
+
+    def _serve():
+        conn, _ = srv.accept()
+        try:
+            # Drain the request headers/body (best-effort; we only need the
+            # connection held open so the client's read blocks).
+            conn.settimeout(5.0)
+            try:
+                conn.recv(65536)
+            except socket.timeout:
+                pass
+            time.sleep(delay_s)
+            body = (
+                b'{"dense_doc_ids": ["d1", "d2", "d3"], '
+                b'"timings": {"dense_ms": ' + str(int(delay_s * 1000)).encode() + b'}}'
+            )
+            resp = (
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: application/json\r\n"
+                b"Content-Length: " + str(len(body)).encode() + b"\r\n"
+                b"\r\n" + body
+            )
+            conn.sendall(resp)
+        finally:
+            conn.close()
+
+    t = threading.Thread(target=_serve, daemon=True)
+    t.start()
+    return srv, port, t
+
+
+def test_dense_forward_timeout_is_config_driven():
+    """
+    The dense-leg read timeout must come from config (retrieval.dense_timeout_ms),
+    not httpx's 5 s default. A Node B that is slow-but-healthy (~24 s cold,
+    measured) must return real doc ids under the configured timeout, while the
+    same delay must degrade to ([], 0.0) under a too-small timeout.
+
+    We use a 1.0 s server delay (well under the 5 s httpx default, so the
+    old code would have succeeded) and bracket it with two configured
+    timeouts: 0.5 s (below the delay -> ReadTimeout -> degrade) and 3.0 s
+    (above the delay -> real ids). This proves the timeout is actually
+    config-driven and that a slow B is no longer silently cut off.
+    """
+    # (1) Configured timeout BELOW the server delay -> ReadTimeout -> ([], 0.0).
+    srv, port, t = _slow_b_server(1.0)
+    try:
+        _gw._DENSE_TIMEOUT_S = 0.5
+        ids, ms = dense_forward("q", 5, "q1", target=f"http://127.0.0.1:{port}")
+        assert ids == []
+        assert ms == 0.0
+    finally:
+        srv.close()
+        t.join(timeout=5)
+
+    # (2) Configured timeout ABOVE the server delay -> real doc ids come back.
+    srv, port, t = _slow_b_server(1.0)
+    try:
+        _gw._DENSE_TIMEOUT_S = 3.0
+        ids, ms = dense_forward("q", 5, "q1", target=f"http://127.0.0.1:{port}")
+        assert ids == ["d1", "d2", "d3"]
+        assert ms == 1000.0
+    finally:
+        srv.close()
+        t.join(timeout=5)
 
 
 class _FakeOrchestrator(hybrid_coordination_pb2_grpc.GenerationOrchestratorServicer):

@@ -29,6 +29,14 @@ corpus:
 retrieval:
   top_k: 10                 # sparse leg depth at C
   hint_depth: 5             # SPHP sparse-hint depth (subset of top_k)
+  # Dense-leg HTTP read timeout (ms) for the C -> B /query/benchmark forward
+  # (dense_forward). Derived from measured Node B dense latency: ~24,000 ms
+  # cold / ~23,600 ms warm (same 10 doc ids both runs). The old httpx default
+  # (5 s read) sat BELOW the cold value, so every real dense forward hit
+  # ReadTimeout and the dense leg silently degraded to ([], 0.0).
+  # 30,000 ms = 24,000 ms measured cold + 6,000 ms (~25%) headroom for
+  # cold-start variance / GC pauses / WG jitter.
+  dense_timeout_ms: 30000
 
 # User-facing FastAPI gateway (clients talk to C, not to B)
 gateway:
