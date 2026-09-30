@@ -111,6 +111,46 @@ The paper's related-work section already cites the canonical pair — **Leviatha
 
 ---
 
+## Cost models & placement policies — LR-4 (Phase 1)
+
+**Session:** LR-4 · **Date:** 2026-09-30 · **Branch:** `feat/three-node-study`
+**Concern:** ground our analytical placement cost model (the RQ3 predictor: per-stage compute times + payload sizes + network terms → best placement per regime; live policy realized within 15% tolerance; leave-one-tier-out MAPE 1.3–2.8%) in the published literature.
+**Method:** for each of three families — (i) distributed-inference / LLM-serving placement, (ii) data/computation placement in edge–cloud systems, (iii) queueing / network models predicting serving latency — pick the 2–3 canonical published systems papers by citation standing; each is run through the 4-stage anti-hallucination protocol and appended to `docs/literature_ledger.md` under the LR-4 section. For each we capture: the **model form** (closed-form / regression / queueing / simulation), the **decision it drives**, its **validation methodology**, and a one-line delta vs our regime-level placement predictor.
+
+### Family (i) — distributed-inference / LLM-serving placement
+
+| Paper | Model form | Decision it drives | Validation | Delta vs our regime-level placement predictor |
+|---|---|---|---|---|
+| **Patel, Choukse, Zhang, et al. — *Splitwise: Efficient Generative LLM Inference Using Phase Splitting* (ISCA 2024)** | Analytical **cost/power model** of the two inference phases (compute-bound prefill vs memory-bound decode) parameterized by GPU FLOPs / HBM bandwidth / power / cost. | **Phase placement**: which hardware pool runs prefill vs decode, and the interconnect bandwidth between them. | Measured on production LLMs (Llama-70B); 1.4× throughput at 20% lower cost, or 2.35× throughput at same cost/power. | Places **LLM phases** (KV-cache handoff) by hardware cost/power; our model places **RAG pipeline stages** (sparse/dense/fusion/hydrate/generation) by **RTT × bandwidth regime** with per-stage compute + payload terms — a different object and a different independent variable. |
+| **Zhong, et al. — *DistServe: Disaggregating Prefill and Decoding for Goodput-optimized LLM Serving* (OSDI 2024)** | **Discrete-event simulation** of phase throughput + a **goodput optimization** (max request rate meeting TTFT/TPOT SLOs) over resource allocation and parallelism. | **Phase placement + parallelism**: co-optimizes allocation/parallelism per phase and places the two phases by cluster bandwidth. | Evaluated on popular LLMs/applications under TTFT/TPOT SLOs; 7.4× capacity. | Optimizes **throughput/goodput** (a rate objective) for LLM phases; our model predicts **per-request TTFT** (a latency objective) for RAG stages and selects placement per **network regime**, not per SLO budget. |
+| **Li, Zheng, Zhong, et al. — *AlpaServe: Statistical Multiplexing with Model Parallelism for Deep Learning Serving* (OSDI 2023)** | **Analytical per-model latency/overhead model** + an optimization that places and parallelizes a *set* of DNNs across a cluster to exploit statistical multiplexing. | **Placement + parallelism** of a model portfolio across a cluster. | Production workloads; up to 10× higher rate or 6× more burstiness within latency constraints. | Places a **portfolio of models** for statistical multiplexing; our model places the **stages of a single RAG pipeline** across a fixed 3-node topology as a function of the link regime. |
+
+### Family (ii) — data/computation placement in edge–cloud systems
+
+| Paper | Model form | Decision it drives | Validation | Delta vs our regime-level placement predictor |
+|---|---|---|---|---|
+| **Kang, Hauswald, Gao, et al. — *Neurosurgeon: Collaborative Intelligence Between the Cloud and Mobile Edge* (ASPLOS 2017)** | **Regression / prediction models** of per-layer latency and intermediate data size (fit from a small set of measurements) to estimate end-to-end latency for each candidate split point. | **Partition-point selection**: which layer to split a DNN at between device and cloud, chosen for best latency or energy. | Measured on real mobile devices + cloud; the prediction models track measured latency closely. | The **closest** to our approach — a predictive per-stage cost model driving a split decision. Delta: it partitions a **monolithic DNN at a layer boundary** between device and cloud; our model places **discrete RAG pipeline stages** (sparse/dense/fusion/hydrate/generation) across a **3-node** topology and treats **RTT × bandwidth** as the independent variable. |
+| **Banitalebi-Dehkordi, Vedula, Pei, et al. — *Auto-Split: A General Framework of Collaborative Edge-Cloud AI* (KDD 2021)** | **Optimization** over the split point coupled with post-training quantization, minimizing end-to-end latency subject to accuracy constraints. | **Edge/cloud DNN partitioning** (split point + quantization). | ResNet-50 / MobileNet / YOLOv3; 20–80% latency reduction, >40% edge-model-size reduction. | Couples placement with **quantization** (a model-transformation variable); our model keeps the model fixed and varies only **stage placement** across the link regime. |
+
+### Family (iii) — queueing / network models predicting serving latency
+
+| Paper | Model form | Decision it drives | Validation | Delta vs our regime-level placement predictor |
+|---|---|---|---|---|
+| **Cao, Andersson, Nyberg, Kihl — *Web Server Performance Modeling Using an M/G/1/K\*PS Queue* (Lund, IEEE/ACM)** | **Closed-form M/G/1/K\*PS queueing model** predicting response time, throughput, and blocking probability of a web server. | **Capacity planning / overload control** (how many concurrent requests the server can serve before blocking). | Validated against measured web-server performance in a test lab. | A **queueing** model of a single server under load (concurrency-driven); our model is a **per-stage additive latency** model (compute + payload + network terms) for a **single request** across a **multi-node** pipeline — no queueing/concurrency dimension. |
+| **Gujarati, Karimi, et al. — *Serving DNNs like Clockwork: Performance Predictability from the Bottom Up* (OSDI 2020)** | **Analytical bottom-up performance model** of DNN-serving latency (compute + memory + interconnect) to make serving latency predictable. | **Capacity / placement** decisions for DNN serving. | Validated against measured serving systems (bottom-up predictability). | Predicts **DNN-serving** latency from hardware primitives; our model predicts **RAG-pipeline** TTFT from per-stage compute + payload + network terms and uses it to **select placement per regime**. |
+
+### Verdict — is an analytical per-stage cost model with live placement selection established practice, novel in RAG, or novel outright?
+
+**Established practice in the general systems literature, novel in RAG, and novel outright for the specific combination we make.**
+
+- **Established practice (the pattern):** an analytical / predictive per-stage cost model that drives a **placement decision** is a well-established pattern in both non-LLM families. Family (ii) is the direct ancestor — **Neurosurgeon** (ASPLOS 2017) and **Auto-Split** (KDD 2021) both fit per-stage latency/size models and use them to pick a split point between edge and cloud; **Auto-Split** and **Neurosurgeon** are the two canonical references for "predict per-stage cost → choose placement." Family (i) does the same for LLM phases (**Splitwise**, **DistServe**, **AlpaServe**), and family (iii) supplies the queueing / closed-form latency-prediction substrate. So the *method* (per-stage cost model → placement policy) is **not novel outright**.
+- **Novel in RAG:** no prior work applies this pattern to **hybrid-RAG pipeline stages** (sparse / dense / fusion / hydrate / generation). The LLM-serving line places **LLM phases** (KV-cache handoff), and the edge–cloud line places **DNN layers** — neither places the **retrieval stages of a RAG pipeline**.
+- **Novel outright (the specific combination):** our model is the first to (a) treat **RTT × bandwidth** as the independent variable for a **regime-level** placement decision (a phase map, not a single split point), (b) place **discrete RAG pipeline stages** (not a monolithic DNN or LLM phases) across a **3-node** topology, and (c) drive a **live** placement policy validated against a measured campaign (15% tolerance; leave-one-tier-out MAPE 1.3–2.8%). The closest single work is **Neurosurgeon** (predictive per-stage cost → split point), but it partitions a monolithic DNN at a layer boundary between device and cloud, not RAG stages across a 3-node regime map.
+
+**Closest works, named:** `kang2017neurosurgeon` (ASPLOS 2017) — predictive per-stage cost → split point (closest overall); `zhong2024distserve` (OSDI 2024) — phase placement by cluster bandwidth (closest for the bandwidth-aware placement axis); `li2023alpaserve` (OSDI 2023) — analytical placement optimization (closest for the analytical-optimization axis).
+
+---
+
 ## Bottom line
 
 - **RQ-1:** four families exist (federated RAG, single-host RAG characterization, LLM phase disaggregation, DNN partitioning); **none places hybrid-RAG pipeline stages by network regime.**
