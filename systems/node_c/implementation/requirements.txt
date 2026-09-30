@@ -21,5 +21,14 @@ pyyaml==6.0.1
 grpcio==1.84.0
 grpcio-tools==1.84.0
 
+# Runtime protobuf for the committed pb2 modules.
+# generated/hybrid_coordination_pb2.py was produced with protoc 7.35.1 and
+# calls _runtime_version.ValidateProtobufRuntimeVersion(PUBLIC, 7, 35, 1, ...),
+# which requires the runtime to be >= 7.35.1 within the same major (7.x).
+# The C venv ran 7.36.2 and passed the gate, so >=7.35.1,<8 admits both the
+# generating version and any 7.x runtime that satisfies the gencode check.
+# (grpcio does not pin protobuf, so this must be declared explicitly.)
+protobuf>=7.35.1,<8
+
 # Testing
 pytest>=8.0
