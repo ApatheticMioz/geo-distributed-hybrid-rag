@@ -181,9 +181,14 @@ improves language modeling at scale. A recent survey
 \cite{gao2024ragsurvey} organizes the field into naive, advanced, and
 modular RAG, and active-retrieval variants such as FLARE
 \cite{jiang2023flare} and the declarative compiler DSPy \cite{khattab2023dspy}
-adapt retrieval to the query. All of this work assumes a single, well-provisioned
-host; none addresses the placement of the retrieval and generation stages
-across a geo-distributed, heterogeneous fleet.
+adapt retrieval to the query. The closest systems-level study,
+Shen \emph{et al.}~\cite{shen2024ragtradeoffs}, characterizes the latency,
+throughput, and memory trade-offs of a RAG stack (encode $\rightarrow$ retrieve
+$\rightarrow$ prefill $\rightarrow$ decode) and measures retrieval quality
+jointly with systems metrics---but on a \emph{single host}, with no network leg
+and no placement variable. All of this work assumes a single, well-provisioned host; none
+addresses the placement of the retrieval and generation stages across a
+geo-distributed, heterogeneous fleet.
 
 \subsection{Hybrid Retrieval and Fusion}
 Hybrid search combines a lexical (sparse) and a semantic (dense) signal. BM25
@@ -208,6 +213,33 @@ context before the dense leg has finished, then reconcile. This is a form of
 pipeline-level speculation that exploits the measured structure of the
 retrieval legs (\S\ref{sec:characterization}).
 
+Two RAG-specific speculative systems are the closest neighbors, and both
+differ from SPHP on a distinct axis. \emph{Speculative RAG}
+\cite{speculativerag2025} decomposes RAG into drafting and verification: a
+small specialist LM drafts candidate answers from document subsets while a
+large generalist LM verifies and selects the best draft---a \emph{model-level}
+draft/verify over generated answers, not a prefill on a provisional retrieval
+hint, and it reconciles by selecting the best draft rather than by a
+set-overlap test against the final fused result. \emph{Omnia}
+\cite{omnia2025} speculatively prefills the top reranked chunk while later
+reranking groups append sub-prefills---the closest to ``prefill before the
+full context is ready''---but it speculates on a \emph{reranked chunk} and has
+no reconciliation step. SPHP is distinct from both: it speculates on a
+\emph{provisional sparse hint} (the BM25 leg's top-$k$) and \emph{reconciles}
+the speculative prefill against the \emph{fused} (sparse+dense) context on
+arrival via a set-overlap hit test (\S\ref{sec:sphp}).
+
+The predict$\rightarrow$act$\rightarrow$reconcile pattern itself is long
+established in the systems literature, but never over provisional retrieval
+results. Informed prefetching \cite{patterson1995informed} and predictive web
+prefetching \cite{padmanabhan1996prefetch} predict which \emph{data objects}
+to fetch and simply evict/drop on a miss (no commit/abort/replay). Client
+speculation over replicated services \cite{wester2009clientspec} and
+OS-level application-specific speculation \cite{wester2011ospec} predict a
+\emph{remote result} and reconcile by value-equality or checkpoint/rollback.
+None speculates on a provisional \emph{retrieval result} to prefill a
+generator, and none reconciles by set-overlap against a final fused result.
+
 \subsection{Edge--Cloud and Geo-Distributed Systems}
 Hybrid cloud--edge inference partitions a network between a device and a
 server \cite{kang2017neurosurgeon,teerapittayanon2017ddnn,banitalebi2021autosplit}, and
@@ -217,8 +249,34 @@ as WireGuard \cite{donenfeld2017wireguard} and kernel traffic control
 (\texttt{tc}/\texttt{netem}) \cite{netem2024} provide the transport
 and the controlled-WAN substrate we use. Energy and policy considerations for
 distributed deep learning \cite{strubell2019energy} motivate placing expensive
-stages where hardware and power are cheapest. Our work is the first to bring
-this placement lens to the RAG pipeline itself.
+stages where hardware and power are cheapest.
+
+Driving a placement decision from an analytical per-stage cost model is
+established practice in two adjacent settings, and our cost model
+(\S\ref{sec:costmodel}) follows the same pattern while changing the object
+and the independent variable. In edge--cloud systems, Neurosurgeon
+\cite{kang2017neurosurgeon} fits predictive models of per-layer latency and
+intermediate data size to choose a DNN split point between device and cloud,
+and Auto-Split \cite{banitalebi2021autosplit} optimizes the split point
+coupled with quantization to minimize end-to-end latency. In LLM serving,
+Splitwise \cite{patel2024splitwise} uses an analytical cost/power model of the
+two inference phases to place prefill and decode on different hardware,
+DistServe \cite{zhong2024distserve} co-optimizes per-phase resource allocation
+and parallelism and places the two phases by cluster bandwidth, AlpaServe
+\cite{li2023alpaserve} uses an analytical per-model latency/overhead model to
+place and parallelize a portfolio of models, and Janus \cite{janus2025}
+produces a placement decision as a function of link bandwidth and RTT for
+edge-adjacent prefill/decode disaggregation. These are complemented by
+queueing and bottom-up latency models that predict serving latency---the
+M/G/1/K*PS web-server queue \cite{cao2000mg1kps} and the bottom-up DNN-serving
+model of Clockwork \cite{gujarati2020clockwork}. All of these place
+\emph{DNN layers} or \emph{LLM phases} (with a KV-cache handoff) and treat
+hardware cost/power or cluster bandwidth as the placement variable. Our delta
+is threefold: we place \emph{discrete RAG pipeline stages} (sparse/dense/
+fusion/hydrate/generation), we use \emph{RTT $\times$ bandwidth} as the
+independent variable to produce a regime-level placement phase map, and we
+drive a \emph{live} placement policy validated against a measured campaign.
+Our work is the first to bring this placement lens to the RAG pipeline itself.
 
 % ===========================================================================
 %  III. SYSTEM ARCHITECTURE & DEPLOYMENT
