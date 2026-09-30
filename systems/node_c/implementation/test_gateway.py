@@ -534,6 +534,52 @@ def test_dense_forward_timeout_is_config_driven():
         t.join(timeout=5)
 
 
+def test_create_app_node_b_target_is_http_url(tmp_path):
+    """
+    Discriminative test for the LIVE construction path: create_app() must
+    publish _NODE_B_TARGET as a scheme-bearing http:// URL, because
+    dense_forward() (the in-pipeline default, no explicit target) hands it
+    straight to httpx.Client.post(). A bare host:port string makes httpx
+    raise UnsupportedProtocol (an HTTPError subclass), which the graceful
+    degrade swallows into ([], 0.0) — the exact failure mode that silently
+    killed the dense leg in the live gateway while direct C->B probes
+    (which pass an explicit http:// target) kept succeeding.
+
+    No existing test covers this: the mock-transport tests pass an explicit
+    target, and the timeout-bracket test also passes an explicit
+    http://127.0.0.1 target, so the module-level value built by create_app
+    was never exercised. Here we bind a real local socket server FIRST,
+    build the app from a config whose node_b points at that server's port,
+    and call dense_forward WITHOUT any explicit target — the exact
+    in-pipeline call shape. Pre-fix, the published scheme-less URL makes
+    httpx raise UnsupportedProtocol and the degrade returns ([], 0.0).
+    """
+    saved = _gw._NODE_B_TARGET
+    srv, port, t = _slow_b_server(0.2)
+    try:
+        # Live construction path: create_app publishes the module-level target
+        # pointing at the real local server.
+        cfg = _make_config(tmp_path, tmp_path / "no_such_index")
+        cfg["node_b"] = {"host": "127.0.0.1", "port": port}
+        create_app(cfg)
+        # The published target must be a scheme-bearing URL, not bare host:port.
+        assert _gw._NODE_B_TARGET.startswith("http://"), (
+            f"create_app published a scheme-less target: {_gw._NODE_B_TARGET!r}"
+        )
+
+        # Behavioral proof: dense_forward with NO explicit target (the
+        # in-pipeline call shape) must reach the real server and return
+        # real doc ids — not degrade to ([], 0.0).
+        _gw._DENSE_TIMEOUT_S = 3.0
+        ids, ms = dense_forward("q", 5, "q1")
+        assert ids == ["d1", "d2", "d3"]
+        assert ms == 200.0
+    finally:
+        srv.close()
+        t.join(timeout=5)
+        _gw._NODE_B_TARGET = saved
+
+
 class _FakeOrchestrator(hybrid_coordination_pb2_grpc.GenerationOrchestratorServicer):
     """In-process fake of Node A's GenerationOrchestrator that records requests."""
 
