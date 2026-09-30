@@ -1,177 +1,203 @@
 #!/usr/bin/env bash
 # =============================================================================
-# preflight.sh — Node C connectivity probe for the 3-node remote WAN campaign.
+# preflight.sh — Node C (10.8.0.3) self-readiness probe for the 3-node
+# geo-distributed hybrid-RAG campaign.
 #
-# Probes, from Node C (10.8.0.3):
-#   * ping  + MTU discovery to Node A (10.8.0.1) and Node B (10.8.0.2)
-#   * TCP port probes for gRPC :50052 (Node A) and HTTP :8000 (Node B)
+# Node C is a Windows host whose gateway runs under a Windows scheduled task
+# (`pdc_gateway_c` -> start_gateway_c.bat -> the Windows venv). This probe is
+# a bash script that runs in the C host's WSL distro but delegates every
+# Python check to the *Windows* venv (via WSL<->Windows interop) so that the
+# network probes use the Windows/WireGuard network stack (WSL2 is NAT and
+# cannot reach the 10.8.0.0/24 mesh directly).
+#
+# Checks and their severity:
+#   PASS-gated (a failure here => overall FAIL):
+#     * venv_imports   — the Windows venv imports tantivy/fastapi/uvicorn/
+#                        httpx/yaml/grpc (grpcio) cleanly
+#     * config_loads   — systems/node_c/config.yaml loads via load_config()
+#     * index_num_docs — the Tantivy index opens and reports exactly
+#                        8,841,823 documents
+#     * wg_addr        — the WireGuard adapter carries 10.8.0.3
+#     * telemetry      — systems/node_c/data/telemetry is writable
+#   WARN (informational; a failure here does NOT block PASS):
+#     * b_health       — Node B 10.8.0.2:8000 /health returns ok
+#     * a_grpc_tcp     — Node A 10.8.0.1:50052 (gRPC) is TCP-reachable
 #
 # Usage:
-#   preflight.sh                 # real network probe; exit 0 only if all pass
-#   preflight.sh --dry-run       # mock mode: no network, always exit 0
-#   preflight.sh --mock          # alias for --dry-run
+#   preflight.sh                 # real probe; exit 0 iff no FAIL
+#   preflight.sh --dry-run       # mock mode: no network/python, always PASS
 #
-# The script is intentionally dependency-light: it uses ping, and a
-# /dev/tcp-based port probe (bash builtin) so it runs on a stock laptop.
+# The final line is exactly `PREFLIGHT: PASS` iff there is no FAIL (WARNs are
+# tolerated); otherwise it is `PREFLIGHT: FAIL`.
 # =============================================================================
 set -uo pipefail
 
-# --- defaults ----------------------------------------------------------------
-NODE_A="10.8.0.1"
-NODE_B="10.8.0.2"
-PORT_A=50052          # Node A gRPC GenerationOrchestrator
-PORT_B=8000           # Node B HTTP FastAPI gateway
-PING_COUNT=3
-MTU_MAX=1500
-MTU_MIN=576
-DRY_RUN=0
+# --- locate the repo root (this file lives at scripts/node_c_prep/) --------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+IMPL_DIR="$REPO_ROOT/systems/node_c/implementation"
+TELEMETRY_DIR="$REPO_ROOT/systems/node_c/data/telemetry"
+# The Windows venv, seen from WSL through the /mnt/<drive> interop mount.
+VENV="$REPO_ROOT/systems/node_c/.venv/Scripts/python.exe"
 
-# --- argument parsing ---------------------------------------------------------
+NODE_A="10.8.0.1"
+PORT_A=50052
+NODE_B="10.8.0.2"
+PORT_B=8000
+EXPECTED_DOCS=8841823
+WG_ADDR="10.8.0.3"
+
+DRY_RUN=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run|--mock) DRY_RUN=1 ;;
-    --node-a) : ;;        # reserved for future overrides
-    -h|--help)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
-      exit 0
-      ;;
+    -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
 
-# --- helpers ------------------------------------------------------------------
-PASS=0
-FAIL=0
+# --- result bookkeeping -----------------------------------------------------
+# Each check emits a machine-readable line:  RESULT|<STATUS>|<name>|<detail>
+# STATUS is one of PASS / WARN / FAIL.
+RESULTS_FILE="$(mktemp)"
+trap 'rm -f "$RESULTS_FILE"' EXIT
 
-ok()   { printf '  [PASS] %s\n' "$1"; PASS=$((PASS+1)); }
-bad()  { printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL+1)); }
-info() { printf '  [info] %s\n' "$1"; }
-
-# ping_probe HOST -> prints "ok" / "fail"; records RTT in global LAST_RTT
-ping_probe() {
-  local host="$1"
-  if ping -c "$PING_COUNT" -W 2 "$host" >/dev/null 2>&1; then
-    # Extract a representative RTT (average line) if available.
-    local rtt
-    rtt=$(ping -c "$PING_COUNT" -W 2 "$host" 2>/dev/null \
-          | grep -oE 'rtt=([0-9.]+)' | head -1 | grep -oE '[0-9.]+')
-    LAST_RTT="${rtt:-?}"
-    echo "ok"
-  else
-    LAST_RTT="n/a"
-    echo "fail"
-  fi
+emit() { # emit STATUS NAME DETAIL
+  printf 'RESULT|%s|%s|%s\n' "$1" "$2" "$3" >> "$RESULTS_FILE"
 }
 
-# mtu_probe HOST -> prints the largest non-fragmented payload (or "n/a").
-# Uses ping -M do (do-not-fragment) with a binary search between MTU_MIN and
-# MTU_MAX. Falls back gracefully if the platform lacks -M.
-mtu_probe() {
-  local host="$1"
-  local lo=$MTU_MIN hi=$MTU_MAX best=$MTU_MIN
-  # Probe the max first; if it passes we are done.
-  if ping -M do -s "$((hi-28))" -c 1 -W 2 "$host" >/dev/null 2>&1; then
-    echo "$hi"; return
-  fi
-  # Binary search for the largest payload that does not fragment.
-  while [ "$lo" -lt "$hi" ]; do
-    local mid=$(( (lo + hi + 1) / 2 ))
-    if ping -M do -s "$((mid-28))" -c 1 -W 2 "$host" >/dev/null 2>&1; then
-      lo=$mid; best=$mid
-    else
-      hi=$((mid-1))
-    fi
-  done
-  echo "$best"
-}
-
-# port_probe HOST PORT -> "ok" / "fail" using bash /dev/tcp (no nc required).
-port_probe() {
-  local host="$1" port="$2"
-  if (exec 3<>"/dev/tcp/${host}/${port}") 2>/dev/null; then
-    exec 3>&- 3<&- 2>/dev/null || true
-    echo "ok"
+# --- human summary + final verdict ------------------------------------------
+_print_summary() {
+  echo
+  echo "-------------------------------------------------------------------"
+  local fail=0 warn=0 pass=0
+  while IFS='|' read -r _ st nm dt; do
+    case "$st" in
+      PASS) pass=$((pass+1)); printf '  [PASS] %-16s %s\n' "$nm" "$dt" ;;
+      WARN) warn=$((warn+1)); printf '  [WARN] %-16s %s\n' "$nm" "$dt" ;;
+      FAIL) fail=$((fail+1)); printf '  [FAIL] %-16s %s\n' "$nm" "$dt" ;;
+    esac
+  done < "$RESULTS_FILE"
+  echo "-------------------------------------------------------------------"
+  echo "PREFLIGHT: $((pass+warn+fail)) checks — $pass passed, $warn warned, $fail failed"
+  if [ "$fail" -eq 0 ]; then
+    echo "PREFLIGHT: PASS"
+    return 0
   else
-    echo "fail"
+    echo "PREFLIGHT: FAIL — fix the items above and re-run."
+    return 1
   fi
 }
 
 # =============================================================================
-#  DRY-RUN / MOCK MODE — no network, deterministic, always exit 0.
+#  DRY-RUN / MOCK MODE — no network, no python, deterministic PASS.
 # =============================================================================
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "==================================================================="
-  echo "PREFLIGHT (DRY-RUN / MOCK) — no network calls are made"
+  echo "PREFLIGHT (DRY-RUN / MOCK) — no network or python calls are made"
   echo "==================================================================="
-  echo "Node A: $NODE_A (gRPC :$PORT_A)"
-  echo "Node B: $NODE_B (HTTP :$PORT_B)"
-  echo
-  echo "  [PASS] ping  $NODE_A  (mock RTT=1.0 ms)"
-  echo "  [PASS] ping  $NODE_B  (mock RTT=1.0 ms)"
-  echo "  [PASS] mtu   $NODE_A  (mock 1500)"
-  echo "  [PASS] mtu   $NODE_B  (mock 1500)"
-  echo "  [PASS] port  $NODE_A:$PORT_A  (mock open)"
-  echo "  [PASS] port  $NODE_B:$PORT_B  (mock open)"
-  echo
-  echo "PREFLIGHT: PASS (dry-run) — 6/6 checks simulated OK"
+  for line in \
+    "PASS|venv_imports|mock" \
+    "PASS|config_loads|mock" \
+    "PASS|index_num_docs|mock $EXPECTED_DOCS" \
+    "PASS|wg_addr|mock $WG_ADDR" \
+    "PASS|telemetry|mock" \
+    "WARN|b_health|mock" \
+    "WARN|a_grpc_tcp|mock"; do
+    IFS='|' read -r st nm dt <<< "$line"
+    emit "$st" "$nm" "$dt"
+  done
+  _print_summary
   exit 0
 fi
 
 # =============================================================================
-#  REAL NETWORK PROBE
+#  REAL PROBE
 # =============================================================================
 echo "==================================================================="
-echo "PREFLIGHT — Node C connectivity probe"
-echo "  Node A: $NODE_A (gRPC :$PORT_A)"
-echo "  Node B: $NODE_B (HTTP :$PORT_B)"
+echo "PREFLIGHT — Node C self-readiness probe"
+echo "  repo : $REPO_ROOT"
+echo "  venv : $VENV"
+echo "  Node A: $NODE_A (gRPC :$PORT_A)   Node B: $NODE_B (HTTP :$PORT_B)"
 echo "==================================================================="
 
-# --- ping + MTU to Node A -----------------------------------------------------
-echo
-echo "[Node A: $NODE_A]"
-if [ "$(ping_probe "$NODE_A")" = "ok" ]; then
-  ok "ping $NODE_A (RTT=${LAST_RTT} ms)"
-  m=$(mtu_probe "$NODE_A")
-  ok "MTU $NODE_A = $m"
+# --- Python-side checks (run under the Windows venv via WSL interop) --------
+if [ ! -x "$VENV" ]; then
+  emit FAIL venv_imports "venv python not found at $VENV"
+  emit FAIL config_loads "skipped (no venv)"
+  emit FAIL index_num_docs "skipped (no venv)"
+  emit WARN b_health "skipped (no venv)"
+  emit WARN a_grpc_tcp "skipped (no venv)"
 else
-  bad "ping $NODE_A unreachable"
-  bad "MTU $NODE_A skipped (no connectivity)"
+  # One Windows-python invocation performs all Python + network checks so the
+  # sockets use the Windows/WireGuard stack. Each check is isolated in a
+  # try/except so a single failure cannot abort the rest. Its RESULT lines are
+  # teed into the results file for the summary below.
+  "$VENV" - "$IMPL_DIR" "$NODE_A" "$PORT_A" "$NODE_B" "$PORT_B" "$EXPECTED_DOCS" <<'PY' 2>/dev/null | grep '^RESULT|' >> "$RESULTS_FILE"
+import sys, socket
+impl_dir, node_a, port_a, node_b, port_b, expected_docs = sys.argv[1:7]
+sys.path.insert(0, impl_dir)
+def emit(status, name, detail):
+    print(f"RESULT|{status}|{name}|{detail}")
+try:
+    import tantivy, fastapi, uvicorn, httpx, yaml, grpc
+    emit("PASS", "venv_imports", f"tantivy/fastapi/uvicorn/httpx/yaml/grpc({grpc.__version__})")
+except Exception as e:
+    emit("FAIL", "venv_imports", f"{type(e).__name__}: {e}")
+cfg = None
+try:
+    from src.gateway import load_config, DEFAULT_CONFIG_PATH
+    cfg = load_config(DEFAULT_CONFIG_PATH)
+    emit("PASS", "config_loads", f"role={cfg['role']} wg={cfg['wireguard_ip']} gw={cfg['gateway']['host']}:{cfg['gateway']['port']}")
+except Exception as e:
+    emit("FAIL", "config_loads", f"{type(e).__name__}: {e}")
+try:
+    import tantivy
+    idx = tantivy.Index.open(cfg["corpus"]["tantivy_index_path"])
+    n = idx.searcher().num_docs
+    if n == int(expected_docs):
+        emit("PASS", "index_num_docs", f"{n:,} (expected {int(expected_docs):,})")
+    else:
+        emit("FAIL", "index_num_docs", f"{n:,} != expected {int(expected_docs):,}")
+except Exception as e:
+    emit("FAIL", "index_num_docs", f"{type(e).__name__}: {e}")
+try:
+    import httpx
+    r = httpx.get(f"http://{node_b}:{port_b}/health", timeout=5)
+    if r.status_code == 200 and '"ok"' in r.text:
+        emit("WARN", "b_health", f"HTTP {r.status_code} {r.text.strip()}")
+    else:
+        emit("WARN", "b_health", f"HTTP {r.status_code} {r.text.strip()[:80]}")
+except Exception as e:
+    emit("WARN", "b_health", f"unreachable ({type(e).__name__})")
+try:
+    s = socket.create_connection((node_a, int(port_a)), timeout=5)
+    s.close()
+    emit("WARN", "a_grpc_tcp", f"{node_a}:{port_a} open")
+except Exception as e:
+    emit("WARN", "a_grpc_tcp", f"{node_a}:{port_a} closed ({type(e).__name__})")
+PY
 fi
 
-# --- ping + MTU to Node B -----------------------------------------------------
-echo
-echo "[Node B: $NODE_B]"
-if [ "$(ping_probe "$NODE_B")" = "ok" ]; then
-  ok "ping $NODE_B (RTT=${LAST_RTT} ms)"
-  m=$(mtu_probe "$NODE_B")
-  ok "MTU $NODE_B = $m"
+# --- WireGuard address (Windows-side adapter, via cmd ipconfig) -------------
+if cmd.exe /c ipconfig 2>/dev/null | grep -q "$WG_ADDR"; then
+  emit PASS wg_addr "$WG_ADDR present on WireGuard adapter"
 else
-  bad "ping $NODE_B unreachable"
-  bad "MTU $NODE_B skipped (no connectivity)"
+  emit FAIL wg_addr "$WG_ADDR not found in ipconfig"
 fi
 
-# --- port probes --------------------------------------------------------------
-echo
-echo "[Service ports]"
-if [ "$(port_probe "$NODE_A" "$PORT_A")" = "ok" ]; then
-  ok "gRPC  $NODE_A:$PORT_A open"
+# --- telemetry dir writable --------------------------------------------------
+if [ -d "$TELEMETRY_DIR" ] && [ -w "$TELEMETRY_DIR" ]; then
+  emit PASS telemetry "writable: $TELEMETRY_DIR"
 else
-  bad "gRPC  $NODE_A:$PORT_A closed/unreachable"
-fi
-if [ "$(port_probe "$NODE_B" "$PORT_B")" = "ok" ]; then
-  ok "HTTP  $NODE_B:$PORT_B open"
-else
-  bad "HTTP  $NODE_B:$PORT_B closed/unreachable"
+  # Attempt to create it (best-effort) and re-test.
+  if mkdir -p "$TELEMETRY_DIR" 2>/dev/null && [ -w "$TELEMETRY_DIR" ]; then
+    emit PASS telemetry "created+writable: $TELEMETRY_DIR"
+  else
+    emit FAIL telemetry "not writable: $TELEMETRY_DIR"
+  fi
 fi
 
-# --- summary ------------------------------------------------------------------
-echo
-echo "-------------------------------------------------------------------"
-echo "PREFLIGHT: $((PASS+FAIL)) checks — $PASS passed, $FAIL failed"
-if [ "$FAIL" -eq 0 ]; then
-  echo "PREFLIGHT: PASS"
-  exit 0
-else
-  echo "PREFLIGHT: FAIL — fix the items above and re-run."
-  exit 1
-fi
+# --- summary + verdict -------------------------------------------------------
+_print_summary
+exit $?
