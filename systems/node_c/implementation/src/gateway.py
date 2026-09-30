@@ -225,6 +225,12 @@ def sparse_retrieve(index: "tantivy.Index", query: str, top_k: int, query_id: st
 _NODE_B_TARGET: str | None = None
 _NODE_A_TARGET: str | None = None
 
+# Dense-leg HTTP timeout (seconds) for the C -> B /query/benchmark forward,
+# populated by create_app() from config['retrieval']['dense_timeout_ms'].
+# None means "use httpx defaults" (the pre-fix behavior). See config.yaml
+# for the derivation of the configured value.
+_DENSE_TIMEOUT_S: float | None = None
+
 
 def dense_forward(
     query: str,
@@ -264,9 +270,12 @@ def dense_forward(
     }
     owns_client = client is None
     if client is None:
-        # httpx default timeouts (connect/read/write/pool) — no explicit
-        # timeout is configured in config.yaml, so we rely on the defaults.
-        client = httpx.Client()
+        # Config-driven timeout (seconds) from retrieval.dense_timeout_ms.
+        # None preserves the pre-fix httpx defaults.
+        if _DENSE_TIMEOUT_S is not None:
+            client = httpx.Client(timeout=httpx.Timeout(_DENSE_TIMEOUT_S))
+        else:
+            client = httpx.Client()
     try:
         resp = client.post(f"{target}/query/benchmark", json=body)
         resp.raise_for_status()
@@ -668,9 +677,13 @@ def create_app(config: dict) -> FastAPI:
     # Publish the mesh targets to the module-level handles so the leg
     # functions (dense_forward / sphp_hint_dispatch) can resolve their
     # upstream address without the route bodies threading it through.
-    global _NODE_B_TARGET, _NODE_A_TARGET
+    global _NODE_B_TARGET, _NODE_A_TARGET, _DENSE_TIMEOUT_S
     _NODE_B_TARGET = f"{config['node_b']['host']}:{config['node_b']['port']}"
     _NODE_A_TARGET = f"{config['node_a']['host']}:{config['node_a']['grpc_port']}"
+    # Dense-leg HTTP timeout (seconds) from retrieval.dense_timeout_ms.
+    # Optional: a config without the key keeps the pre-fix httpx defaults.
+    _dense_ms = config.get("retrieval", {}).get("dense_timeout_ms")
+    _DENSE_TIMEOUT_S = (float(_dense_ms) / 1000.0) if _dense_ms is not None else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
