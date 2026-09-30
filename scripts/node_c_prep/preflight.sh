@@ -40,6 +40,21 @@ TELEMETRY_DIR="$REPO_ROOT/systems/node_c/data/telemetry"
 # The Windows venv, seen from WSL through the /mnt/<drive> interop mount.
 VENV="$REPO_ROOT/systems/node_c/.venv/Scripts/python.exe"
 
+# The Windows python.exe cannot resolve WSL-style /mnt/<drive>/... paths (they
+# only exist inside the WSL filesystem). When a path is handed to the Windows
+# interpreter as an *argument* (sys.path entry, config/index location) it must
+# be a native Windows path (C:/...). Executing the .exe itself via the /mnt/c
+# path is fine (WSL interop), but the strings it receives are not.
+to_win_path() {
+  local p="$1"
+  if [[ "$p" =~ ^/mnt/([a-zA-Z])/(.*)$ ]]; then
+    printf '%s:/%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  else
+    printf '%s' "$p"
+  fi
+}
+IMPL_DIR_WIN="$(to_win_path "$IMPL_DIR")"
+
 NODE_A="10.8.0.1"
 PORT_A=50052
 NODE_B="10.8.0.2"
@@ -133,7 +148,7 @@ else
   # sockets use the Windows/WireGuard stack. Each check is isolated in a
   # try/except so a single failure cannot abort the rest. Its RESULT lines are
   # teed into the results file for the summary below.
-  "$VENV" - "$IMPL_DIR" "$NODE_A" "$PORT_A" "$NODE_B" "$PORT_B" "$EXPECTED_DOCS" <<'PY' 2>/dev/null | grep '^RESULT|' >> "$RESULTS_FILE"
+  "$VENV" - "$IMPL_DIR_WIN" "$NODE_A" "$PORT_A" "$NODE_B" "$PORT_B" "$EXPECTED_DOCS" <<'PY' 2>/dev/null | grep '^RESULT|' >> "$RESULTS_FILE"
 import sys, socket
 impl_dir, node_a, port_a, node_b, port_b, expected_docs = sys.argv[1:7]
 sys.path.insert(0, impl_dir)
