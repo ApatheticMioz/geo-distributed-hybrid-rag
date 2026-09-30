@@ -1,7 +1,9 @@
 # Node C — sparse retrieval + user-facing gateway (3-node topology)
 #
 # Lightweight subset of Node B's requirements: no torch/FlagEmbedding/
-# Qdrant (dense leg stays on Node B), no gRPC (Node A is reached
+# Qdrant (dense leg stays on Node B). The SPHP sparse-hint leg (NC-3)
+# speaks Node A's GenerationOrchestrator gRPC contract directly, so
+# grpcio is required here (Node A is reached directly on :50052, not
 # transitively via Node B's P2 path).
 
 # Disk-backed BM25 via Tantivy (Rust)
@@ -12,6 +14,12 @@ fastapi==0.111.0
 uvicorn[standard]==0.29.0
 httpx>=0.27.0
 pyyaml==6.0.1
+
+# gRPC client for the SPHP hint leg (Node A GenerationOrchestrator).
+# Pinned to the version that generated the committed pb2 files
+# (generated/ was produced with grpcio-tools 1.84.0).
+grpcio==1.84.0
+grpcio-tools==1.84.0
 
 # Testing
 pytest>=8.0
