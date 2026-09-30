@@ -130,6 +130,10 @@ Z.~Jiang \emph{et~al.}, ``Active retrieval augmented generation,'' in
 O.~Khattab \emph{et~al.}, ``{DSPy}: Compiling declarative language model calls
   into self-improving pipelines,'' 2023.
 
+\bibitem{shen2024ragtradeoffs}
+Y.~Shen, M.~Umar, S.~Maeng, J.~Suh, and I.~Gupta, ``Towards understanding
+  systems trade-offs in {RAG} model inference,'' 2024.
+
 \bibitem{khattab2020colbert}
 O.~Khattab and M.~Zaharia, ``{ColBERT}: Efficient and effective passage search
   via contextualized late interaction over {BERT},'' in \emph{Proceedings of
@@ -146,6 +150,39 @@ C.~Chen, S.~Borgeaud, G.~Irving, J.-B. Lespiau, L.~Sifre, and J.-J. Cappe,
   ``Accelerating large language model decoding with speculative sampling,''
   2023.
 
+\bibitem{speculativerag2025}
+Y.~Wang \emph{et~al.}, ``Speculative {RAG}: Enhancing retrieval-augmented
+  generation through drafting,'' in \emph{International Conference on Learning
+  Representations (ICLR)}, 2025.
+
+\bibitem{omnia2025}
+Omnia \emph{et~al.}, ``Efficient {RAG} serving through speculative
+  scheduling,'' in \emph{Proceedings of the {ACM} International Conference for
+  High Performance Computing, Networking, Storage and Analysis (HPDC)}, 2025,
+  dOI 10.1145/3806645.3807814.
+
+\bibitem{patterson1995informed}
+R.~H. Patterson, G.~A. Gibson, E.~Ginting, D.~Stodolsky, and J.~Zelenka,
+  ``Informed prefetching and caching,'' in \emph{Proceedings of the 15th {ACM}
+  Symposium on Operating Systems Principles (SOSP)}, 1995, pp. 79--95.
+
+\bibitem{padmanabhan1996prefetch}
+V.~N. Padmanabhan and J.~C. Mogul, ``Using predictive prefetching to improve
+  world wide web latency,'' in \emph{Proceedings of the {ACM} Conference on
+  Communications Architectures, Protocols and Applications (SIGCOMM)}, 1996,
+  pp. 22--36.
+
+\bibitem{wester2009clientspec}
+B.~Wester, P.~M. Chen, J.~Cowling, J.~Flinn, E.~B. Nightingale, and B.~Liskov,
+  ``Tolerating latency in replicated state machines through client
+  speculation,'' in \emph{Proceedings of the 6th USENIX Symposium on Networked
+  Systems Design and Implementation (NSDI)}, 2009.
+
+\bibitem{wester2011ospec}
+B.~Wester, P.~M. Chen, and J.~Flinn, ``Operating system support for
+  application-specific speculation,'' in \emph{Proceedings of the 6th European
+  Conference on Computer Systems (EuroSys)}, 2011.
+
 \bibitem{barroso2009datacenter}
 L.~A. Barroso and U.~H{\"o}lzle, \emph{The Datacenter as a Computer: An
   Introduction to the Design of Warehouse-Scale Machines}.\hskip 1em plus 0.5em
@@ -155,5 +192,42 @@ L.~A. Barroso and U.~H{\"o}lzle, \emph{The Datacenter as a Computer: An
 E.~Strubell, A.~Ganesh, and A.~McCallum, ``Energy and policy considerations for
   deep learning in {NLP},'' in \emph{Proceedings of the 57th Annual Meeting of
   the Association for Computational Linguistics (ACL)}, 2019, pp. 3645--3650.
+
+\bibitem{patel2024splitwise}
+P.~Patel, E.~Choukse, C.~Zhang, A.~Shah, {\'I}.~Goiri, S.~Maleki, and
+  R.~Bianchini, ``Splitwise: Efficient generative {LLM} inference using phase
+  splitting,'' in \emph{Proceedings of the 51st {ACM}/{IEEE} International
+  Symposium on Computer Architecture (ISCA)}, 2024.
+
+\bibitem{zhong2024distserve}
+Y.~Zhong, Z.~Liu, J.~Gu, X.~Jin, J.~Chen, M.~Park, Y.~Liu, J.~Pang, Y.~Sheng,
+  S.~Han \emph{et~al.}, ``{DistServe}: Disaggregating prefill and decoding for
+  goodput-optimized large language model serving,'' in \emph{Proceedings of the
+  17th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  2024.
+
+\bibitem{li2023alpaserve}
+Z.~Li, L.~Zheng, Y.~Zhong, V.~Liu, Y.~Sheng, X.~Jin, Y.~Huang, Z.~Chen,
+  H.~Zhang, J.~E. Gonzalez, and I.~Stoica, ``Alpaserve: Statistical
+  multiplexing with model parallelism for deep learning serving,'' in
+  \emph{Proceedings of the 16th USENIX Symposium on Operating Systems Design
+  and Implementation (OSDI)}, 2023, pp. 663--679.
+
+\bibitem{janus2025}
+Aruna, Kaliraj, Sudha, Sureka \emph{et~al.}, ``Janus: Joint prefill/decode
+  disaggregation with {KV}-cache-aware multi-cloud routing for edge-adjacent
+  {LLM} serving,'' \emph{EAI Endorsed Transactions on the Internet of Things},
+  2025, dOI 10.4108/eetiot.13349.
+
+\bibitem{cao2000mg1kps}
+J.~Cao, M.~Andersson, C.~Nyberg, and M.~Kihl, ``Web server performance modeling
+  using an {M/G/1/K*PS} queue,'' \emph{IEEE/ACM Transactions on Networking},
+  2000.
+
+\bibitem{gujarati2020clockwork}
+A.~Gujarati, R.~Karimi \emph{et~al.}, ``Serving {DNNs} like clockwork:
+  Performance predictability from the bottom up,'' in \emph{Proceedings of the
+  13th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  2020.
 
 \end{thebibliography}
