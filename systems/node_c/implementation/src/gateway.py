@@ -678,7 +678,7 @@ def create_app(config: dict) -> FastAPI:
     # functions (dense_forward / sphp_hint_dispatch) can resolve their
     # upstream address without the route bodies threading it through.
     global _NODE_B_TARGET, _NODE_A_TARGET, _DENSE_TIMEOUT_S
-    _NODE_B_TARGET = f"{config['node_b']['host']}:{config['node_b']['port']}"
+    _NODE_B_TARGET = f"http://{config['node_b']['host']}:{config['node_b']['port']}"
     _NODE_A_TARGET = f"{config['node_a']['host']}:{config['node_a']['grpc_port']}"
     # Dense-leg HTTP timeout (seconds) from retrieval.dense_timeout_ms.
     # Optional: a config without the key keeps the pre-fix httpx defaults.
