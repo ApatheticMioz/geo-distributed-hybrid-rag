@@ -282,19 +282,36 @@ def dense_forward(
         data = resp.json()
         dense_ids = list(data.get("dense_doc_ids", []))
         dense_ms = float(data.get("timings", {}).get("dense_ms", 0.0))
-        logger.info(
-            "[%s] Dense forward: %.1f ms, %d docs",
-            query_id, dense_ms, len(dense_ids),
-        )
+        if dense_ids:
+            logger.info(
+                "[%s] Dense forward: %.1f ms, %d docs",
+                query_id, dense_ms, len(dense_ids),
+            )
+        else:
+            # Legitimately empty result: B answered 200 OK but returned no
+            # dense docs (e.g. no match in the dense index). This is NOT a
+            # transport failure — log it distinctly (INFO) so operators can
+            # tell "B is healthy but found nothing" from "B is unreachable"
+            # (the ERROR path below). The return contract is unchanged.
+            logger.info(
+                "[%s] Dense forward: %.1f ms, 0 docs (legitimately empty "
+                "result from B, not a transport error)",
+                query_id, dense_ms,
+            )
         return dense_ids, dense_ms
     except httpx.HTTPError as exc:
         # Degrade gracefully on a Node B transport/HTTP failure (mirrors
         # Node B's _sparse_retrieve returning ([], 0.0) when its retriever
         # is unavailable): a B outage must not 500 the whole query — the
-        # local sparse leg still serves the request.
-        logger.warning(
-            "[%s] Dense forward to Node B failed (%s); returning empty dense leg",
-            query_id, exc,
+        # local sparse leg still serves the request. The return contract
+        # stays ([], 0.0); only the logging is elevated to ERROR (with the
+        # query_id and the exception class) so a transport failure is
+        # distinguishable from a legitimately empty 200-OK result (INFO
+        # above).
+        logger.error(
+            "[%s] Dense forward to Node B transport error: %s (%s); "
+            "degrading to empty dense leg",
+            query_id, type(exc).__name__, exc,
         )
         return [], 0.0
     finally:
