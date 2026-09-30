@@ -15,6 +15,7 @@ Run from systems/node_c/implementation:
 """
 
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -24,13 +25,17 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import src.gateway as _gw  # noqa: E402
+
 from src.gateway import (  # noqa: E402
     BenchmarkResponse,
     ConfigError,
     QueryRequest,
     _bm25_query,
+    _drain_tokens,
     _escape_lucene,
     _LUCENE_SPECIALS,
+    _open_final_stream,
     create_app,
     dense_forward,
     load_config,
@@ -209,29 +214,51 @@ def test_benchmark_response_round_trip():
 # Route contracts
 # ============================================================================
 
-def test_query_route_returns_501_until_nc2_nc4(tmp_path):
-    # The route must exist and be reachable; the pipeline legs are
-    # NC-2..NC-4 stubs, so a valid request must surface as 501.
+def test_query_route_empty_result_streaming(tmp_path):
+    # NC-4: a query matching nothing (sparse empty, dense degrades to []
+    # because B is unavailable) must return the B-mirrored empty-result
+    # StreamingResponse "[No relevant documents found]" (200, text/plain).
     idx_path = tmp_path / "tantivy_index"
     _build_tiny_index(idx_path)
     app = create_app(_make_config(tmp_path, idx_path))
-    with TestClient(app) as client:
-        r = client.post("/query", json={"query": "distributed computing", "top_k": 3})
-    assert r.status_code == 501
-    assert "not yet implemented" in r.json()["detail"]
+    saved = _gw._NODE_B_TARGET
+    _gw._NODE_B_TARGET = None  # B unavailable -> dense_forward degrades to ([], 0.0)
+    try:
+        with TestClient(app) as client:
+            r = client.post("/query", json={"query": "zzz nonexistent term", "top_k": 3})
+    finally:
+        _gw._NODE_B_TARGET = saved
+    assert r.status_code == 200
+    assert r.text == "[No relevant documents found]"
 
 
-def test_benchmark_route_returns_501_until_nc2_nc4(tmp_path):
+def test_benchmark_route_retrieval_only(tmp_path):
+    # NC-4: retrieval_only=true skips generation and returns a
+    # BenchmarkResponse with zeroed generation metrics (no gRPC to A).
     idx_path = tmp_path / "tantivy_index"
     _build_tiny_index(idx_path)
     app = create_app(_make_config(tmp_path, idx_path))
-    with TestClient(app) as client:
-        r = client.post(
-            "/query/benchmark",
-            json={"query": "distributed computing", "top_k": 3},
-        )
-    assert r.status_code == 501
-    assert "not yet implemented" in r.json()["detail"]
+    saved = _gw._NODE_B_TARGET
+    _gw._NODE_B_TARGET = None  # B unavailable -> dense leg degrades to ([], 0.0)
+    try:
+        with TestClient(app) as client:
+            r = client.post(
+                "/query/benchmark",
+                json={"query": "distributed computing", "top_k": 3, "retrieval_only": True},
+            )
+    finally:
+        _gw._NODE_B_TARGET = saved
+    assert r.status_code == 200
+    body = r.json()
+    assert body["token_count"] == 0
+    assert body["decode_tps"] == 0
+    assert body["answer_preview"] == ""
+    assert body["timings"]["ttft_ms"] == 0
+    assert body["timings"]["decode_ms"] == 0
+    # The local sparse leg found d1; dense degrades to [] (B unavailable).
+    assert body["sparse_doc_ids"] == ["d1"]
+    assert body["dense_doc_ids"] == []
+    assert body["fused_doc_ids"] == ["d1"]
 
 
 def test_invalid_mode_rejected_400(tmp_path):
@@ -530,3 +557,198 @@ def test_config_accepts_hint_depth_5(tmp_path):
     p.write_text(yaml.safe_dump(raw), encoding="utf-8")
     cfg = load_config(p)
     assert cfg["retrieval"]["hint_depth"] == 5
+
+
+# ============================================================================
+# NC-4 — fused reconcile (RRF) + full query orchestration
+# ============================================================================
+
+# Node B's RRF implementation (source of truth for byte-identity).
+_B_IMPL_DIR = Path(__file__).resolve().parent.parent.parent / "node_b" / "implementation" / "src"
+sys.path.insert(0, str(_B_IMPL_DIR))
+from fusion import reciprocal_rank_fusion as _b_rrf  # noqa: E402
+
+from src.gateway import reciprocal_rank_fusion as _c_rrf  # noqa: E402
+
+
+def test_rrf_identity_vs_node_b():
+    """C's RRF must be byte-identical to Node B's for a range of inputs."""
+    cases = [
+        (["a", "b", "c"], ["b", "c", "d"], 60),
+        (["a", "b"], None, 60),
+        ([], ["x", "y"], 60),
+        (["a", "b", "c"], [], 30),
+        (["a", "b", "c", "d", "e"], ["e", "d", "c", "b", "a"], 60),
+        (["solo"], None, 100),
+    ]
+    for sparse, dense, k in cases:
+        assert _c_rrf(sparse, dense, k) == _b_rrf(sparse, dense, k), (sparse, dense, k)
+
+
+def test_mode_matrix_retrieval_only(tmp_path):
+    """Mode matrix: sparse/dense/hybrid each run the correct leg(s) and
+    produce the correct final/fused lists (retrieval_only, no generation)."""
+    idx_path = tmp_path / "tantivy_index"
+    _build_tiny_index(idx_path)  # d1: 'distributed computing'
+    app = create_app(_make_config(tmp_path, idx_path))
+    saved = _gw._NODE_B_TARGET
+    _gw._NODE_B_TARGET = None  # B unavailable -> dense leg degrades to ([], 0.0)
+    try:
+        with TestClient(app) as client:
+            # sparse: local leg only; dense skipped (0.0 ms, []).
+            r = client.post("/query/benchmark", json={"query": "distributed", "mode": "sparse", "retrieval_only": True})
+            b = r.json()
+            assert b["sparse_doc_ids"] == ["d1"]
+            assert b["dense_doc_ids"] == []
+            assert b["fused_doc_ids"] == []  # no RRF in single-leg mode
+            assert b["timings"]["dense_ms"] == 0
+
+            # dense: forward leg only (B unavailable -> []); sparse skipped.
+            r = client.post("/query/benchmark", json={"query": "distributed", "mode": "dense", "retrieval_only": True})
+            b = r.json()
+            assert b["sparse_doc_ids"] == []
+            assert b["dense_doc_ids"] == []
+            assert b["fused_doc_ids"] == []
+            assert b["timings"]["sparse_ms"] == 0
+
+            # hybrid: both legs; fused = RRF(sparse, dense). dense empty -> fused == sparse.
+            r = client.post("/query/benchmark", json={"query": "distributed", "mode": "hybrid", "retrieval_only": True})
+            b = r.json()
+            assert b["sparse_doc_ids"] == ["d1"]
+            assert b["fused_doc_ids"] == ["d1"]  # RRF with empty dense == sparse
+            assert b["timings"]["fusion_ms"] >= 0
+    finally:
+        _gw._NODE_B_TARGET = saved
+
+
+class _FakeOrchestratorFull(hybrid_coordination_pb2_grpc.GenerationOrchestratorServicer):
+    """Fake Node A that records requests and streams tokens back, reporting
+    SPHP reconciliation fields on the final token (overlap / wasted_prefill)."""
+
+    def __init__(self, overlap=0.0, wasted=0.0, hit=False):
+        self.received = []
+        self.hint_received = asyncio.Event()
+        self.final_received = asyncio.Event()
+        self.overlap = overlap
+        self.wasted = wasted
+        self.hit = hit
+
+    async def GenerateStream(self, request_iterator, context):
+        async for req in request_iterator:
+            self.received.append(req)
+            if req.is_sparse_hint:
+                self.hint_received.set()
+                continue
+            self.final_received.set()
+            # Stream a couple of answer tokens, then a final sentinel carrying
+            # the SPHP reconciliation fields.
+            for tok in ("Hel", "lo"):
+                yield hybrid_coordination_pb2.GenerationToken(
+                    query_id=req.query_id, token=tok, is_final=False,
+                )
+            yield hybrid_coordination_pb2.GenerationToken(
+                query_id=req.query_id, token="", is_final=True,
+                sphp_hit=self.hit, sphp_overlap=self.overlap,
+                wasted_prefill_ms=self.wasted,
+            )
+            break
+
+
+async def _run_full_sphp_flow(overlap, wasted, hit):
+    server = grpc.aio.server()
+    servicer = _FakeOrchestratorFull(overlap=overlap, wasted=wasted, hit=hit)
+    hybrid_coordination_pb2_grpc.add_GenerationOrchestratorServicer_to_server(servicer, server)
+    port = server.add_insecure_port("127.0.0.1:0")
+    await server.start()
+    channel = grpc.aio.insecure_channel(f"127.0.0.1:{port}")
+    try:
+        stream = await sphp_hint_dispatch(
+            query_id="q1",
+            query_text="distributed computing",
+            sparse_doc_ids=["d1", "d2", "d3", "d4", "d5", "d6"],
+            t_sparse_ms=12.5,
+            hint_depth=5,
+            target=f"127.0.0.1:{port}",
+            channel=channel,
+        )
+        # NC-4: send the final fused context on the SAME stream.
+        stream.send_final(
+            query_id="q1",
+            query_text="distributed computing",
+            fused_doc_ids=["d2", "d1"],
+            t_sparse_ms=12.5,
+            t_dense_ms=30.0,
+            t_fusion_ms=5.0,
+        )
+        tokens, meta, ttft_ms = await _drain_tokens(stream, "q1", time.perf_counter())
+        return servicer, tokens, meta, ttft_ms
+    finally:
+        await channel.close()
+        await server.stop(0)
+
+
+def test_full_sphp_flow_token_drain_and_overlap_passthrough():
+    """Full SPHP flow: hint + final on the same stream, token drain, and
+    overlap / wasted_prefill / sphp_hit passthrough into meta."""
+    async def _go():
+        servicer, tokens, meta, ttft_ms = await _run_full_sphp_flow(
+            overlap=0.6, wasted=0.0, hit=True,
+        )
+        # Both messages on the same stream, in order.
+        assert [r.is_sparse_hint for r in servicer.received] == [True, False]
+        # Tokens drained (non-final only).
+        assert tokens == ["Hel", "lo"]
+        # SPHP reconciliation fields passed through from the final token.
+        assert meta["sphp_hit"] is True
+        assert meta["sphp_overlap"] == 0.6
+        assert "wasted_prefill_ms" not in meta  # 0.0 -> not recorded
+        assert ttft_ms >= 0.0
+
+    asyncio.run(_go())
+
+
+def test_full_sphp_flow_wasted_prefill_passthrough():
+    """SPHP miss: wasted_prefill_ms > 0 must be recorded in meta."""
+    async def _go():
+        servicer, tokens, meta, ttft_ms = await _run_full_sphp_flow(
+            overlap=0.2, wasted=42.0, hit=False,
+        )
+        assert meta["sphp_hit"] is False
+        assert meta["sphp_overlap"] == 0.2
+        assert meta["wasted_prefill_ms"] == 42.0
+
+    asyncio.run(_go())
+
+
+def test_non_sphp_single_message_path():
+    """Non-SPHP: a fresh stream carries exactly ONE message (is_sparse_hint=False)."""
+    async def _go():
+        server = grpc.aio.server()
+        servicer = _FakeOrchestratorFull(overlap=0.0, wasted=0.0, hit=False)
+        hybrid_coordination_pb2_grpc.add_GenerationOrchestratorServicer_to_server(servicer, server)
+        port = server.add_insecure_port("127.0.0.1:0")
+        await server.start()
+        channel = grpc.aio.insecure_channel(f"127.0.0.1:{port}")
+        try:
+            stream = await _open_final_stream(
+                query_id="q1",
+                query_text="distributed computing",
+                fused_doc_ids=["d1", "d2"],
+                t_sparse_ms=10.0,
+                t_dense_ms=20.0,
+                t_fusion_ms=3.0,
+                target=f"127.0.0.1:{port}",
+                channel=channel,
+            )
+            await asyncio.wait_for(servicer.final_received.wait(), timeout=5)
+            # Exactly one message, and it is the final (non-hint) context.
+            assert len(servicer.received) == 1
+            assert servicer.received[0].is_sparse_hint is False
+            assert [d.doc_id for d in servicer.received[0].fused_docs] == ["d1", "d2"]
+            assert servicer.received[0].t_dense_ms == 20.0
+            assert servicer.received[0].t_fusion_ms == 3.0
+        finally:
+            await channel.close()
+            await server.stop(0)
+
+    asyncio.run(_go())
