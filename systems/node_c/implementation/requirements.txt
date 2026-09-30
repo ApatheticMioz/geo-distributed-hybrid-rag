@@ -1,0 +1,17 @@
+# Node C — sparse retrieval + user-facing gateway (3-node topology)
+#
+# Lightweight subset of Node B's requirements: no torch/FlagEmbedding/
+# Qdrant (dense leg stays on Node B), no gRPC (Node A is reached
+# transitively via Node B's P2 path).
+
+# Disk-backed BM25 via Tantivy (Rust)
+tantivy>=0.26.0,<0.27
+
+# Web framework for the user-facing gateway
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+httpx>=0.27.0
+pyyaml==6.0.1
+
+# Testing
+pytest>=8.0
