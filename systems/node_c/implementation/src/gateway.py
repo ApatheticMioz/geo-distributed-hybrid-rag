@@ -24,17 +24,31 @@ NC-2..NC-4 targets and are intentionally NOT implemented here.
 import asyncio
 import logging
 import os
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List
 
+import grpc
+import httpx
 import tantivy
 import yaml
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+# Node A's generation contract (hybrid_coordination.proto) is copied UNEDITED
+# into systems/node_c/implementation/proto/ and compiled to the generated/
+# package. We import the generated pb2 modules directly (committed, not
+# regenerated at import time) so the gateway has no build-time dependency on
+# grpcio-tools.
+_generated_dir = Path(__file__).resolve().parent.parent / "generated"
+if str(_generated_dir) not in sys.path:
+    sys.path.insert(0, str(_generated_dir))
+import hybrid_coordination_pb2  # noqa: E402
+import hybrid_coordination_pb2_grpc  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,6 +99,17 @@ def _validate_config(raw: Any, source: str) -> dict:
             raise ConfigError(
                 f"{source}: section '{section}' missing key(s): {', '.join(missing_sub)}"
             )
+    # SPHP contract: Node A's GenerateStream reconciliation hardcodes the
+    # provisional/final top-5 and the overlap threshold (len(intersection)/5.0
+    # >= 0.5) — see systems/node_a/implementation/src/main.py:336-345. C's
+    # hint_depth must therefore be exactly 5; any other value silently
+    # desyncs the overlap denominator and the hit threshold, so reject it.
+    if int(raw["retrieval"]["hint_depth"]) != 5:
+        raise ConfigError(
+            f"{source}: retrieval.hint_depth must be 5 (Node A's SPHP "
+            f"reconciliation hardcodes top-5 / 0.5 overlap); got "
+            f"{raw['retrieval']['hint_depth']}"
+        )
     return raw
 
 
@@ -192,18 +217,193 @@ def sparse_retrieve(index: "tantivy.Index", query: str, top_k: int, query_id: st
     return doc_ids, elapsed_ms
 
 
-def dense_forward(query: str, top_k: int, query_id: str) -> tuple[list[str], float]:
+# Module-level mesh targets, populated by create_app() from config so the
+# leg functions can resolve their upstream address without the route bodies
+# having to thread it through (keeps the /query and /query/benchmark route
+# call sites byte-identical to the NC-1 skeleton).
+_NODE_B_TARGET: str | None = None
+_NODE_A_TARGET: str | None = None
+
+
+def dense_forward(
+    query: str,
+    top_k: int,
+    query_id: str,
+    target: str | None = None,
+    client: "httpx.Client | None" = None,
+) -> tuple[list[str], float]:
     """
     NC-3 — Dense-leg forward to Node B's FastAPI gateway.
 
     Contract:
-      * POSTs the query to config['node_b'] (host:port, 10.8.0.2:8000)
-        over the WireGuard mesh and returns (doc_id_list, elapsed_ms)
-        in Node B's _dense_retrieve shape.
-      * Node B's dense leg (BGE-M3 + Qdrant) stays on B; C only
-        forwards and times the round trip.
+      * POSTs to Node B's /query/benchmark with
+        {query, top_k, mode:'dense', retrieval_only:true} — the
+        retrieval-only fast path that returns dense_doc_ids +
+        timings.dense_ms WITHOUT triggering Node A generation (Node B's
+        /query has no retrieval-only flag and always generates).
+      * Returns (dense_doc_ids, timings.dense_ms) in Node B's
+        _dense_retrieve shape so the campaign harness is gateway-agnostic.
+      * Node B's dense leg (BGE-M3 + Qdrant) stays on B; C only forwards
+        and times the round trip.
+      * Must be safe to run in a worker thread (asyncio.to_thread); uses a
+        synchronous httpx.Client. Timeouts use httpx defaults (no explicit
+        timeout) unless a caller injects a preconfigured client.
     """
-    raise NotImplementedError("NC-3: dense-leg forward to Node B not yet implemented")
+    if target is None:
+        target = _NODE_B_TARGET
+    if target is None:
+        logger.warning("[%s] Node B target not configured; skipping dense forward", query_id)
+        return [], 0.0
+
+    body = {
+        "query": query,
+        "top_k": top_k,
+        "mode": "dense",
+        "retrieval_only": True,
+    }
+    owns_client = client is None
+    if client is None:
+        # httpx default timeouts (connect/read/write/pool) — no explicit
+        # timeout is configured in config.yaml, so we rely on the defaults.
+        client = httpx.Client()
+    try:
+        resp = client.post(f"{target}/query/benchmark", json=body)
+        resp.raise_for_status()
+        data = resp.json()
+        dense_ids = list(data.get("dense_doc_ids", []))
+        dense_ms = float(data.get("timings", {}).get("dense_ms", 0.0))
+        logger.info(
+            "[%s] Dense forward: %.1f ms, %d docs",
+            query_id, dense_ms, len(dense_ids),
+        )
+        return dense_ids, dense_ms
+    except httpx.HTTPError as exc:
+        # Degrade gracefully on a Node B transport/HTTP failure (mirrors
+        # Node B's _sparse_retrieve returning ([], 0.0) when its retriever
+        # is unavailable): a B outage must not 500 the whole query — the
+        # local sparse leg still serves the request.
+        logger.warning(
+            "[%s] Dense forward to Node B failed (%s); returning empty dense leg",
+            query_id, exc,
+        )
+        return [], 0.0
+    finally:
+        if owns_client:
+            client.close()
+
+
+class SphpStream:
+    """
+    Bidirectional gRPC stream to Node A's GenerationOrchestrator.GenerateStream.
+
+    Mirrors Node B's stream_to_node_a: a request_queue feeds the request
+    iterator, and the caller pushes HybridContextRequest messages onto the
+    queue. Node A reconciles ONE request sequence per stream (sparse hint
+    first, then the final fused context) and then breaks — so the SPHP hint
+    (NC-3) and the final fused dispatch (NC-4) MUST share this same stream
+    handle.
+
+    The gRPC channel is injectable (``channel``) so tests can point the stream
+    at an in-process fake servicer instead of the real Node A.
+    """
+
+    def __init__(self, target: str, channel: "grpc.aio.Channel | None" = None):
+        self._target = target
+        self._channel = channel
+        self._owns_channel = channel is None
+        self._stub = None
+        self._response_iter = None
+        self._request_queue: asyncio.Queue = asyncio.Queue()
+
+    async def _open(self) -> None:
+        if self._channel is None:
+            self._channel = grpc.aio.insecure_channel(self._target)
+        self._stub = hybrid_coordination_pb2_grpc.GenerationOrchestratorStub(self._channel)
+        # Start the bidi RPC; the request iterator is driven by _request_queue.
+        self._response_iter = self._stub.GenerateStream(self._request_iterator())
+
+    def _request_iterator(self):
+        async def _gen():
+            while True:
+                req = await self._request_queue.get()
+                if req is None:
+                    break
+                yield req
+        return _gen()
+
+    @staticmethod
+    def _build_hint(
+        query_id: str,
+        query_text: str,
+        sparse_doc_ids: list[str],
+        t_sparse_ms: float,
+        hint_depth: int,
+    ) -> "hybrid_coordination_pb2.HybridContextRequest":
+        # Truncate to hint_depth and number ranks 1..hint_depth (mirrors
+        # Node B's stream_to_node_a SPHP step 1).
+        docs = [
+            hybrid_coordination_pb2.FusedDocument(
+                doc_id=doc_id, rrf_score=0.0, rank=rank,
+            )
+            for rank, doc_id in enumerate(sparse_doc_ids[:hint_depth], start=1)
+        ]
+        return hybrid_coordination_pb2.HybridContextRequest(
+            query_id=query_id,
+            query_text=query_text,
+            fused_docs=docs,
+            t_sparse_ms=t_sparse_ms,
+            is_sparse_hint=True,
+        )
+
+    def send_hint(
+        self,
+        query_id: str,
+        query_text: str,
+        sparse_doc_ids: list[str],
+        t_sparse_ms: float,
+        hint_depth: int,
+    ) -> "hybrid_coordination_pb2.HybridContextRequest":
+        """Push the SPHP sparse hint (message 1) onto the stream."""
+        req = self._build_hint(query_id, query_text, sparse_doc_ids, t_sparse_ms, hint_depth)
+        self._request_queue.put_nowait(req)
+        return req
+
+    def send_final(
+        self,
+        query_id: str,
+        query_text: str,
+        fused_doc_ids: list[str],
+        t_sparse_ms: float,
+        t_dense_ms: float,
+        t_fusion_ms: float,
+    ) -> "hybrid_coordination_pb2.HybridContextRequest":
+        """
+        Push the final fused context (message 2) onto the SAME stream, then
+        close the request side (None sentinel). NC-4 calls this after RRF.
+        """
+        docs = [
+            hybrid_coordination_pb2.FusedDocument(
+                doc_id=doc_id, rrf_score=0.0, rank=rank,
+            )
+            for rank, doc_id in enumerate(fused_doc_ids, start=1)
+        ]
+        req = hybrid_coordination_pb2.HybridContextRequest(
+            query_id=query_id,
+            query_text=query_text,
+            fused_docs=docs,
+            t_sparse_ms=t_sparse_ms,
+            t_dense_ms=t_dense_ms,
+            t_fusion_ms=t_fusion_ms,
+            is_sparse_hint=False,
+        )
+        self._request_queue.put_nowait(req)
+        self._request_queue.put_nowait(None)  # sentinel: end the request stream
+        return req
+
+    async def close(self) -> None:
+        if self._owns_channel and self._channel is not None:
+            await self._channel.close()
+            self._channel = None
 
 
 async def sphp_hint_dispatch(
@@ -212,18 +412,38 @@ async def sphp_hint_dispatch(
     sparse_doc_ids: list[str],
     t_sparse_ms: float,
     hint_depth: int,
-) -> None:
+    target: str | None = None,
+    channel: "grpc.aio.Channel | None" = None,
+) -> SphpStream:
     """
     NC-3 — SPHP sparse-hint dispatch (the hint originates at C).
 
     Contract:
-      * When req.sphp and mode == 'hybrid', dispatch the top
-        config['retrieval']['hint_depth'] sparse ids to Node A's
-        GenerationOrchestrator gRPC stream (reached transitively via
-        Node B's P2 path) immediately at t_sparse, before the dense
-        leg completes — mirroring Node B's stream_to_node_a SPHP step 1.
+      * Opens a bidirectional gRPC stream to Node A's
+        GenerationOrchestrator.GenerateStream (node_a.grpc_port) and sends
+        the SPHP sparse hint as message 1: the top ``hint_depth`` sparse ids
+        (ranked 1..hint_depth) with is_sparse_hint=True — mirroring Node B's
+        stream_to_node_a SPHP step 1, but originating one hop closer to the
+        user.
+      * RETURNS the open SphpStream handle so NC-4 can send the final fused
+        context (message 2) on the SAME stream. Node A's GenerateStream
+        reconciles one request sequence per stream and then breaks, so the
+        hint and the final dispatch must share this handle.
     """
-    raise NotImplementedError("NC-3: SPHP hint dispatch not yet implemented")
+    if target is None:
+        target = _NODE_A_TARGET
+    if target is None:
+        logger.warning("[%s] Node A target not configured; skipping SPHP hint", query_id)
+        return SphpStream("", channel=channel)
+
+    stream = SphpStream(target, channel=channel)
+    await stream._open()
+    stream.send_hint(query_id, query_text, sparse_doc_ids, t_sparse_ms, hint_depth)
+    logger.info(
+        "[%s] SPHP: dispatched early sparse hint (%d docs) to Node A",
+        query_id, min(len(sparse_doc_ids), hint_depth),
+    )
+    return stream
 
 
 def fused_reconcile(sparse_ids: list[str], dense_ids: list[str], rrf_k: int) -> list[str]:
@@ -326,6 +546,13 @@ def create_app(config: dict) -> FastAPI:
     startup; until then it returns 503 {"status":"not_ready","node":"C"}.
     """
     _validate_config(config, "config")
+
+    # Publish the mesh targets to the module-level handles so the leg
+    # functions (dense_forward / sphp_hint_dispatch) can resolve their
+    # upstream address without the route bodies threading it through.
+    global _NODE_B_TARGET, _NODE_A_TARGET
+    _NODE_B_TARGET = f"{config['node_b']['host']}:{config['node_b']['port']}"
+    _NODE_A_TARGET = f"{config['node_a']['host']}:{config['node_a']['grpc_port']}"
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

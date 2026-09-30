@@ -32,8 +32,11 @@ from src.gateway import (  # noqa: E402
     _escape_lucene,
     _LUCENE_SPECIALS,
     create_app,
+    dense_forward,
     load_config,
+    sphp_hint_dispatch,
     sparse_retrieve,
+    SphpStream,
 )
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
@@ -362,3 +365,168 @@ def test_sparse_field_names_identical_to_node_b(tmp_path):
     assert _escape_lucene("paula deen's") == "paula deen\\'s"
     assert _escape_lucene("distributed computing") == "distributed computing"
     assert _LUCENE_SPECIALS == set('+-!(){}[]^"~*?:/\\\'')
+
+
+# ============================================================================
+# NC-3 — dense forward (httpx) + SPHP hint dispatch (gRPC)
+# ============================================================================
+
+import asyncio  # noqa: E402
+import json  # noqa: E402
+
+import grpc  # noqa: E402
+import httpx  # noqa: E402
+
+import hybrid_coordination_pb2  # noqa: E402
+import hybrid_coordination_pb2_grpc  # noqa: E402
+
+
+def test_dense_forward_httpx_mocktransport():
+    """dense_forward POSTs the retrieval-only dense body to B and parses the response."""
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["method"] = request.method
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "dense_doc_ids": ["d9", "d8"],
+                "timings": {"dense_ms": 42.5},
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    ids, ms = dense_forward(
+        "distributed computing", 10, "q1",
+        target="http://10.8.0.2:8000", client=client,
+    )
+    assert ids == ["d9", "d8"]
+    assert ms == 42.5
+    assert captured["method"] == "POST"
+    assert captured["url"] == "http://10.8.0.2:8000/query/benchmark"
+    assert captured["body"] == {
+        "query": "distributed computing",
+        "top_k": 10,
+        "mode": "dense",
+        "retrieval_only": True,
+    }
+
+
+def test_dense_forward_degrades_on_transport_error():
+    """A Node B transport failure must degrade to ([], 0.0), not raise."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    ids, ms = dense_forward("q", 5, "q1", target="http://10.8.0.2:8000", client=client)
+    assert ids == []
+    assert ms == 0.0
+
+
+class _FakeOrchestrator(hybrid_coordination_pb2_grpc.GenerationOrchestratorServicer):
+    """In-process fake of Node A's GenerationOrchestrator that records requests."""
+
+    def __init__(self):
+        self.received = []
+        self.hint_received = asyncio.Event()
+        self.final_received = asyncio.Event()
+
+    async def GenerateStream(self, request_iterator, context):
+        async for req in request_iterator:
+            self.received.append(req)
+            if req.is_sparse_hint:
+                self.hint_received.set()
+                continue
+            # Final fused message: emit a final token and end the sequence.
+            self.final_received.set()
+            yield hybrid_coordination_pb2.GenerationToken(
+                query_id=req.query_id, token="", is_final=True,
+            )
+            break
+
+
+async def _run_sphp_fake_servicer():
+    server = grpc.aio.server()
+    servicer = _FakeOrchestrator()
+    hybrid_coordination_pb2_grpc.add_GenerationOrchestratorServicer_to_server(
+        servicer, server
+    )
+    port = server.add_insecure_port("127.0.0.1:0")
+    await server.start()
+    channel = grpc.aio.insecure_channel(f"127.0.0.1:{port}")
+    try:
+        # 6 sparse ids, hint_depth=5 -> must truncate to the first 5.
+        stream = await sphp_hint_dispatch(
+            query_id="q1",
+            query_text="distributed computing",
+            sparse_doc_ids=["d1", "d2", "d3", "d4", "d5", "d6"],
+            t_sparse_ms=12.5,
+            hint_depth=5,
+            target=f"127.0.0.1:{port}",
+            channel=channel,
+        )
+        assert isinstance(stream, SphpStream)
+        await asyncio.wait_for(servicer.hint_received.wait(), timeout=5)
+
+        # The hint (message 1) must be captured with the right shape.
+        hint = servicer.received[0]
+        assert hint.is_sparse_hint is True
+        assert hint.query_id == "q1"
+        assert hint.query_text == "distributed computing"
+        assert hint.t_sparse_ms == 12.5
+        # Truncated to hint_depth=5, ranks numbered 1..5, doc order preserved.
+        assert [d.doc_id for d in hint.fused_docs] == ["d1", "d2", "d3", "d4", "d5"]
+        assert [d.rank for d in hint.fused_docs] == [1, 2, 3, 4, 5]
+        assert all(d.rrf_score == 0.0 for d in hint.fused_docs)
+
+        # The SAME handle accepts a second send (message 2) on the same stream.
+        stream.send_final(
+            query_id="q1",
+            query_text="distributed computing",
+            fused_doc_ids=["d2", "d1"],
+            t_sparse_ms=12.5,
+            t_dense_ms=30.0,
+            t_fusion_ms=5.0,
+        )
+        await asyncio.wait_for(servicer.final_received.wait(), timeout=5)
+
+        final = servicer.received[1]
+        assert final.is_sparse_hint is False
+        assert [d.doc_id for d in final.fused_docs] == ["d2", "d1"]
+        assert [d.rank for d in final.fused_docs] == [1, 2]
+        assert final.t_dense_ms == 30.0
+        assert final.t_fusion_ms == 5.0
+        # Both messages landed on the same stream, in order.
+        assert len(servicer.received) == 2
+    finally:
+        await channel.close()
+        await server.stop(0)
+
+
+def test_sphp_hint_dispatch_fake_servicer():
+    """SPHP hint: is_sparse_hint, doc order + rank numbering, hint_depth truncation,
+    t_sparse_ms/query_id passthrough, and a second send on the same stream."""
+    asyncio.run(_run_sphp_fake_servicer())
+
+
+def test_config_rejects_hint_depth_not_5(tmp_path):
+    # Fault injection: Node A's SPHP reconciliation hardcodes top-5 / 0.5
+    # overlap (node_a/src/main.py:336-345), so hint_depth != 5 must be rejected.
+    raw = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    raw["retrieval"]["hint_depth"] = 3
+    p = tmp_path / "config.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ConfigError, match="hint_depth"):
+        load_config(p)
+
+
+def test_config_accepts_hint_depth_5(tmp_path):
+    # The real config (hint_depth=5) is the contract and must be accepted.
+    raw = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    raw["retrieval"]["hint_depth"] = 5
+    p = tmp_path / "config.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg["retrieval"]["hint_depth"] == 5
