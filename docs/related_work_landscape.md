@@ -75,6 +75,42 @@ Verdicts: **established** (prior work already makes this claim), **partial** (pr
 
 ---
 
+## Speculation landscape — LR-2a (Phase 1)
+
+**Session:** LR-2a · **Date:** 2026-09-30 · **Branch:** `feat/three-node-study`
+**Concern:** map the published *speculation* landscape in the two non-LLM families that SPHP borrows from — (A) speculative prefetch in storage/DB/web serving, and (B) speculation over slow/unreliable links (speculative RPC/execution) — and run a targeted existence check for the specific SPHP mechanism (speculate on a *partial retrieval result* to prefill a generator, then reconcile against the final result).
+
+**Method:** for each family, pick the 2 canonical published systems papers by citation standing; each is run through the 4-stage anti-hallucination protocol (S1 resolve, S2 triangulate, S3 corroborate, S4 verdict) and appended to `docs/literature_ledger.md` under the LR-2a section. For each we capture: the claim, the **reconciliation semantics** (commit / abort / replay), and a one-line delta vs SPHP (sparse-hint speculative prefill, abort-on-mismatch). LLM speculative decoding is **not** re-surveyed here — the paper's related-work section already cites the canonical pair (`leviathan2023speculative`, `chen2023speculative`); we reuse those and add nothing.
+
+### Family A — speculative prefetch in storage / DB / web serving
+
+| Paper | Claim | Reconciliation semantics | Delta vs SPHP |
+|---|---|---|---|
+| **Patterson, Gibson, Ginting, Stodolsky, Zelenka — *Informed Prefetching and Caching* (SOSP 1995)** | The application discloses *hints* about its future I/O; the file system prefetches those pages speculatively to hide I/O latency. | **Advisory / non-binding.** A hint is a prediction, not a commitment: if the predicted access never occurs the prefetched page is simply **evicted** (no abort, no replay — it is a cache, so "commit" = the page stays resident, "miss" = eviction). | Speculates on **which data to fetch** (I/O), not on **which context to prefill a generator with**; there is no later authoritative result to reconcile against — the hint is a cache-fill prediction, not a provisional answer to a query. |
+| **Padmanabhan & Mogul — *Using Predictive Prefetching to Improve World Wide Web Latency* (SIGCOMM 1996)** | A server maintains per-client usage statistics and **predicts the next object** a client will request, prefetching it before it is demanded to hide Web latency. | **Predict / drop.** The prefetch is speculative by nature; if the prediction is wrong the prefetched object is **dropped** (the cost is cache pollution / bandwidth waste) — no replay, no commit. | Speculates on **which web object to fetch next** from usage history, not on a **provisional retrieval result** to prefill a generator; no reconciliation against a final fused result. |
+
+### Family B — speculation over slow / unreliable links (speculative RPC / execution)
+
+| Paper | Claim | Reconciliation semantics | Delta vs SPHP |
+|---|---|---|---|
+| **Wester, Chen, Cowling, Flinn, Nightingale, Liskov — *Tolerating Latency in Replicated State Machines through Client Speculation* (NSDI 2009)** | A client of a geographically-replicated service **speculates the result of a request**, proceeds on the predicted value, and reconciles when the real response arrives — hiding network + protocol latency over slow links. | **Commit / abort (predicated).** The client issues *predicated writes* and *replica-resolved speculation*: if the predicted result matches the real one the speculation is **committed**; if not it is **aborted** and rolled back. | Speculates on the **value returned by a remote RPC** and reconciles by **value-equality** on the RPC result; SPHP speculates on a **provisional retrieval context** and reconciles by **set-overlap** on a retrieval ranking — a different object and a different (lighter) test. |
+| **Wester, Chen, Flinn — *Operating System Support for Application-Specific Speculation* (EuroSys 2011)** | A general OS-level **mechanism** for speculative execution (checkpointing, rollback, causality tracking, output buffering) that lets applications define *what* to predict and *how* to compare results, coordinating speculation across all applications and kernel state. | **Checkpoint / rollback (abort) or commit.** The OS captures state before a speculative action; on a mismatch it **rolls back** to the checkpoint (abort), otherwise the action is **committed**. | A **general mechanism with full state rollback**; SPHP is a **pipeline-schedule** speculation whose speculative prefill is *masked* (held in a scratch buffer, never committed to client state) and reconciled by a lightweight set-overlap test — no full state checkpoint/rollback. |
+
+### LLM speculative decoding (reused, not re-surveyed)
+
+The paper's related-work section already cites the canonical pair — **Leviathan, Kalman, Matias — *Fast Inference from Transformers via Speculative Decoding* (ICML 2023)** and **Chen et al. — *Accelerating Large Language Model Decoding with Speculative Sampling* (2023)** — and states that SPHP is **orthogonal** to this line: it speculates over the **pipeline schedule** (begin prefilling on a provisional sparse context before the dense leg finishes, then reconcile), not over the **tokens** of a single model. We reuse these citations and add nothing new here.
+
+### Existence check — does any published system speculate on a *partial retrieval result* to prefill a generator, then reconcile against the final result?
+
+**Verdict: NOT FOUND.** A targeted search for published systems that (i) speculate on a **partial / provisional retrieval result** (a sparse or lexical hint) to **prefill a generator**, and (ii) **reconcile** (commit/abort) that speculation against the **final fused retrieval result**, returns no match. The two nearest misses, both already in the LR-1 ledger, fall short on a distinct axis:
+
+- **`speculativerag2025` — *Speculative RAG* (ICLR 2025, Google Research).** A small specialist LM **drafts** candidate answers from document subsets while retrieval continues; a large generalist LM **verifies** by selecting the best draft. **Nearest-miss delta:** it speculates on **draft answers from a smaller model** (model-level draft/verify), not on a **provisional sparse retrieval hint** to prefill the generator, and it reconciles by **selecting the best draft**, not by a **set-overlap hit test** against the final fused retrieval result.
+- **`omnia2025` — *Efficient RAG Serving through Speculative Scheduling* (HPDC 2025).** After the first reranking group finishes, the top chunk begins **speculative prefilling** while later groups append sub-prefills — the closest to "prefill before the full context is ready." **Nearest-miss delta:** it speculates on a **reranked chunk** (a partial *reranking* result), not on a **provisional sparse hint**, and it has **no reconciliation** step (it appends sub-prefills; there is no commit/abort against a final fused result).
+
+**Bottom line for LR-2a:** the *speculation* pattern (predict → act → reconcile) is well established in both non-LLM families, but every prior instance speculates on **I/O objects** (Family A) or **RPC results / general state** (Family B) — never on a **provisional retrieval result used to prefill a generator**, and never with a **set-overlap reconciliation against a final fused retrieval result**. SPHP's specific combination (sparse-hint prefill + fused-context set-overlap reconciliation) is **open**.
+
+---
+
 ## Bottom line
 
 - **RQ-1:** four families exist (federated RAG, single-host RAG characterization, LLM phase disaggregation, DNN partitioning); **none places hybrid-RAG pipeline stages by network regime.**
