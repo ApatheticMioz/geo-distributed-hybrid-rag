@@ -14,6 +14,7 @@ Run from systems/node_c/implementation:
     .venv/bin/python -m pytest test_gateway.py -v
 """
 
+import logging
 import socket
 import sys
 import threading
@@ -452,6 +453,56 @@ def test_dense_forward_degrades_on_transport_error():
     ids, ms = dense_forward("q", 5, "q1", target="http://10.8.0.2:8000", client=client)
     assert ids == []
     assert ms == 0.0
+
+
+def test_dense_forward_error_path_logs_distinctly(caplog):
+    """
+    The dense_forward error path must be observable and distinguishable from a
+    legitimately empty result:
+
+      * a Node B transport/HTTP failure (httpx.HTTPError) must log at ERROR
+        level, carrying the query_id and the exception class name, while still
+        degrading to the ([], 0.0) return contract;
+      * a 200-OK response with an empty dense_doc_ids list (B healthy but
+        found nothing) must log at INFO level — NOT ERROR — so operators can
+        tell "B is unreachable" from "B is healthy but found nothing".
+
+    Both paths return ([], 0.0); only the log level/message differs.
+    """
+    # (1) Transport error -> ERROR log with query_id + exception class.
+    def err_handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom")
+
+    client = httpx.Client(transport=httpx.MockTransport(err_handler))
+    with caplog.at_level("ERROR", logger="src.gateway"):
+        ids, ms = dense_forward("q-err", 5, "q-err",
+                                 target="http://10.8.0.2:8000", client=client)
+    assert ids == []
+    assert ms == 0.0
+    err_records = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert err_records, "transport error must log at ERROR level"
+    joined = " ".join(r.getMessage() for r in err_records)
+    assert "q-err" in joined, "ERROR log must carry the query_id"
+    assert "ConnectError" in joined, "ERROR log must name the exception class"
+
+    # (2) Legitimately empty 200-OK result -> INFO log, NOT ERROR.
+    def empty_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"dense_doc_ids": [], "timings": {"dense_ms": 12.0}})
+
+    client2 = httpx.Client(transport=httpx.MockTransport(empty_handler))
+    caplog.clear()
+    with caplog.at_level("INFO", logger="src.gateway"):
+        ids2, ms2 = dense_forward("q-empty", 5, "q-empty",
+                                   target="http://10.8.0.2:8000", client=client2)
+    assert ids2 == []
+    assert ms2 == 12.0
+    err_records2 = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert not err_records2, "legitimately empty result must NOT log at ERROR"
+    info_records = [r for r in caplog.records if r.levelno == logging.INFO]
+    assert info_records, "legitimately empty result must log at INFO level"
+    joined2 = " ".join(r.getMessage() for r in info_records)
+    assert "q-empty" in joined2
+    assert "legitimately empty" in joined2
 
 
 def _slow_b_server(delay_s: float) -> tuple[socket.socket, int, threading.Thread]:
