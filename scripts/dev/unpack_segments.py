@@ -3,7 +3,7 @@ import glob
 import subprocess
 import time
 
-segments_dir = r"D:\FAST\semester-project\NLP\project_node_b\node_B\qdrant_storage\collections\msmarco_passages\0\segments"
+segments_dir = r"D:\geo-distributed-hybrid-rag\node_b\node_B\qdrant_storage\collections\msmarco_passages\0\segments"
 tar_files = sorted(glob.glob(os.path.join(segments_dir, "*.tar")))
 print(f"Found {len(tar_files)} segment tar files to unpack.")
 
