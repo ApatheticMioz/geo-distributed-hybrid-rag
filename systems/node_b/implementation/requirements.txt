@@ -2,7 +2,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Core ML and Embedding Dependencies
-torch==2.2.2+cu118
+torch==2.7.1+cu118
 FlagEmbedding>=1.2.9
 
 # Vector Database Client
