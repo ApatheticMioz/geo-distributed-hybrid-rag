@@ -74,13 +74,12 @@ Node B: push from Node A, pull on the node).
    ```bash
    ssh <user>@<node-c-lan-ip>
    ```
-2. **Clone or pull the project repo** (Node C runs from the same repository;
-   its runtime config is `systems/node_c/config.yaml`):
+2. **Clone or pull the project repo** (Node C clone root:
+   `C:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3`; its runtime config is `systems/node_c/config.yaml`):
    ```bash
-   git -C <repo-path> pull --ff-only
+   git -C "C:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3" pull --ff-only
    ```
-3. **Verify:** `git -C <repo-path> log --oneline -1` matches the commit Node A
-   pushed most recently.
+3. **Verify:** `git log --oneline -1` matches the active commit on `origin/feat/three-node-study`.
 
 ---
 
@@ -89,44 +88,35 @@ Node B: push from Node A, pull on the node).
 Unlike the old client-only package, the sparse tier needs real dependencies
 (Tantivy + FastAPI), not just stdlib.
 
-1. **Create an isolated environment:**
-   ```bash
-   python3 --version            # 3.10+ recommended
-   python3 -m venv .venv-nodec
-   . .venv-nodec/bin/activate
-   pip install tantivy fastapi uvicorn requests pyyaml
+1. **Create an isolated environment (or use existing `systems/node_c/.venv`):**
+   ```powershell
+   python -m venv systems\node_c\.venv
+   .\systems\node_c\.venv\Scripts\Activate.ps1
+   pip install -r systems\node_c\requirements.txt
    ```
 2. **Verify:**
-   ```bash
-   python3 -c "import tantivy, fastapi, uvicorn, requests; print('OK')"
+   ```powershell
+   .\systems\node_c\.venv\Scripts\python.exe -c "import tantivy, fastapi, uvicorn, requests; print('OK')"
    ```
-
-> If Node C is a Windows/WSL host, run everything inside the WSL
-> distribution so that `bash`, `ping`, and `tar` behave as documented.
 
 ---
 
 ## 4. Transfer the Tantivy index (~3.2 GB)
 
 The full sparse index lives on Node B at
-`systems/node_b/implementation/data/tantivy_index_full`. Transfer it with the same
-tar-over-ssh pattern used by `scripts/transfer_tantivy.sh`, targeted at C:
+`systems/node_b/implementation/data/tantivy_index`. Transfer it targeted at C:
 
 ```bash
-# From Node B (or from Node A ssh'd to B), adjust <user>@<node-c-ip>:
-REMOTE_DIR=<repo-path>/data/tantivy_index
-ssh <user>@<node-c-ip> "mkdir -p '$REMOTE_DIR'"
-tar -cf - -C systems/node_b/implementation/data/tantivy_index_full . \
-    | ssh <user>@<node-c-ip> "tar -xf - -C '$REMOTE_DIR'"
+# Target path on Node C:
+REMOTE_DIR="C:/Users/Yurnero/Desktop/Uni Work/Semester 6/NLP/Project/Phase 3/systems/node_c/data/tantivy_index"
+ssh friend-laptop "powershell.exe -Command \"New-Item -ItemType Directory -Force -Path '$REMOTE_DIR' | Out-Null\""
+tar -cf - -C systems/node_b/implementation/data/tantivy_index . \
+    | ssh friend-laptop "powershell.exe -Command \"Set-Location '$REMOTE_DIR'; tar.exe -xf -\""
 ```
 
 1. **Verify the index loads** (build/load check, do not rebuild the corpus):
-   ```bash
-   python3 - <<'PY'
-   import tantivy
-   idx = tantivy.Index.open("<repo-path>/data/tantivy_index")
-   print("index OK:", idx.num_docs(), "documents")
-   PY
+   ```powershell
+   .\systems\node_c\.venv\Scripts\python.exe -c "import tantivy; idx = tantivy.Index.open(r'systems\node_c\data\tantivy_index'); print('index OK:', idx.searcher().num_docs, 'documents')"
    ```
    Expect ≈ 8,841,823 documents.
 2. **Spot-check one BM25 query** returns ranked hits in well under a second

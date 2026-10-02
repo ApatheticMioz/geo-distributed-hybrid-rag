@@ -268,20 +268,40 @@ The script always clears netem in a `finally` block, even on failure.
 
 ---
 
-## 7. Node A/B deploy loop
+## 7. Cross-node deploy and sync loop
 
-One-liner (Node A → Node B):
+Development can occur on Node A, Node B, or Node C. Commits are coordinated
+through remote Git (`origin/feat/three-node-study`).
 
+**From Node A (PC) or Node B (Laptop):**
+Push to remote, then trigger remote pull on target nodes via SSH:
 ```bash
-git commit -am "<msg>" && git push && ssh laptop "cd D:\Work\Semester6\NLP\Project_Laptop && git pull"
+# Push active branch
+git push origin feat/three-node-study
+
+# Remotely sync Node B (from A):
+ssh laptop "git -C 'D:\Work\Semester6\NLP\Project_Laptop' pull origin feat/three-node-study"
+
+# Remotely sync Node A (from B):
+ssh pc "wsl.exe -d Ubuntu -e bash -c 'cd /home/apath/Work/PDC/Project && git pull origin feat/three-node-study'"
+
+# Remotely sync Node C (from A or B):
+ssh friend-laptop "git -C 'C:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3' pull origin feat/three-node-study"
 ```
 
-Then, **only if `systems/node_b/` code changed**, restart the gateway on B
-(PowerShell): `schtasks /End /TN pdc_gateway` then `schtasks /Run /TN
-pdc_gateway`. Qdrant needs no restart for code-only changes.
+**From Node C (Friend's Laptop):**
+Node C does not have SSH access into Node A or Node B. The developer on Node C
+works locally, commits and pushes to `origin`, and pulls updates directly:
+```powershell
+git pull origin feat/three-node-study
+```
 
-Full access details, the one-time `docs/B_MIGRATION.md` cutover, and
-PowerShell 7 (`pwsh.exe`) environment details are in `docs/NODE_ACCESS.md`.
+**Service restarts (only if relevant code changed):**
+- **Node B gateway**: `schtasks /End /TN pdc_gateway` then `schtasks /Run /TN pdc_gateway`.
+- **Node C gateway**: Restart `start_gateway_c.bat` or `pdc_gateway_c` task.
+- **Node A stack**: `bash scripts/node_a/stop_stack.sh && bash scripts/node_a/start_stack.sh`.
+
+Full topology, SSH permissions matrix, and environment details are in `docs/NODE_ACCESS.md`.
 
 
 ---

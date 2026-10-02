@@ -1,5 +1,7 @@
 # Node B one-time migration — repo restructure cutover
 
+> **Status: COMPLETED (2026-10-02)**. Node B is fully migrated and operational at `D:\Work\Semester6\NLP\Project_Laptop` under `systems/node_b/`. The steps below are retained for historical record; do not re-run directory moves.
+
 Commit `1d76c8e` (2026-09-18) moved `node_B/` to `systems/node_b/` in the
 repository. Git only moves **tracked** files. Node B's clone carries large
 **untracked** state inside the old directory, so its next `git pull` would
