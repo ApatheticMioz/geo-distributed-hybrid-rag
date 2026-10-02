@@ -51,9 +51,6 @@ llama3-awq
 !experiments/bench/campaigns/*.jsonl
 !experiments/analysis/results/*.jsonl
 
-# Evo lineage & snapshots
-.evo/snapshots/
-**/evo_state
-!.evo/lineage.json
-
 .scratch/
+.evo/
+.pytest_cache/

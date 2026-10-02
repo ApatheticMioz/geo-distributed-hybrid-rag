@@ -2,7 +2,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Core ML and Embedding Dependencies
-torch==2.2.2+cu118
+torch==2.7.1+cu118
 FlagEmbedding>=1.2.9
 
 # Vector Database Client
@@ -19,7 +19,7 @@ tantivy>=0.26.0,<0.27
 # Data Handlers (Pinned below 2.0.0 to prevent breaking changes in ML ecosystem)
 numpy<2.0.0
 
-# Transformers compatibility for torch 2.2.2 and FlagEmbedding
+# Transformers compatibility for FlagEmbedding (bge-m3 needs torch>=2.6 per CVE-2025-32434 guard — satisfied by the torch pin above)
 transformers<=4.39.3
 peft<=0.10.0
 sentence-transformers<=2.7.0

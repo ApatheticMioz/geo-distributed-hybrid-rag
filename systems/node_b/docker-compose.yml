@@ -7,7 +7,11 @@ services:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - ./qdrant_storage:/qdrant/storage
+      - pdc_qdrant_storage:/qdrant/storage
       - ./snapshots:/qdrant/snapshots
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
+
+volumes:
+  pdc_qdrant_storage:
+    external: true
