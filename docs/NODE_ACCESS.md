@@ -103,6 +103,7 @@ Sparse-retrieval (Tantivy BM25) + user-facing tier. Clients talk to C, not B.
 | Sparse index | Tantivy BM25, local at C (`data/tantivy_index`) |
 | Dense leg | forwarded to Node B `10.8.0.2:8000` |
 | Generation | transitive: B → A `10.8.0.1:50052` |
+| Clone root | `C:\Users\Yurnero\Desktop\Uni Work\Semester 6\NLP\Project\Phase 3` |
 
 **Bring-up:** follow `scripts/node_c_prep/NODE_C_CHECKLIST.md` (WireGuard peer
 `10.8.0.3/24`, repo sync, venv, Tantivy index transfer, preflight, e2e smoke).
