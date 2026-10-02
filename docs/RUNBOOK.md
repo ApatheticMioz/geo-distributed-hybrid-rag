@@ -131,12 +131,29 @@ cache-flush endpoint, so **repeat 0 is the cold-prefix reference** and repeats
 pre-cached by an earlier arm.
 
 **Netem discipline (root required).** `scripts/netem/*` need `CAP_NET_ADMIN`
-and contain no sudo — run as root:
+and contain no sudo — run as root on Node A.
+
+Supports independent per-link shaping for the 3-node topology (Link B: `10.8.0.2`,
+Link C: `10.8.0.3`):
 
 ```bash
+# 1. Apply shaping:
+# Default / Link B (10.8.0.2):
 wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh 15 5
+# Specific peer (e.g. Node C 10.8.0.3):
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --peer c 40 1
+# Independent per-leg shaping simultaneously:
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-b 15 0 --link-c 40 1
+
+# 2. Inspect active qdiscs, HTB classes, and filters:
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/show.sh
+
+# 3. Closed-loop validation (±30% gate):
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh 15            # Link B
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh --peer c 40  # Link C
+
+# 4. Clear all netem and HTB state:
 wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/clear.sh
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh 15
 ```
 
 `campaign.py` calls `apply.sh`/`clear.sh` itself per regime (skipped for the
