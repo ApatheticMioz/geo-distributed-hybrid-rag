@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 MODEL_NAME = os.environ.get("BGE_M3_MODEL", "BAAI/bge-m3")
-QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "127.0.0.1")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 QDRANT_GRPC_PORT = int(os.environ.get("QDRANT_GRPC_PORT", "6334"))
 QDRANT_TIMEOUT_SECONDS = max(1, int(float(os.environ.get("QDRANT_TIMEOUT_SECONDS", "30"))))
@@ -101,7 +101,7 @@ def initialize_globals() -> None:
         host=QDRANT_HOST,
         port=QDRANT_PORT,
         grpc_port=QDRANT_GRPC_PORT,
-        prefer_grpc=False,
+        prefer_grpc=True,
         timeout=QDRANT_TIMEOUT_SECONDS,
     )
     logger.info("Qdrant client configured")
