@@ -4,9 +4,9 @@
 # Logs: gateway_out.log (stdout+stderr, append) in the repo root.
 $ErrorActionPreference = "Stop"
 
-$Repo = "D:\FAST\Semester6\NLP\Project_Laptop"
+$Repo = "D:\Work\Semester6\NLP\Project_Laptop"
 $Log = Join-Path $Repo "gateway_out.log"
-$TR = "cmd /c cd /d ""$Repo\node_B\implementation"" && ""$Repo\node_B\implementation\.venv\Scripts\python.exe"" -m uvicorn src.server:app --host 0.0.0.0 --port 8000 >> ""$Log"" 2>&1"
+$TR = "cmd /c cd /d ""$Repo\systems\node_b\implementation"" && ""$Repo\systems\node_b\implementation\.venv\Scripts\python.exe"" -m uvicorn src.server:app --host 0.0.0.0 --port 8000 >> ""$Log"" 2>&1"
 
 # Kill any previous instance (task tree first, then stray :8000 listeners).
 schtasks /End /TN pdc_gateway 2>$null | Out-Null

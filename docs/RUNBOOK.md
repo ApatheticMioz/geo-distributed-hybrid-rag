@@ -47,6 +47,20 @@ curl -s http://10.8.0.2:8000/health     # expect "role":"hybrid_retrieval_gatewa
 `schtasks /End /TN pdc_gateway`; Qdrant via
 `docker compose -f systems\node_b\docker-compose.yml up -d`.
 
+**Node B environment (ground truth, 2026-10-01):**
+- **Qdrant storage** is an **external named volume** `pdc_qdrant_storage`
+  (compose `volumes:` block, `external: true`), not a bind. The pre-migration
+  bind data is preserved under the clone root (`D:\Work\...`); deleting it is
+  the owner's call, not the stack's.
+- **Docker VM memory** on B is governed by `C:\Users\Apath\.wslconfig`
+  (`[wsl2] memory=12GB`) — the WSL2 VM hosting the Docker Desktop engine.
+- **B venv torch** = `2.7.1+cu118`. BGE-M3 needs torch `>=2.6`; the pin also
+  keeps the CVE-2025-32434 guard in place.
+- **Dense leg** currently runs in a stable disk-I/O regime at **21.1–24.3 s**
+  (a dedicated issue is being filed next — do not "fix" this in passing).
+- **Launch contract unchanged:** the gateway is started **only** via the
+  `pdc_gateway` scheduled task (see the restart contract below).
+
 Gateway restart contract (learned 2026-09-19, cost several fake "hangs"):
 
 - **Launch only via the scheduled task.** A uvicorn started from an
@@ -259,7 +273,7 @@ The script always clears netem in a `finally` block, even on failure.
 One-liner (Node A → Node B):
 
 ```bash
-git commit -am "<msg>" && git push && ssh laptop "cd D:\FAST\Semester6\NLP\Project_Laptop && git pull"
+git commit -am "<msg>" && git push && ssh laptop "cd D:\Work\Semester6\NLP\Project_Laptop && git pull"
 ```
 
 Then, **only if `systems/node_b/` code changed**, restart the gateway on B

@@ -9,7 +9,7 @@ tree (or fail: the tracked sources it needs are gone from the old path).
 
 Do the steps below **in order, on Node B**, from PowerShell. Stop between
 steps if anything errors. Run from the clone root
-`D:\FAST\Semester6\NLP\Project_Laptop`.
+`D:\Work\Semester6\NLP\Project_Laptop`.
 
 ## 1. Stop services first (they hold the dirs we move)
 
@@ -51,8 +51,10 @@ docker compose -f systems\node_b\docker-compose.yml up -d
 schtasks /Run /TN pdc_gateway
 ```
 
-Note: compose mounts are relative (`./qdrant_storage`), so the container
-must be recreated from the **new** compose path (step 4 does that).
+Note: the Qdrant data mount is now an **external named volume**
+(`pdc_qdrant_storage`), so the container must be recreated from the **new**
+compose path (step 4 does that); the pre-migration bind data is preserved
+under the clone root and its deletion is the owner's call.
 
 ## 5. Verify
 
