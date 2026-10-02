@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, r"D:\FAST\semester-project\NLP\project_node_b\node_B\implementation\.venv\Lib\site-packages")
+sys.path.insert(0, r"D:\geo-distributed-hybrid-rag\node_b\systems\node_b\implementation\.venv\Lib\site-packages")
 import torch
 print("CUDA Available:", torch.cuda.is_available())
 if torch.cuda.is_available():
