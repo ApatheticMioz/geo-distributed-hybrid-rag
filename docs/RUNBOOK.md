@@ -130,27 +130,27 @@ cache-flush endpoint, so **repeat 0 is the cold-prefix reference** and repeats
 1..R-1 are warm. Disjoint slices guarantee no arm's repeat-0 prefixes are
 pre-cached by an earlier arm.
 
-**Netem discipline (root required).** `scripts/netem/*` need `CAP_NET_ADMIN`
+**Netem discipline (root required).** `scripts/netem/*` require `CAP_NET_ADMIN`
 and contain no sudo — run as root on Node A.
 
-Supports independent per-link shaping for the 3-node topology (Link B: `10.8.0.2`,
-Link C: `10.8.0.3`):
+Requires explicit per-link target flags (`--link-b` for Node B `10.8.0.2`,
+`--link-c` for Node C `10.8.0.3`). Ambiguous positional arguments are rejected:
 
 ```bash
-# 1. Apply shaping:
-# Default / Link B (10.8.0.2):
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh 15 5
-# Specific peer (e.g. Node C 10.8.0.3):
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --peer c 40 1
-# Independent per-leg shaping simultaneously:
+# 1. Apply independent per-link shaping:
+# Shape Link B only (15 ms RTT, 0% loss):
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-b 15 0
+# Shape Link C only (40 ms RTT, 1% loss):
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-c 40 1
+# Shape both links simultaneously:
 wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-b 15 0 --link-c 40 1
 
 # 2. Inspect active qdiscs, HTB classes, and filters:
 wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/show.sh
 
 # 3. Closed-loop validation (±30% gate):
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh 15            # Link B
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh --peer c 40  # Link C
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh --link-b 15
+wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh --link-c 40
 
 # 4. Clear all netem and HTB state:
 wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/clear.sh
