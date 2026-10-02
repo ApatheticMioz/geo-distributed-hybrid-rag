@@ -156,3 +156,50 @@ The paper's related-work section already cites the canonical pair — **Leviatha
 - **RQ-1:** four families exist (federated RAG, single-host RAG characterization, LLM phase disaggregation, DNN partitioning); **none places hybrid-RAG pipeline stages by network regime.**
 - **RQ-2:** **OPEN** — no prior work couples stage placement + network regime + retrieval-quality-jointly-with-systems-metrics on a standard IR benchmark.
 - **RQ-3:** H1 **partial**, H2 **partial**, H3 **open**, H4 **partial→open** (for RAG stages), SPHP **open**. The two claims most at risk of a reviewer's "this is just X" are **H4** (vs. `janus2025`) and **SPHP** (vs. `speculativerag2025`/`omnia2025`); both survive on the RAG-stage / sparse-hint-reconciliation delta, and the paper's related-work section should cite `janus2025`, `speculativerag2025`, and `omnia2025` explicitly to preempt that objection.
+
+---
+
+## LR-6 — Counter-Paradigms, Competing Architectures & Boundary Conditions (2024–2026)
+
+**Session:** LR-6 · **Date:** 2026-10-02 · **Branch:** `feat/three-node-study`
+**Concern:** Map the broader literature landscape *beyond* confirmation bias. A rigorous Q1 submission must confront the four major competing paradigms that modern systems reviewers will raise:
+
+### 1. Prompt / Prefix Caching (The "Why Speculate when you can Cache?" Objection)
+* **Competing Literature**:
+  - `zheng2024sglang` (ICML 2024) — *SGLang / RadixAttention*: maintains Radix trees over KV caches to reuse shared prompt prefixes across multi-turn and multi-doc calls.
+  - `gim2024promptcache` (MLSys 2024) — *Prompt Cache*: modular attention reuse for prefill reduction.
+  - `liu2024cachegen` (SIGCOMM 2024) — *CacheGen*: fast context loading via KV-cache streaming and compression.
+* **The Tension**: If prefix caching is active and queries share documents, warm-prefix TTFT drops to sub-100 ms, rendering speculative prefill irrelevant.
+* **Our Rigorous Grounding**:
+  - SPHP's benefit is strictly a function of **cache state**. In warm regimes ($R_{1..2}$), empirical savings drop to within measurement noise ($<2\%$).
+  - SPHP is strictly a **cold-prefix mechanism** ($R_0$) targeting exploratory, ad-hoc, or tail queries where the retrieved document combination has zero prefix overlap in the Radix tree. SPHP does not replace prefix caching; it is the *complement* that covers the cold-miss tail where caching fails.
+
+### 2. Edge SLMs vs. Centralized Server Offloading (The "Why WAN at all?" Objection)
+* **Competing Literature**:
+  - `wang2024edgefm` (MobiCom 2024) — *EdgeFM*: foundation models on mobile devices.
+  - `chen2024eacorag` (IEEE INFOCOM 2024) — *EACO-RAG*: edge-assisted collaborative online RAG.
+  - Recent high-efficiency SLMs: Llama-3.2-1B/3B, Qwen2.5-1.5B/3B, Phi-3.5-mini.
+* **The Tension**: Modern edge devices (laptop GPUs, NPUs) can run 1B–3B models locally with 0 ms network delay. Why introduce geo-distributed complexity?
+* **Our Rigorous Grounding**:
+  - Edge generation hits a strict reasoning and context-length ceiling (hallucination rate and multi-hop accuracy on complex benchmarks like MS MARCO).
+  - Our analytical cost model (H2/H4) quantifies the exact crossover boundary: when the quality/reasoning gap of 1B–3B models outweighs the WAN transfer latency of offloading to a 27B+ parameter generator.
+
+### 3. Dense-Only / Late-Interaction (The "Why Hybrid BM25?" Objection)
+* **Competing Literature**:
+  - `santhanam2022colbertv2` (NAACL 2022) / `santhanam2022plaid` (CIKM 2022) — *ColBERTv2 / PLAID*: lightweight late-interaction retrieval.
+  - `thakur2021beir` (NeurIPS 2021) — *BEIR benchmark*: zero-shot IR evaluation across 18 datasets.
+* **The Tension**: Modern dense models (BGE-M3 standalone, E5-Mistral) argue BM25 is obsolete, eliminating the two-leg hybrid pipeline.
+* **Our Rigorous Grounding**:
+  - Out-of-domain robustness: BEIR studies demonstrate that dense-only models suffer from vocabulary mismatch on exact keywords, serial numbers, and domain shifts, where BM25 remains indispensable.
+  - Dual purpose in SPHP: The sparse leg is not just a quality booster—it serves as the **ultra-low-latency speculative trigger** (~15 ms vs ~1,100 ms dense) that allows speculative prefill to initiate before dense vector search completes.
+
+### 4. Speculation Penalties & Wasted Work (The "Negative Payoff" Objection)
+* **Competing Literature**:
+  - `leviathan2023speculative` (ICML 2023) / `chen2023speculative` (arXiv 2023) — Speculative decoding.
+  - `cai2024medusa` (ICML 2024) — Medusa multi-head speculation.
+* **The Tension**: When speculative predictions fail, GPU compute and memory bandwidth are wasted, introducing head-of-line blocking under load.
+* **Our Rigorous Grounding**:
+  - We derive the analytical break-even hit rate:
+    $$h^* = \frac{T_{\text{prefill}}}{T_{\text{prefill}} + T_{\text{WAN}}}$$
+  - Below $h^*$, speculation introduces net degradation due to wasted prefill aborts ($T_{\text{miss}}$). Our measured hit rate ($h = 0.84$) comfortably clears the break-even threshold ($h^* \approx 0.35–0.45$).
+
