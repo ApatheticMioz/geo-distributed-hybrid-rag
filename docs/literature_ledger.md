@@ -103,7 +103,7 @@ All three originally-failed entries have been replaced with verified sources (fu
 
 > **Acceptance met:** no failed or contradicted rows remain. The 29 bib entries now resolve to 24 verified + 3 verified-by-replacement + 2 provisional = 29. The 2 provisional entries (`chen2024bge`, `llama2024`) are not load-bearing: `chen2024bge`'s cited claim (dense + sparse from one encoder) is confirmed by the abstract, and `llama2024` is unused in `main.tex`.
 
-### 2026-10-15 re-repair pass (issue #5)
+### 2026-10-13 re-repair pass (issue #5)
 
 | verdict | count | keys |
 |---|---|---|
