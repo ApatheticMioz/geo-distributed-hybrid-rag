@@ -60,7 +60,12 @@ PORT_A=50052
 NODE_B="10.8.0.2"
 PORT_B=8000
 EXPECTED_DOCS=8841823
-WG_ADDR="10.8.0.3"
+# WG address: prefer the configured value from systems/node_c/config.yaml
+# (wireguard_ip:); fall back to the known mesh address if the config is
+# missing or unparseable. The wireguard_ip line is a plain scalar, so a
+# minimal parse suffices (no YAML library needed in the bash layer).
+WG_ADDR="$(sed -n 's/^[[:space:]]*wireguard_ip:[[:space:]]*"\{0,1\}\([0-9.]*\)"\{0,1\}[[:space:]]*$/\1/p' "$REPO_ROOT/systems/node_c/config.yaml" 2>/dev/null | head -1)"
+WG_ADDR="${WG_ADDR:-10.8.0.3}"
 
 DRY_RUN=0
 for arg in "$@"; do
@@ -194,11 +199,37 @@ except Exception as e:
 PY
 fi
 
-# --- WireGuard address (Windows-side adapter, via cmd ipconfig) -------------
-if cmd.exe /c ipconfig 2>/dev/null | grep -q "$WG_ADDR"; then
-  emit PASS wg_addr "$WG_ADDR present on WireGuard adapter"
+# --- WireGuard address (Windows-side adapter) -------------------------------
+# The original check grepped raw `cmd.exe /c ipconfig` output, which is brittle:
+# the per-adapter blocks are interleaved and the labels are localized
+# (e.g. "IPv4 Address" vs localized variants), and a disabled WSL->Windows
+# interop yields empty output indistinguishably from a missing address
+# (false negative observed on Node C with a verified 10.8.0.3 on wg0).
+# Prefer structured, layout-stable Windows sources, in order of preference:
+#   1. netsh interface ipv4 show addresses — stable "IP Address: x.x.x.x" lines
+#   2. Get-NetIPAddress -AddressFamily IPv4 (powershell.exe) — fixed column layout
+#   3. legacy ipconfig grep — last-resort fallback if neither is reachable
+# Matching is a whole-word grep on the address token itself, which is
+# independent of label language and column layout. Interop calls are guarded
+# so an absent interpreter is reported distinctly from a truly missing address.
+wg_addr_src=""
+netsh_out="$(netsh.exe interface ipv4 show addresses 2>/dev/null)"
+if [ -n "$netsh_out" ] && printf '%s\n' "$netsh_out" | grep -qw "$WG_ADDR"; then
+  wg_addr_src="netsh"
 else
-  emit FAIL wg_addr "$WG_ADDR not found in ipconfig"
+  ps_out="$(powershell.exe -NoProfile -Command 'Get-NetIPAddress -AddressFamily IPv4' 2>/dev/null)"
+  if [ -n "$ps_out" ] && printf '%s\n' "$ps_out" | grep -qw "$WG_ADDR"; then
+    wg_addr_src="Get-NetIPAddress"
+  elif cmd.exe /c ipconfig 2>/dev/null | grep -qw "$WG_ADDR"; then
+    wg_addr_src="ipconfig (fallback)"
+  fi
+fi
+if [ -n "$wg_addr_src" ]; then
+  emit PASS wg_addr "$WG_ADDR present on WireGuard adapter (via $wg_addr_src)"
+elif [ -z "$netsh_out" ] && [ -z "$ps_out" ]; then
+  emit FAIL wg_addr "Windows interop unavailable (netsh/powershell produced no output); cannot verify $WG_ADDR"
+else
+  emit FAIL wg_addr "$WG_ADDR not found on any Windows interface (netsh/Get-NetIPAddress/ipconfig)"
 fi
 
 # --- telemetry dir writable --------------------------------------------------
