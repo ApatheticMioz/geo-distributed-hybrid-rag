@@ -287,8 +287,9 @@ Our work is the first to bring this placement lens to the RAG pipeline itself.
 \subsection{Testbed}
 We deploy a two-node hybrid RAG system over a WireGuard virtual private
 network. \textbf{Node~A} (generation) is an RTX~3090 workstation
-(24~GB VRAM) serving a Qwen3.8-27B model quantized to W4A16
-\cite{qwen3technicalreport} under vLLM \cite{kwon2023vllm}, together with a
+(24~GB VRAM) serving the Qwen3.8-27B checkpoint
+\cite{qwen38hf2026}, quantized to W4A16 (INT4) with AutoRound
+\cite{autoround2024}, under vLLM \cite{kwon2023vllm}, together with a
 local SQLite store holding the full 8{,}841{,}823-passage MS~MARCO corpus
 \cite{bajaj2018msmarco} for $O(1)$ hydration. The engine runs with
 speculative decoding enabled; because the model emits chain-of-thought
