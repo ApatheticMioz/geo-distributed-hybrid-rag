@@ -229,7 +229,7 @@ SPHP TTFT 0.198–0.282 (cold 0.198–0.243; warm 0.209–0.282); total_ms
 
 | Run | Arms | N/arm | R | W/arm | Measured records | Total requests |
 |---|---|---|---|---|---|---|
-| v2 confirmatory core (2-node) | 8 (4 RTT × {P2, P2-SPHP}) | 120 | 3 | 10 | 28,800 | 28,880 |
+| v2 confirmatory core (2-node) | 8 (4 RTT × {P2, P2-SPHP}) | 120 | 3 | 10 | 2,880 | 2,960 |
 | v2 loss sweep (2-node, retrieval-only) | 6 | 50 | 3 | 5 | 900 | 930 |
 | **v2 core total** | | | | | **29,700** | **29,810** |
 | WS-CM 3-node | 6 (3 (B,C) cells × 2 arms) | 80 | 3 | 10 | 14,400 | 15,000 |
@@ -241,7 +241,7 @@ slices and fails fast on pool exhaustion; v2 adds `--query-sample 120`
 support, the per-leg `--link-c` argument, retrieval-only mode, and the
 manifest writer (§5). Runtime estimate: full-generation requests run at
 ≈ total_ms + overhead (~3 s each, v1 measured 2.3–3.2 s total_ms) ⇒ the
-confirmatory core ≈ 28,800 × 3 s ≈ **24 h (two overnight batches**); the
+confirmatory core ≈ 2,960 × 3 s ≈ **~2.5 h (one overnight batch)**; the
 retrieval-only loss sweep ≈ 900 × ~1.5 s ≈ 25 min.
 
 ## 5. Query pools
