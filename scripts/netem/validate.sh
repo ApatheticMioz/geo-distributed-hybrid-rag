@@ -4,9 +4,9 @@
 #
 # Semantics:
 #   1. Clear all qdiscs.
-#   2. Measure baseline median RTT over 5 pings.
+#   2. Measure baseline median RTT over $PING_COUNT pings.
 #   3. Apply shaping via apply.sh for the target link.
-#   4. Measure shaped median RTT over 5 pings.
+#   4. Measure shaped median RTT over $PING_COUNT pings.
 #   5. Enforce gate: |shaped - baseline - RTT_MS| <= 30% of RTT_MS.
 #   6. Trap cleanup clears all netem state on exit.
 #
@@ -26,7 +26,10 @@ command -v tc >/dev/null 2>&1 || { echo "FATAL: 'tc' not found." >&2; exit 1; }
 command -v ping >/dev/null 2>&1 || { echo "FATAL: 'ping' not found." >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PING_COUNT=5
+# 11 samples keeps the median odd-valued (no interpolation in median()) and
+# tightens the median vs the 5-ping variance noted in the 2026-10-12 A-B
+# validation (weakest tier: 15 ms target, 5-ping median high-variance).
+PING_COUNT=11
 
 usage() {
   echo "Usage:" >&2
