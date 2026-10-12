@@ -379,3 +379,78 @@
   journal = {IEEE/ACM Transactions on Networking},
   year    = {2000}
 }
+
+
+% ----------------------------------------------------------------------------
+% 8. 2024--26 competitor baselines (LR-12 positioning set)
+%    (ledger-verified; see docs/literature_ledger.md)
+% ----------------------------------------------------------------------------
+
+% --- LLM-serving placement / disaggregation lineage (cost-model section) ---
+
+@inproceedings{mei2025helix,
+  title     = {Helix: Serving Large Language Models over Heterogeneous {GPU}s and Network via Max-Flow},
+  author    = {Mei, Yixuan and Zhuang, Yonghao and Miao, Xupeng and Yang, Juncheng and Jia, Zhihao and Vinayak, Rashmi},
+  booktitle = {Proceedings of the 30th {ACM} International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+  year      = {2025},
+  pages     = {586--602},
+  doi       = {10.1145/3669940.3707215}
+}
+
+@inproceedings{wu2024loongserve,
+  title     = {LoongServe: Efficiently Serving Long-Context Large Language Models with Elastic Sequence Parallelism},
+  author    = {Wu, Bingyang and Liu, Shengyu and Zhong, Yinmin and Sun, Peng and Liu, Xuanzhe and Jin, Xin},
+  booktitle = {Proceedings of the 30th {ACM} {SIGOPS} Symposium on Operating Systems Principles (SOSP)},
+  year      = {2024},
+  pages     = {640--654},
+  doi       = {10.1145/3694715.3695948}
+}
+
+@inproceedings{qin2025mooncake,
+  title     = {Mooncake: Trading More Storage for Less Computation --- A {KVCache}-centric Architecture for Serving {LLM} Chatbot},
+  author    = {Qin, Ruoyu and Li, Zheming and He, Weiran and Cui, Jialei and Ren, Feng and Zhang, Mingxing and Wu, Yongwei and Zheng, Weimin and Xu, Xinran},
+  booktitle = {Proceedings of the 23rd {USENIX} Conference on File and Storage Technologies (FAST)},
+  year      = {2025},
+  pages     = {155--170},
+  note      = {Best Paper}
+}
+
+@inproceedings{liu2024cachegen,
+  title     = {CacheGen: {KV} Cache Compression and Streaming for Fast Large Language Model Serving},
+  author    = {Liu, Yuhan and Li, Hanchen and Cheng, Yihua and Ray, Siddhant and Huang, Yuyang and Zhang, Qizheng and Du, Kuntai and Yao, Jiayi and Lu, Shan and Ananthanarayanan, Ganesh and Maire, Michael and Hoffmann, Henry and Holtzman, Ari and Jiang, Junchen},
+  booktitle = {Proceedings of the 2024 {ACM} {SIGCOMM} Conference (SIGCOMM)},
+  year      = {2024},
+  pages     = {38--56},
+  doi       = {10.1145/3651890.3672274}
+}
+
+% --- Distributed speculation over WAN (motivation / differentiator) ---
+
+@misc{lyu2026speculation,
+  title         = {Speculation at a Distance: Where Edge--Cloud Speculative Decoding Actually Pays Off},
+  author        = {Lyu, Yuan and Irukulapati, Bharath and Champati, Jaya Prakash},
+  year          = {2026},
+  eprint        = {2606.25091},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.DC}
+}
+
+% --- Federated / privacy-preserving RAG (positioning) ---
+
+@inproceedings{chakraborty2025federatedrag,
+  title     = {Federated Retrieval-Augmented Generation: A Systematic Mapping Study},
+  author    = {Chakraborty, Abhijit and Dahal, Chahana and Gupta, Vivek},
+  booktitle = {Findings of the Association for Computational Linguistics: {EMNLP} 2025},
+  year      = {2025},
+  pages     = {7362--7374},
+  doi       = {10.18653/v1/2025.findings-emnlp.388}
+}
+
+@misc{sharma2025ragsurvey,
+  title         = {Retrieval-Augmented Generation: A Comprehensive Survey of Architectures, Enhancements, and Robustness Frontiers},
+  author        = {Sharma, Chaitanya},
+  year          = {2025},
+  eprint        = {2506.00054},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.IR}
+}
