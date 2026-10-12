@@ -59,6 +59,13 @@ Usage (Campaign v2 — confirmatory 2-node matrix, per
         --pool experiments/bench/queries/campaign_v2_master5000_seed42.txt \
         --dry-run
 
+Usage (Campaign v2 — WS-CM 3-node matrix, design §2.2/§3.2):
+    # Plan only (no netem, no HTTP, no files):
+    python3 experiments/bench/campaign.py \
+        --run three-node \
+        --pool experiments/bench/queries/campaign_v2_master5000_seed42.txt \
+        --dry-run
+
     # Real run (defaults in --pool mode implement the design: RTT
     # {0,15,40,80} x loss {0} x {P2, P2-SPHP}, N=120/arm, W=10, R=3,
     # arms consuming lines 1..1040 of the pool, per-tier 11-ping fidelity
@@ -75,10 +82,14 @@ shaping uses the explicit-link contract (``apply.sh --link-b <RTT> <LOSS>``,
 ``validate.sh --link-b <RTT>`` — no positional args), and the driver writes
 ``<out-dir>/campaign_v2_manifest.json`` before any request.
 
-Scope note: 3-node / RQ2 dropout / genuine-WAN run types are designed in
-``docs/campaign_v2_design.md`` but are **WS-CM workstream** extension points
-(see ``V2_RUN_SPECS``); this slice implements the confirmatory 2-node path
-only.
+The three-node run (``--run three-node``) implements the design's WS-CM
+3-node matrix: 3 per-leg (B, C) cells x {3node-P2, 3node-SPHP-from-C} =
+6 arms, N = 80/arm, W = 10, R = 3, consuming pool lines 1371..1910
+(design §5.1).  Both the A<->B (``--link-b``) and A<->C (``--link-c``) legs
+are shaped per cell, each with its own pre- and post-cell 11-ping fidelity
+gate.  Queries enter at Node C (the user-facing gateway).  The RQ2 dropout
+and genuine-WAN run types remain WS-CM extension points (see
+``V2_RUN_SPECS``).
 """
 
 import argparse
@@ -125,25 +136,62 @@ RESPONSE_FIELDS = ("token_count", "decode_tps")
 SPHP_FIELDS = ("sphp_hit", "sphp_overlap", "wasted_prefill_ms")
 
 # ---------------------------------------------------------------------------
-# v2: confirmatory run types (design §5.1 line-range spec)
+# v2: registered run types (design §5.1 line-range spec)
 # ---------------------------------------------------------------------------
 # Design-frozen pool line-ranges (1-based, inclusive start).  The end of each
-# run's range is derived from the run's arms x (N + W).  Only the confirmatory
-# core run is implemented in this slice; the WS-CM run types below are
-# extension points (design §5.1) and intentionally NOT registered here.
+# run's range is derived from the run's arms x (N + W).
 #
-#   "loss-sweep":    {"pool_line_start": 1041},  # 6 arms x (50+5)  = 330  [WS-CM]
-#   "three_node":    {"pool_line_start": 1371},  # 6 arms x (80+10) = 540  [WS-CM]
-#   "dropout":       {"pool_line_start": 1911},  # 2 arms x (60+5)  = 130  [WS-CM]
-#   "genuine_wan":   {"pool_line_start": 2041},  # 2 arms x (100+5) = 210  [WS-CM]
+#   "confirmatory":  lines 1..1040   (8 arms x (120+10) = 1040)  [implemented]
+#   "three_node":    lines 1371..1910 (6 arms x (80+10) = 540)   [implemented]
+#   "loss-sweep":    {"pool_line_start": 1041},  # 6 arms x (50+5)  = 330  [WS-CM, not yet registered]
+#   "dropout":       {"pool_line_start": 1911},  # 2 arms x (60+5)  = 130  [WS-CM, not yet registered]
+#   "genuine_wan":   {"pool_line_start": 2041},  # 2 arms x (100+5) = 210  [WS-CM, not yet registered]
+#
+# The three-node run is the design's WS-CM 3-node matrix (§2.2/§3.2/§4.3/§5.1):
+# 3 per-leg (B, C) cells x 2 placement arms.  Design-frozen parameters:
+#   * cells (RTT_B, RTT_C) = {(15,15),(40,15),(80,15)} — B carries the
+#     dense/generation legs, C the user-facing sparse leg; loss 0 on both
+#     legs (all 3-node cells are shaped);
+#   * arms per cell = {3node-P2 (mode=hybrid, variant=baseline),
+#     3node-SPHP-from-C (mode=hybrid, variant=sphp)}; the 3node-SPHP-from-B
+#     counterpart and the D-B/D-C dropout arms are WS-CM workstream scope
+#     (design §2.2) and are not part of the 6-arm 3-node matrix;
+#   * N = 80/arm, W = 10/arm, R = 3 (design §4.3 / §4.1).
+# The 2-node confirmatory core keeps its own defaults (N=120, W=10, R=3,
+# rtt tiers [0,15,40,80]); each run type resolves its own defaults.
 V2_RUN_SPECS: Dict[str, Dict[str, Any]] = {
     "confirmatory": {
         "pool_line_start": 1,
         "label": "v2 confirmatory core (2-node)",
+        "gateway_ip": "10.8.0.2",
+        # (rtt, loss) regimes swept on link-b; rtt 0 = unshaped baseline.
+        "cells": [(0, 0), (15, 0), (40, 0), (80, 0)],
+        "variants": ["baseline", "sphp"],
+        "n": 120, "warmups": 10, "repeats": 3,
+    },
+    "three-node": {
+        "pool_line_start": 1371,
+        "label": "WS-CM 3-node matrix",
+        # Queries enter at the Node C gateway (user-facing tier; design §2.2).
+        "gateway_ip": "10.8.0.3",
+        # (rtt_b, rtt_c) per-leg cells (design §3.2); loss is 0 on both legs
+        # for every 3-node cell (all cells are shaped).
+        "cells": [(15, 15), (40, 15), (80, 15)],
+        # The 2 arms of the design's 3-node matrix: 3node-P2 and
+        # 3node-SPHP-from-C (the SPHP hint originates on the user-facing
+        # Node C).  The 3node-SPHP-from-B counterpart is a WS-CM paired
+        # contrast, not part of this matrix (design §2.2).
+        "variants": ["baseline", "sphp"],
+        "n": 80, "warmups": 10, "repeats": 3,
     },
 }
 
 V1_DEFAULT_QUERIES = "experiments/bench/queries/latency_dev480_seed42.txt"
+
+# Design §5.1: the v2 pool file is the 5,000-line seeded master pool
+# (all v2 run types share it; each run type consumes its own line-range
+# slice).  Used as the default when `--pool` is not given for a v2 run type.
+V2_DEFAULT_POOL = "experiments/bench/queries/campaign_v2_master5000_seed42.txt"
 
 
 class ManifestError(Exception):
@@ -259,6 +307,46 @@ def verify_pool_manifest(pool_path: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # v2: line-range slice selection (design §5.1 — fixed, arm-ordered ranges)
 # ---------------------------------------------------------------------------
+def _check_pool_range(
+    all_queries: List[str],
+    line_start: int,
+    line_end: int,
+    n_arms: int,
+    n: int,
+    warmups: int,
+) -> List[str]:
+    """Validate a (1-based, inclusive) pool line range and return its block.
+
+    Shared by the 2-node and 3-node slice selectors so both run types carry
+    identical fail-fast guards:
+      * the range holds exactly ``n_arms * (n + warmups)`` lines,
+      * the range is within the pool file's bounds,
+      * the block holds no duplicate queries.
+
+    Returns the ``line_end - line_start + 1`` line block (the pool file is
+    the seeded shuffle, so it is consumed as-is, no re-shuffle).
+    """
+    per_arm = n + warmups
+    required = line_end - line_start + 1
+    if required != n_arms * per_arm:
+        raise ValueError(
+            f"line range [{line_start}, {line_end}] holds {required} lines but "
+            f"{n_arms} arms x (N={n} + W={warmups}) = {n_arms * per_arm} are "
+            f"required (recompute the range from the design spec)")
+    available = len(all_queries)
+    if line_start < 1 or line_end > available:
+        raise ValueError(
+            f"pool line range [{line_start}, {line_end}] out of bounds: "
+            f"the pool file has {available} non-blank lines")
+
+    block = all_queries[line_start - 1:line_end]
+    if len(set(block)) != len(block):
+        raise ValueError(
+            f"duplicate queries inside pool range [{line_start}, {line_end}]: "
+            f"the pool file must hold distinct queries (re-run the generator)")
+    return block
+
+
 def v2_line_range(run_name: str, n_arms: int, n: int, warmups: int) -> Tuple[int, int]:
     """Return the (1-based, inclusive) pool line range for a v2 run type.
 
@@ -301,26 +389,10 @@ def select_pool_slices(
     Returns one dict per arm (in arm order) with the same keys as
     ``build_arm_query_plan`` plus nothing renamed.
     """
+    block = _check_pool_range(all_queries, line_start, line_end,
+                              len(arms), n, warmups)
     n_arms = len(arms)
     per_arm = n + warmups
-    required = line_end - line_start + 1
-    if required != n_arms * per_arm:
-        raise ValueError(
-            f"line range [{line_start}, {line_end}] holds {required} lines but "
-            f"{n_arms} arms x (N={n} + W={warmups}) = {n_arms * per_arm} are "
-            f"required (recompute the range from the design spec)")
-    available = len(all_queries)
-    if line_start < 1 or line_end > available:
-        raise ValueError(
-            f"pool line range [{line_start}, {line_end}] out of bounds: "
-            f"the pool file has {available} non-blank lines")
-
-    block = all_queries[line_start - 1:line_end]
-    if len(set(block)) != len(block):
-        raise ValueError(
-            f"duplicate queries inside pool range [{line_start}, {line_end}]: "
-            f"the pool file must hold distinct queries (re-run the generator)")
-
     plan: List[Dict[str, Any]] = []
     for i, (rtt, loss, mode, variant) in enumerate(arms):
         start = (line_start - 1) + i * per_arm
@@ -497,6 +569,67 @@ def clear_netem(dry_run: bool) -> None:
         print(f"    [netem] WARNING: clear.sh failed: {out}", file=sys.stderr)
 
 
+def apply_netem_3node(rtt_b: int, loss_b: int, rtt_c: int, loss_c: int,
+                      dry_run: bool) -> bool:
+    """Apply the 3-node per-leg shaping regime (design §3.2).
+
+    ``apply.sh --link-b <RTT_B> <LOSS_B> --link-c <RTT_C> <LOSS_C>`` shapes
+    the A<->B and A<->C legs independently in one call (the explicit-link
+    contract; C<->B traffic relays through A).  ``rtt_c=0``/``loss_c=0``
+    means the C leg is left on the unshaped default class.  Skipped for
+    dry-run.  Returns True only if apply.sh succeeded.
+    """
+    if dry_run:
+        return False
+    ok, out = run_netem(APPLY_SH,
+                        "--link-b", rtt_b, loss_b,
+                        "--link-c", rtt_c, loss_c)
+    if ok:
+        print(f"    [netem] applied --link-b rtt={rtt_b}ms loss={loss_b}% "
+              f"--link-c rtt={rtt_c}ms loss={loss_c}%")
+    else:
+        print(f"    [netem] WARNING: apply.sh failed "
+              f"(--link-b {rtt_b} {loss_b} --link-c {rtt_c} {loss_c}): {out}",
+              file=sys.stderr)
+    return ok
+
+
+def run_fidelity_gate_3node(rtt_b: int, rtt_c: int, when: str,
+                            dry_run: bool) -> List[Dict[str, Any]]:
+    """Per-leg 11-ping fidelity gate for a 3-node cell (design §3.2/§6).
+
+    Validates EACH shaped leg independently — ``validate.sh --link-b
+    <RTT_B>`` and ``validate.sh --link-c <RTT_C>`` — so the ±30% added-RTT
+    window is enforced per leg, not across a merged ping set.  A 0-RTT leg
+    (unshaped) is recorded as ``skipped-baseline``.  ``when`` is "pre" (before
+    the cell's arms) or "post" (at cell close).  Returns one record per
+    shaped leg, in [B, C] order.
+    """
+    if dry_run:
+        return [{"link": "b", "rtt_ms": rtt_b, "when": when,
+                 "status": "planned" if rtt_b > 0 else "skipped-baseline"},
+                {"link": "c", "rtt_ms": rtt_c, "when": when,
+                 "status": "planned" if rtt_c > 0 else "skipped-baseline"}]
+    out: List[Dict[str, Any]] = []
+    for link, rtt in (("b", rtt_b), ("c", rtt_c)):
+        if rtt <= 0:
+            out.append({"link": link, "rtt_ms": rtt, "when": when,
+                        "status": "skipped-baseline",
+                        "baseline_median_ms": None, "shaped_median_ms": None,
+                        "added_rtt_ms": None, "output_tail": ""})
+            continue
+        ok, gate_out = run_netem(VALIDATE_SH, f"--link-{link}", rtt,
+                                 timeout=300)
+        parsed = parse_fidelity_gate_output(gate_out)
+        out.append({"link": link,
+                    "rtt_ms": rtt,
+                    "when": when,
+                    "status": "PASS" if ok else "FAIL",
+                    **parsed,
+                    "output_tail": (gate_out or "")[-500:]})
+    return out
+
+
 # ---------------------------------------------------------------------------
 # v2: fidelity gate (design §6 — 11-ping median, ±30% added-RTT window)
 # ---------------------------------------------------------------------------
@@ -648,9 +781,13 @@ def build_parser() -> argparse.ArgumentParser:
                          "a query-pool file with a .manifest.json sidecar "
                          "(sha256 + n verified at startup; arm slices are the "
                          "design's fixed line-ranges, not a seeded shuffle)")
-    ap.add_argument("--run", default="confirmatory", choices=sorted(V2_RUN_SPECS),
-                    help="v2 run type (3-node/dropout/genuine-WAN are WS-CM "
-                         "extension points, not registered here)")
+    ap.add_argument("--run", default=None, choices=sorted(V2_RUN_SPECS),
+                    help="v2 run type (activates v2 mode when given, with or "
+                         "without --pool): 'confirmatory' (2-node confirmatory "
+                         "core) or 'three-node' (WS-CM 3-node matrix). dropout "
+                         "/ genuine-WAN are WS-CM extension points, not "
+                         "registered. Default: v1 mode unless --pool is given "
+                         "(then 'confirmatory').")
     ap.add_argument("--rtt-tiers", nargs="+", type=int,
                     default=[0, 15, 40, 80],
                     help="Full-round-trip RTT tiers (ms) to sweep (paper tiers)")
@@ -676,9 +813,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="RNG seed (v1 pool shuffle; recorded in the v2 "
                          "manifest — the v2 pool file itself is pre-seeded "
                          "by the generator)")
-    ap.add_argument("--repeats", type=int, default=3,
+    ap.add_argument("--repeats", type=int, default=None,
                     help="Back-to-back repeats per measured query, R; "
-                         "repeat 0 is the cold-prefix stratum")
+                         "repeat 0 is the cold-prefix stratum "
+                         "(default: v1 3; v2 from the run spec)")
     ap.add_argument("--warmups", type=int, default=None,
                     help="Warmup queries per arm, W; executed but not "
                          "recorded (default: v1 5; v2 10 per design §5.2)")
@@ -705,8 +843,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def is_v2(args: argparse.Namespace) -> bool:
-    """v2 (Campaign v2) mode is activated by --pool (v2 = --pool is set)."""
-    return args.pool is not None
+    """v2 (Campaign v2) mode is activated by --pool OR --run.
+
+    ``--pool FILE`` (the historical activation) or an explicit ``--run``
+    (``--run confirmatory`` / ``--run three-node``) both select v2 mode.
+    ``--run`` without ``--pool`` uses the design §5.1 default pool file.
+    """
+    return args.pool is not None or args.run is not None
 
 
 def resolve_mode_defaults(args: argparse.Namespace) -> None:
@@ -719,19 +862,29 @@ def resolve_mode_defaults(args: argparse.Namespace) -> None:
     An explicitly provided value always wins.
     """
     if is_v2(args):
+        spec = V2_RUN_SPECS.get(args.run, V2_RUN_SPECS["confirmatory"])
         if args.modes is None:
             args.modes = ["hybrid"]
         # store_true with default=SUPPRESS: the attribute is absent unless
         # the flag was passed.  v2 default: axis ON (the confirmatory core
-        # is the P2 vs P2-SPHP comparison).
+        # is the P2 vs P2-SPHP comparison; the 3-node matrix is likewise the
+        # 3node-P2 vs 3node-SPHP-from-C axis).
         if not getattr(args, "sphp_axis", False):
             args.sphp_axis = True
         if args.loss_tiers is None:
             args.loss_tiers = [0]
+        # Per-run frozen sample sizes (design §4): confirmatory N=120/W=10;
+        # three-node N=80/W=10.  An explicit CLI value always wins.
         if args.query_sample is None:
-            args.query_sample = 120
+            args.query_sample = spec["n"]
         if args.warmups is None:
-            args.warmups = 10
+            args.warmups = spec["warmups"]
+        if args.repeats is None:
+            args.repeats = spec["repeats"]
+        # Gateway: the 2-node core queries the Node B gateway; the 3-node
+        # run queries the Node C (user-facing) gateway (design §2.2).
+        if args.gateway_url == "http://10.8.0.2:8000":
+            args.gateway_url = f"http://{spec['gateway_ip']}:8000"
     else:
         if args.modes is None:
             args.modes = ["hybrid", "dense", "sparse"]
@@ -744,6 +897,8 @@ def resolve_mode_defaults(args: argparse.Namespace) -> None:
             args.query_sample = 50
         if args.warmups is None:
             args.warmups = 5
+        if args.repeats is None:
+            args.repeats = 3
 
 
 # ---------------------------------------------------------------------------
@@ -786,6 +941,247 @@ def build_arm_list(args: argparse.Namespace) -> List[Tuple[int, int, str, str]]:
                 for variant in variants_for_mode(mode, args.sphp_axis):
                     arms.append((rtt, loss, mode, variant))
     return arms
+
+
+# ---------------------------------------------------------------------------
+# v2: three-node run (design §2.2/§3.2/§4.3/§5.1 — WS-CM matrix)
+# ---------------------------------------------------------------------------
+def three_node_arm_label(variant: str) -> str:
+    """Design §2.2 3-node arm key for a variant label.
+
+    baseline -> ``3node-P2`` (3-node baseline: sparse on C);
+    sphp -> ``3node-SPHP-from-C`` (provisional sparse hint originates on the
+    user-facing Node C).  The ``3node-SPHP-from-B`` counterpart is a separate
+    WS-CM paired contrast, not part of the 6-arm matrix.
+    """
+    return "3node-P2" if variant == "baseline" else "3node-SPHP-from-C"
+
+
+def build_3node_arm_list(spec: Dict[str, Any]) -> List[Tuple[int, int, str]]:
+    """Return the ordered 3-node arm list: ``(rtt_b, rtt_c, variant)``.
+
+    Order is cell-major (the design's (B, C) cells in §3.2), then the two
+    placement arms (baseline -> sphp).  Both legs are shaped in every 3-node
+    cell (loss is 0 on both); there is no unshaped 3-node control (the
+    2-node rtt-0 baseline is the control, design §3.2).
+    """
+    arms: List[Tuple[int, int, str]] = []
+    for rtt_b, rtt_c in spec["cells"]:
+        for variant in spec["variants"]:
+            arms.append((rtt_b, rtt_c, variant))
+    return arms
+
+
+def select_pool_slices_3node(
+    all_queries: List[str],
+    cells: List[Tuple[int, int]],
+    variants: List[str],
+    n: int,
+    warmups: int,
+    line_start: int,
+    line_end: int,
+) -> List[Dict[str, Any]]:
+    """Assign each 3-node arm a DISJOINT contiguous pool line slice.
+
+    Arms are laid out cell-major, variant-second (matching
+    ``build_3node_arm_list``) so the fixed line-range of design §5.1 maps
+    one arm per block.  Arm ``i`` gets lines
+    ``[line_start + i*(N+W) .. line_start + (i+1)*(N+W) - 1]``; the first
+    ``warmups`` are warmups (executed, not recorded), the rest measured.
+
+    Fails fast via ``_check_pool_range`` (range size / bounds / duplicates)
+    and asserts pairwise disjointness.  Returns one dict per arm with keys
+    ``rtt_b, rtt_c, loss_b, loss_c, mode, variant, warmups, measured,
+    pool_start, pool_end``.
+    """
+    arms = [(rtt_b, rtt_c, var)
+            for rtt_b, rtt_c in cells for var in variants]
+    block = _check_pool_range(all_queries, line_start, line_end,
+                              len(arms), n, warmups)
+    per_arm = n + warmups
+    plan: List[Dict[str, Any]] = []
+    for i, (rtt_b, rtt_c, variant) in enumerate(arms):
+        start = (line_start - 1) + i * per_arm
+        end = start + per_arm
+        slice_ = block[i * per_arm:(i + 1) * per_arm]
+        plan.append({
+            "rtt_b": rtt_b,
+            "rtt_c": rtt_c,
+            "loss_b": 0,
+            "loss_c": 0,
+            "mode": "hybrid",
+            "variant": variant,
+            "warmups": slice_[:warmups],
+            "measured": slice_[warmups:end - start],
+            "pool_start": start,
+            "pool_end": end,
+        })
+    # Disjointness assertion over the 3-node arm slices (warmups + measured).
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert not (sets[i] & sets[j]), "internal error: 3-node slices overlap"
+    return plan
+
+
+def build_3node_manifest(
+    run_id: str,
+    pool_path: str,
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+    plan: List[Dict[str, Any]],
+    n: int,
+    warmups: int,
+    repeats: int,
+    seed: int,
+) -> Dict[str, Any]:
+    """Build the ``campaign_v2_manifest.json`` document for the 3-node run
+    (design §5.1).  Same manifest discipline as the confirmatory run; the
+    per-arm shape records both per-leg (B, C) targets plus the arm's
+    design §2.2 key."""
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    disjoint = True
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            if sets[i] & sets[j]:
+                disjoint = False
+                break
+    return {
+        "schema": "pdc.campaign_manifest/v2",
+        "design_doc": DESIGN_DOC,
+        "design_commit": DESIGN_COMMIT,
+        "run_id": run_id,
+        "generated_at_utc": _now_iso(),
+        "run": "three-node",
+        "pool": {
+            "path": pool_path,
+            "sha256": manifest.get("_verified_sha256"),
+            "manifest_path": str(Path(pool_path).with_name(
+                Path(pool_path).name + ".manifest.json")),
+            "n": manifest.get("n"),
+            "line_start": line_start,
+            "line_end": line_end,
+        },
+        "seed": seed,
+        "n_per_arm": n,
+        "warmups_per_arm": warmups,
+        "repeats_per_query": repeats,
+        "arms": [
+            {
+                "arm": three_node_arm_label(a["variant"]),
+                "rtt_b": a["rtt_b"],
+                "loss_b": a["loss_b"],
+                "rtt_c": a["rtt_c"],
+                "loss_c": a["loss_c"],
+                "mode": a["mode"],
+                "variant": a["variant"],
+                "netem_link_b_applied": {"rtt_ms": a["rtt_b"],
+                                         "loss_pct": a["loss_b"]},
+                "netem_link_c_applied": {"rtt_ms": a["rtt_c"],
+                                         "loss_pct": a["loss_c"]},
+                "pool_start": a["pool_start"] + 1,   # 1-based line numbers
+                "pool_end": a["pool_end"],
+                "warmups": a["warmups"],
+                "measured": a["measured"],
+            } for a in plan
+        ],
+        "disjointness": {
+            "asserted": disjoint,
+            "n_slices": len(plan),
+            "pairwise_intersection_size": 0 if disjoint else -1,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Plan / dry-run
+# ---------------------------------------------------------------------------
+def print_plan_v2_3node(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    arm_plan: List[Dict[str, Any]],
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Dry-run plan for the v2 three-node run (no netem, no HTTP, no files)."""
+    spec = V2_RUN_SPECS["three-node"]
+    cells = spec["cells"]
+    n_arms = len(arm_plan)
+    per_arm = args.query_sample + args.warmups
+    n_measured_per_arm = len(arm_plan[0]["measured"]) * args.repeats
+    n_warmups_per_arm = len(arm_plan[0]["warmups"])
+    n_total_per_arm = n_warmups_per_arm + n_measured_per_arm
+    n_measured = n_arms * n_measured_per_arm
+    n_warmups = n_arms * n_warmups_per_arm
+    n_total = n_arms * n_total_per_arm
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in arm_plan]
+    disjoint = all(not (sets[i] & sets[j])
+                   for i in range(len(sets))
+                   for j in range(i + 1, len(sets)))
+
+    print("=" * 78)
+    print("CAMPAIGN V2 — WS-CM 3-NODE MATRIX — DRY RUN")
+    print("=" * 78)
+    print(f"  design doc   : {DESIGN_DOC} (commit {DESIGN_COMMIT})")
+    print(f"  run type     : three-node  ({spec['label']})")
+    print(f"  gateway      : {args.gateway_url} (Node C — user-facing tier)")
+    print(f"  pool file    : {args.pool}  ({len(all_queries)} lines, "
+          f"sha256={manifest.get('_verified_sha256')})")
+    print(f"  pool manifest: VERIFIED OK (sha256 + n={manifest.get('n')} "
+          f"+ line_count all match)")
+    print(f"  pool lines   : {line_start}..{line_end} of the pool file "
+          f"(design §5.1; 6 arms x {per_arm} = {n_arms * per_arm} lines)")
+    print(f"  per-leg cells: (B, C) in ms = {cells}  "
+          f"(B = dense/generation, C = user-facing sparse; loss 0 on both)")
+    print(f"  arms         : {n_arms} = {len(cells)} cells x "
+          f"{{3node-P2, 3node-SPHP-from-C}} "
+          f"(mode=hybrid, sphp axis on)")
+    print(f"  per arm      : W={args.warmups} warmups + N={args.query_sample} "
+          f"x R={args.repeats} = {n_total_per_arm} requests "
+          f"({n_measured_per_arm} measured + {n_warmups_per_arm} warmups)")
+    print(f"  TOTAL        : {n_total} requests "
+          f"({n_measured} measured + {n_warmups} warmups)")
+    print(f"  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm "
+          f"(no cache flush exists; §5.2)")
+    print(f"  fidelity gate: pre- AND post- each cell, PER LEG: "
+          f"validate.sh --link-b <rtt_b> and --link-c <rtt_c> "
+          f"(11-ping median, ±30% added-RTT window per leg); "
+          f"FAIL aborts the campaign")
+    print(f"  error gate   : ≤1% error rate per arm (WS-CM 3-node, design §6.4; "
+          f"the 2-node core stays at 0)")
+    print(f"  campaign manifest: would be written to "
+          f"{args.out_dir}/campaign_v2_manifest.json before any request")
+    print("-" * 78)
+    print("  Execution plan (cells sequentially; arms 3node-P2 -> "
+          "3node-SPHP-from-C per cell):")
+    for rtt_b, rtt_c in cells:
+        tag = (f"shaped: apply --link-b {rtt_b} 0 --link-c {rtt_c} 0; "
+               f"per-leg gate pre+post")
+        cell_arms = [a for a in arm_plan
+                     if a["rtt_b"] == rtt_b and a["rtt_c"] == rtt_c]
+        n_cell_total = sum(len(a["warmups"]) + len(a["measured"]) * args.repeats
+                           for a in cell_arms)
+        n_cell_measured = sum(len(a["measured"]) * args.repeats
+                              for a in cell_arms)
+        print(f"    cell (B={rtt_b}ms, C={rtt_c}ms)  [{tag}]")
+        for variant in spec["variants"]:
+            arm = next(a for a in cell_arms if a["variant"] == variant)
+            a_total = (len(arm["warmups"])
+                       + len(arm["measured"]) * args.repeats)
+            print(f"        arm {three_node_arm_label(variant):<18} "
+                  f"(mode={arm['mode']} variant={variant})  "
+                  f"-> pool lines {arm['pool_start'] + 1}..{arm['pool_end']}  "
+                  f"({len(arm['warmups'])}W + {len(arm['measured'])}x{args.repeats}R "
+                  f"= {a_total} req)")
+        print(f"        cell subtotal: {n_cell_total} requests "
+              f"({n_cell_measured} measured)")
+    print("-" * 78)
+    print(f"  manifest disjointness: {len(arm_plan)} arm slices, pairwise "
+          f"intersection == {'0 (asserted OK)' if disjoint else 'NON-EMPTY (FAIL)'}")
+    print("-" * 78)
+    print("  DRY RUN complete. No network calls, no netem, no files were made.")
 
 
 # ---------------------------------------------------------------------------
@@ -1504,6 +1900,291 @@ def run_campaign_v2(
 
 
 # ---------------------------------------------------------------------------
+# v2: three-node record fields & runner (design §2.2/§3.2/§5)
+# ---------------------------------------------------------------------------
+def v3node_record_extra(
+    repeat_index: int,
+    rtt_b: int,
+    loss_b: int,
+    rtt_c: int,
+    loss_c: int,
+    pre_gates: List[Dict[str, Any]],
+    pool_path: str,
+    manifest: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The 3-node record-field additions (all additive).
+
+    - stratum: 'cold' (repeat 0) / 'warm' (repeats 1..R-1), design §5.2;
+    - rtt_ping_median_ms: the pre-cell LINK-B shaped 11-ping median (the
+      dense/generation leg that dominates TTFT); None when the leg is
+      unshaped;
+    - netem_link_b_applied / netem_link_c_applied: per-leg targets (design
+      §3.2 — the record gains ``netem_link_c_applied`` + per-leg targets);
+    - pool provenance: pool name + verified sha256.
+    """
+    b_gate = next((g for g in pre_gates if g.get("link") == "b"), None)
+    netem_b = {"rtt_ms": rtt_b, "loss_pct": loss_b}
+    netem_c = {"rtt_ms": rtt_c, "loss_pct": loss_c}
+    return {
+        "stratum": stratum_for_repeat(repeat_index),
+        "rtt_ping_median_ms": (b_gate or {}).get("shaped_median_ms"),
+        "netem_link_b_applied": netem_b,
+        "netem_link_c_applied": netem_c,
+        "pool_file": Path(pool_path).name,
+        "pool_manifest_sha256": manifest.get("_verified_sha256"),
+    }
+
+
+def run_campaign_v3node(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    manifest: Dict[str, Any],
+    arm_plan: List[Dict[str, Any]],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Execute the WS-CM 3-node matrix (design §2.2/§3.2/§6 procedure).
+
+    Per (B, C) cell: pre-cell per-leg fidelity gate (``validate.sh
+    --link-b`` + ``validate.sh --link-c``, each FAIL aborts), then
+    ``apply.sh --link-b … --link-c …``, then the two arms
+    (3node-P2 -> 3node-SPHP-from-C) against the Node C gateway, then a
+    post-cell per-leg gate, then a ≤1% per-arm error gate (design §6.4 —
+    the 3-node arms relax from the 2-node 0-error to ≤1%), then clear.
+    Writes ``<out-dir>/campaign_v2_manifest.json`` before any request.
+    Exits 1 (with partial artifacts kept) on any gate or error-gate failure.
+
+    This run type is the WS-CM workstream slice; it does not implement the
+    v2-core ``--resume`` machinery (a single-shot per-cell batch).
+    """
+    spec = V2_RUN_SPECS["three-node"]
+    cells = spec["cells"]
+    pool_path = str(args.pool)
+    endpoint = args.gateway_url.rstrip("/") + "/query/benchmark"
+
+    # Health check at the Node C gateway (fail fast if it is down).
+    if not check_health(args.gateway_url, timeout=15):
+        print(f"ERROR: gateway health check failed at {args.gateway_url}/health",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"Gateway healthy: {args.gateway_url} (Node C)")
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    run_id = _run_id()
+    jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
+    if jsonl_path.exists():
+        print(f"ERROR: {jsonl_path} already exists; omit --run-id for a "
+              f"fresh run.", file=sys.stderr)
+        sys.exit(1)
+
+    # Design §5.1: the campaign manifest is written BEFORE any request.
+    manifest_path = out_dir / "campaign_v2_manifest.json"
+    manifest_doc = build_3node_manifest(
+        run_id, pool_path, manifest, line_start, line_end,
+        arm_plan, args.query_sample, args.warmups, args.repeats, args.seed)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_doc, f, indent=2)
+    print(f"Manifest written: {manifest_path} "
+          f"(disjointness asserted: {manifest_doc['disjointness']['asserted']})")
+
+    # Clean slate before any shaping.
+    clear_netem(dry_run=False)
+
+    arms_recs: Dict[Tuple[int, int, str, str], List[Dict[str, Any]]] = {}
+    gates_log: List[Dict[str, Any]] = []
+    n_ok = 0
+    n_err = 0
+    n_warmup_ok = 0
+    n_warmup_err = 0
+    exit_code = 0
+    abort_reason: Optional[str] = None
+
+    def _finalize() -> None:
+        summary_rows: List[Dict[str, Any]] = []
+        for (rtt_b, rtt_c, mode, variant), recs in arms_recs.items():
+            row = summarize_arm(recs)
+            row = {"rtt_b": rtt_b, "rtt_c": rtt_c, "mode": mode,
+                   "variant": variant, **row}
+            summary_rows.append(row)
+        summary_rows.sort(key=lambda r: (r["rtt_b"], r["rtt_c"],
+                                         r["mode"], r["variant"]))
+        summary_doc = {
+            "schema": "pdc.campaign_summary/v2",
+            "design_doc": DESIGN_DOC,
+            "design_commit": DESIGN_COMMIT,
+            "run": "three-node",
+            "run_id": run_id,
+            "generated_at": _now_iso(),
+            "status": "completed" if abort_reason is None else "aborted",
+            "abort_reason": abort_reason,
+            "gateway_url": args.gateway_url,
+            "pool": manifest_doc["pool"],
+            "line_range": [line_start, line_end],
+            "seed": args.seed,
+            "query_sample": args.query_sample,
+            "warmups": args.warmups,
+            "repeats": args.repeats,
+            "cells": [list(c) for c in cells],
+            "variants": spec["variants"],
+            "top_k": args.top_k,
+            "fidelity_gates": gates_log,
+            "n_ok": n_ok,
+            "n_errors": n_err,
+            "n_warmup_ok": n_warmup_ok,
+            "n_warmup_errors": n_warmup_err,
+            "summary": summary_rows,
+        }
+        csv_path, json_path = write_summary_outputs(
+            out_dir, run_id, summary_rows, summary_doc)
+        print(f"\nJSONL   : {jsonl_path}")
+        print(f"CSV     : {csv_path}")
+        print(f"JSON    : {json_path}")
+        if abort_reason is not None:
+            print(f"CAMPAIGN ABORTED: {abort_reason}", file=sys.stderr)
+        print("Done.")
+        sys.exit(exit_code)
+
+    jsonl_f = open(jsonl_path, "w", encoding="utf-8")
+    try:
+        for rtt_b, rtt_c in cells:
+            print(f"\n=== cell (B={rtt_b}ms, C={rtt_c}ms) [shaped] ===")
+
+            # --- pre-cell per-leg fidelity gate (design §3.2/§6) ---
+            pre_gates = run_fidelity_gate_3node(rtt_b, rtt_c, "pre",
+                                                dry_run=False)
+            gates_log.extend(pre_gates)
+            for g in pre_gates:
+                print(f"    [gate pre]  link-{g['link']} rtt={g['rtt_ms']}ms: "
+                      f"{g['status']} "
+                      f"(baseline={g.get('baseline_median_ms')} ms, "
+                      f"shaped={g.get('shaped_median_ms')} ms, "
+                      f"added={g.get('added_rtt_ms')} ms)")
+            if any(g["status"] != "PASS" for g in pre_gates):
+                clear_netem(dry_run=False)
+                bad = next(g for g in pre_gates if g["status"] != "PASS")
+                abort_reason = (f"pre-cell fidelity gate FAIL on link-"
+                                f"{bad['link']} at (B={rtt_b}, C={rtt_c}): "
+                                f"{bad.get('output_tail','').strip()[-200:]}")
+                exit_code = 1
+                _finalize()
+
+            # validate.sh clears netem on exit; re-apply both legs.
+            netem_applied = apply_netem_3node(rtt_b, 0, rtt_c, 0,
+                                              dry_run=False)
+
+            # --- arms (3node-P2 -> 3node-SPHP-from-C per cell) ---
+            for variant in spec["variants"]:
+                if not check_health(args.gateway_url, timeout=15):
+                    clear_netem(dry_run=False)
+                    abort_reason = (f"gateway /health failed before arm "
+                                    f"{three_node_arm_label(variant)} at "
+                                    f"(B={rtt_b}, C={rtt_c})")
+                    exit_code = 1
+                    _finalize()
+                sphp = sphp_flag_for_variant(variant)
+                arm_key = (rtt_b, rtt_c, "hybrid", variant)
+                arm = next(a for a in arm_plan
+                           if a["rtt_b"] == rtt_b and a["rtt_c"] == rtt_c
+                           and a["variant"] == variant)
+                print(f"  arm {three_node_arm_label(variant):<18} "
+                      f"(mode={arm['mode']} variant={variant} sphp={sphp})  "
+                      f"pool lines {arm['pool_start'] + 1}..{arm['pool_end']}")
+
+                # Warmups: executed but NOT recorded (disjoint slice).
+                for w, wq in enumerate(arm["warmups"]):
+                    try:
+                        http_post_json(endpoint, {
+                            "query": wq, "top_k": args.top_k,
+                            "mode": "hybrid", "sphp": sphp,
+                        }, timeout=args.timeout)
+                        n_warmup_ok += 1
+                    except Exception as e:
+                        n_warmup_err += 1
+                        print(f"    [warmup] {variant} w={w} failed: {e}",
+                              file=sys.stderr)
+
+                # Measured: N queries x R repeats back-to-back.
+                for query in arm["measured"]:
+                    for rep in range(args.repeats):
+                        extra = v3node_record_extra(
+                            rep, rtt_b, 0, rtt_c, 0, pre_gates,
+                            pool_path, manifest)
+                        try:
+                            res = http_post_json(endpoint, {
+                                "query": query, "top_k": args.top_k,
+                                "mode": "hybrid", "sphp": sphp,
+                            }, timeout=args.timeout)
+                            rec = build_record(
+                                run_id, rtt_b, 0, "hybrid", variant, rep,
+                                query, res, netem_applied, extra=extra)
+                            n_ok += 1
+                        except Exception as e:
+                            rec: Dict[str, Any] = {
+                                "run_id": run_id,
+                                "timestamp": _now_iso(),
+                                "query_id": None,
+                                "query": query,
+                                "rtt_ms": rtt_b,
+                                "loss_pct": 0,
+                                "mode": "hybrid",
+                                "variant": variant,
+                                "repeat_index": rep,
+                                "top_k": args.top_k,
+                                "netem_applied": netem_applied,
+                                **extra,
+                            }
+                            rec["error"] = str(e)
+                            n_err += 1
+                        jsonl_f.write(json.dumps(rec) + "\n")
+                        jsonl_f.flush()
+                        arms_recs.setdefault(arm_key, []).append(rec)
+
+            # --- cell close: ≤1% per-arm error gate (design §6.4) ---
+            cell_arms = [k for k in arms_recs
+                         if k[0] == rtt_b and k[1] == rtt_c]
+            for arm_key in cell_arms:
+                recs = arms_recs[arm_key]
+                errs = sum(1 for r in recs if "error" in r)
+                total = len(recs)
+                if total and (errs / total) > 0.01:
+                    post_gates = run_fidelity_gate_3node(
+                        rtt_b, rtt_c, "post", dry_run=False)
+                    gates_log.extend(post_gates)
+                    clear_netem(dry_run=False)
+                    abort_reason = (f"≤1% error gate FAILED on arm "
+                                    f"{three_node_arm_label(arm_key[3])} at "
+                                    f"(B={rtt_b}, C={rtt_c}): {errs}/{total} "
+                                    f"errors ({100.0 * errs / total:.1f}%)")
+                    exit_code = 1
+                    _finalize()
+
+            # --- post-cell per-leg fidelity gate (design §6; clears netem) ---
+            post_gates = run_fidelity_gate_3node(rtt_b, rtt_c, "post",
+                                                 dry_run=False)
+            gates_log.extend(post_gates)
+            for g in post_gates:
+                print(f"    [gate post] link-{g['link']} rtt={g['rtt_ms']}ms: "
+                      f"{g['status']} "
+                      f"(shaped={g.get('shaped_median_ms')} ms, "
+                      f"added={g.get('added_rtt_ms')} ms)")
+            if any(g["status"] != "PASS" for g in post_gates):
+                clear_netem(dry_run=False)
+                bad = next(g for g in post_gates if g["status"] != "PASS")
+                abort_reason = (f"post-cell fidelity gate FAIL on link-"
+                                f"{bad['link']} at (B={rtt_b}, C={rtt_c}): "
+                                f"{bad.get('output_tail','').strip()[-200:]}")
+                exit_code = 1
+                _finalize()
+
+            clear_netem(dry_run=False)
+    finally:
+        jsonl_f.close()
+
+    _finalize()
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -1513,6 +2194,17 @@ def main() -> None:
         print("ERROR: --pool and --queries are mutually exclusive "
               "(v2 uses the pool file and its manifest sidecar)", file=sys.stderr)
         sys.exit(1)
+
+    # v2 mode: resolve the default pool / run type.
+    #   --pool FILE            -> v2, pool = FILE, run defaults to
+    #                             'confirmatory' (the historical surface);
+    #   --run <type> [pool]    -> v2, run = <type>, pool defaults to the
+    #                             design §5.1 master pool.
+    if is_v2(args):
+        if args.pool is None:
+            args.pool = V2_DEFAULT_POOL
+        if args.run is None:
+            args.run = "confirmatory"
 
     queries_path = resolve_queries_path(args.pool if is_v2(args) else args.queries)
     try:
@@ -1535,6 +2227,29 @@ def main() -> None:
             sys.exit(1)
 
     resolve_mode_defaults(args)
+
+    if is_v2(args) and args.run == "three-node":
+        # WS-CM 3-node matrix (design §2.2/§3.2): 3 (B, C) cells x
+        # {3node-P2, 3node-SPHP-from-C} = 6 arms, pool lines 1371..1910.
+        spec = V2_RUN_SPECS["three-node"]
+        arms = build_3node_arm_list(spec)
+        n_arms = len(arms)
+        line_start, line_end = v2_line_range(
+            "three-node", n_arms, args.query_sample, args.warmups)
+        try:
+            arm_plan = select_pool_slices_3node(
+                all_queries, spec["cells"], spec["variants"],
+                args.query_sample, args.warmups, line_start, line_end)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+        if args.dry_run:
+            print_plan_v2_3node(args, all_queries, arm_plan, manifest,
+                                line_start, line_end)
+            return
+        run_campaign_v3node(args, all_queries, manifest, arm_plan,
+                            line_start, line_end)
+        return
 
     # Build the full arm list FIRST, then assign each arm its query slice.
     arms = build_arm_list(args)

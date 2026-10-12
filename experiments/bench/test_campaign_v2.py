@@ -1,6 +1,7 @@
-"""Tests for the Campaign v2 confirmatory driver (experiments/bench/campaign.py).
+"""Tests for the Campaign v2 confirmatory + 3-node driver
+(experiments/bench/campaign.py).
 
-Covers the PURE functions added for the v2 confirmatory path only:
+Covers the PURE functions added for the v2 confirmatory path:
   * verify_pool_manifest        (pool file <-> manifest sha256/n/line_count)
   * v2_line_range / select_pool_slices / slices_disjoint
   * parse_fidelity_gate_output / stratum_for_repeat
@@ -8,6 +9,12 @@ Covers the PURE functions added for the v2 confirmatory path only:
   * arm_label / is_v2 / resolve_mode_defaults / build_campaign_manifest
 plus a byte-determinism check that the v1 code path is unchanged (the v1
 dry-run plan is identical to the pre-v2 implementation's output).
+
+And the WS-CM 3-node run (design §2.2/§3.2/§4.3/§5.1):
+  * v2_line_range("three-node") -> lines 1371..1910
+  * build_3node_arm_list / three_node_arm_label / select_pool_slices_3node
+  * v3node_record_extra / build_3node_manifest / run_fidelity_gate_3node
+  * resolve_mode_defaults for the three-node run (Node C gateway, N=80)
 """
 
 import json
@@ -695,3 +702,184 @@ def test_v2_no_resume_existing_file_aborts(tmp_path, monkeypatch):
     # No HTTP was performed (aborted before any request).
     assert posted == []
 
+
+
+# ---------------------------------------------------------------------------
+# v2: three-node run (WS-CM matrix, design §2.2/§3.2/§4.3/§5.1)
+# ---------------------------------------------------------------------------
+def test_3node_line_range():
+    # design §5.1: WS-CM 3-node = 6 arms x (N=80 + W=10) = 540 lines,
+    # starting at line 1371 -> 1371..1910.
+    s, e = campaign.v2_line_range("three-node", 6, 80, 10)
+    assert (s, e) == (1371, 1910)
+
+
+def test_3node_arm_expansion():
+    spec = campaign.V2_RUN_SPECS["three-node"]
+    arms = campaign.build_3node_arm_list(spec)
+    # 3 (B,C) cells x 2 placement arms = 6 arms, cell-major then variant.
+    assert len(arms) == 6
+    assert arms == [
+        (15, 15, "baseline"), (15, 15, "sphp"),
+        (40, 15, "baseline"), (40, 15, "sphp"),
+        (80, 15, "baseline"), (80, 15, "sphp"),
+    ]
+    # Both legs shaped in every cell (all cells non-baseline); C is the
+    # user-facing sparse leg held at 15 ms (design §3.2).
+    assert all(rtt_b > 0 and rtt_c > 0 for rtt_b, rtt_c, _ in arms)
+    assert all(rtt_c == 15 for _, rtt_c, _ in arms)
+
+
+def test_3node_arm_label():
+    assert campaign.three_node_arm_label("baseline") == "3node-P2"
+    assert campaign.three_node_arm_label("sphp") == "3node-SPHP-from-C"
+
+
+def test_3node_select_pool_slices_disjoint_and_ordered():
+    spec = campaign.V2_RUN_SPECS["three-node"]
+    # 6 arms x (80 + 10) = 540 lines -> lines 1371..1910 of a big pool.
+    pool = [f"q{i}" for i in range(2000)]
+    plan = campaign.select_pool_slices_3node(
+        pool, spec["cells"], spec["variants"], 80, 10, 1371, 1910)
+    assert len(plan) == 6
+    # arm i consumes pool lines [1371 + i*90 .. 1371 + (i+1)*90 - 1] (1-based).
+    for i, a in enumerate(plan):
+        assert a["pool_start"] == (1371 - 1) + i * 90
+        assert a["pool_end"] == a["pool_start"] + 90
+        assert len(a["warmups"]) == 10
+        assert len(a["measured"]) == 80
+        # slice contents are the fixed pool lines (no re-shuffle)
+        assert a["warmups"] == [f"q{1370 + i * 90 + k}" for k in range(10)]
+    # disjointness (warmups + measured)
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert not (sets[i] & sets[j])
+    # measured queries total 6 x 80 distinct
+    assert len({q for a in plan for q in a["measured"]}) == 480
+
+
+def test_3node_select_pool_slices_out_of_bounds():
+    spec = campaign.V2_RUN_SPECS["three-node"]
+    # pool too short to hold line range 1371..1910
+    pool = [f"q{i}" for i in range(1400)]
+    with pytest.raises(ValueError, match="out of bounds"):
+        campaign.select_pool_slices_3node(
+            pool, spec["cells"], spec["variants"], 80, 10, 1371, 1910)
+
+
+def test_3node_select_pool_slices_range_arm_mismatch():
+    spec = campaign.V2_RUN_SPECS["three-node"]
+    pool = [f"q{i}" for i in range(2000)]
+    # wrong end: 1371..1900 holds 530 lines, not 6 x 90 = 540
+    with pytest.raises(ValueError, match="recompute the range"):
+        campaign.select_pool_slices_3node(
+            pool, spec["cells"], spec["variants"], 80, 10, 1371, 1900)
+
+
+def test_3node_record_extra():
+    man = {"_verified_sha256": "ab" * 32}
+    pre_gates = [
+        {"link": "b", "rtt_ms": 15, "shaped_median_ms": 16.2},
+        {"link": "c", "rtt_ms": 15, "shaped_median_ms": 15.9},
+    ]
+    extra = campaign.v3node_record_extra(
+        0, 15, 0, 15, 0, pre_gates, "pool.txt", man)
+    assert extra["stratum"] == "cold"
+    # rtt_ping_median_ms = the LINK-B (dense/generation leg) shaped median
+    assert extra["rtt_ping_median_ms"] == 16.2
+    # per-leg targets are both populated for the 3-node run
+    assert extra["netem_link_b_applied"] == {"rtt_ms": 15, "loss_pct": 0}
+    assert extra["netem_link_c_applied"] == {"rtt_ms": 15, "loss_pct": 0}
+    assert extra["pool_file"] == "pool.txt"
+    assert extra["pool_manifest_sha256"] == "ab" * 32
+
+
+def test_3node_record_extra_warm_stratum():
+    extra = campaign.v3node_record_extra(
+        1, 40, 0, 15, 0,
+        [{"link": "b", "rtt_ms": 40, "shaped_median_ms": 41.0},
+         {"link": "c", "rtt_ms": 15, "shaped_median_ms": 15.0}],
+        "p.txt", {"_verified_sha256": "cc" * 32})
+    assert extra["stratum"] == "warm"
+    assert extra["rtt_ping_median_ms"] == 41.0
+
+
+def test_3node_run_fidelity_gate_dry_run():
+    gates = campaign.run_fidelity_gate_3node(15, 15, "pre", dry_run=True)
+    assert len(gates) == 2
+    assert [g["link"] for g in gates] == ["b", "c"]
+    assert all(g["status"] == "planned" for g in gates)
+    # an unshaped (0) leg is recorded skipped-baseline
+    gates2 = campaign.run_fidelity_gate_3node(15, 0, "pre", dry_run=True)
+    assert gates2[0]["status"] == "planned"
+    assert gates2[1]["status"] == "skipped-baseline"
+
+
+def test_3node_build_manifest(tmp_path):
+    # 1,910-line pool: the 3-node range 1371..1910 fits.
+    pool = _write_pool(tmp_path, 1910)
+    man = {"_verified_sha256": "aa" * 32, "n": 1910}
+    spec = campaign.V2_RUN_SPECS["three-node"]
+    plan = campaign.select_pool_slices_3node(
+        campaign.load_queries(str(pool)), spec["cells"], spec["variants"],
+        80, 10, 1371, 1910)
+    doc = campaign.build_3node_manifest(
+        "rid", str(pool), man, 1371, 1910, plan, 80, 10, 3, 42)
+    assert doc["schema"] == "pdc.campaign_manifest/v2"
+    assert doc["run"] == "three-node"
+    assert doc["design_commit"] == "1f911ef"
+    assert doc["disjointness"]["asserted"] is True
+    assert doc["pool"]["line_start"] == 1371
+    assert doc["pool"]["line_end"] == 1910
+    # 6 arms, first is 3node-P2 on the (15,15) cell
+    assert len(doc["arms"]) == 6
+    assert doc["arms"][0]["arm"] == "3node-P2"
+    assert doc["arms"][0]["rtt_b"] == 15 and doc["arms"][0]["rtt_c"] == 15
+    assert doc["arms"][1]["arm"] == "3node-SPHP-from-C"
+    assert doc["arms"][0]["pool_start"] == 1371  # 1-based line numbers
+    assert doc["arms"][5]["pool_end"] == 1910
+    # per-leg targets recorded on every arm
+    assert doc["arms"][0]["netem_link_b_applied"] == {"rtt_ms": 15, "loss_pct": 0}
+    assert doc["arms"][0]["netem_link_c_applied"] == {"rtt_ms": 15, "loss_pct": 0}
+
+
+def test_3node_resolve_mode_defaults():
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(QUERIES_DIR / "campaign_v2_master5000_seed42.txt"),
+        "--run", "three-node", "--dry-run",
+    ])
+    campaign.resolve_mode_defaults(args)
+    # Node C gateway (user-facing tier), N=80, W=10, R=3 per design §4.3
+    assert args.gateway_url == "http://10.8.0.3:8000"
+    assert args.query_sample == 80
+    assert args.warmups == 10
+    assert args.repeats == 3
+    assert args.modes == ["hybrid"]
+    assert args.sphp_axis is True
+    assert args.loss_tiers == [0]
+
+
+def test_2node_confirmatory_keeps_node_b_gateway():
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(QUERIES_DIR / "campaign_v2_master5000_seed42.txt"),
+        "--run", "confirmatory", "--dry-run",
+    ])
+    campaign.resolve_mode_defaults(args)
+    # The confirmatory 2-node core keeps the existing Node B gateway default.
+    assert args.gateway_url == "http://10.8.0.2:8000"
+    assert args.query_sample == 120
+    assert args.warmups == 10
+    assert args.repeats == 3
+
+
+def test_v2_explicit_repeats_wins():
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(QUERIES_DIR / "campaign_v2_master5000_seed42.txt"),
+        "--run", "three-node", "--repeats", "5", "--dry-run",
+    ])
+    campaign.resolve_mode_defaults(args)
+    assert args.repeats == 5
