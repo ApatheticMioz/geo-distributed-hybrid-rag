@@ -1,0 +1,2975 @@
+{
+  "analysis_plan": {
+    "design_doc": "docs/campaign_v2_design.md",
+    "design_commit": "1f911ef",
+    "stats_engine": "experiments/analysis/stats.py (unmodified)",
+    "new_campaign": "campaign_v2_confirm_2node_20261013.jsonl",
+    "old_campaign": "campaign_20260918T130756Z.jsonl",
+    "new_n_per_arm": 120,
+    "old_n_per_arm": 50,
+    "new_n_records": 2880,
+    "old_n_records": 1200,
+    "rtt_tiers": [
+      0,
+      15,
+      40,
+      80
+    ],
+    "cold_definition": "repeat_index == 0",
+    "warm_definition": "repeat_index >= 1",
+    "primary_family": "Holm FWER over 8 tests (4 RTT tiers x {mean, median}) on cold TTFT",
+    "secondary_family": "Benjamini-Hochberg FDR over 8 tests (4 RTT tiers x {mean, median}) on warm TTFT",
+    "seeds": {
+      "bootstrap": 42,
+      "permutation": 42,
+      "B": 1000,
+      "n_resamples": 10000
+    },
+    "manifest_cold_n_per_arm_check": true,
+    "deviations": [
+      "Design \u00a72 lists the H3 primary family as '4 one-sided permutation tests, Holm-adjusted', while \u00a77's pre-registered battery prescribes the delta CI + permutation test on BOTH mean and median, and the dispatch runs the identical battery on both statistics. Holm is applied over the 8-test family (primary adjusted_p); the 4-test reading (mean only) is reported alongside as adjusted_p_4test_reading on each cold-mean cell. In this data both readings give identical verdicts: all 4 cold-mean cells have p = 1/10001, Holm(8) = 0.0008, Holm(4) = 0.0004, all < 0.05.",
+      "Warm strata contribute 2 records per query (repeats 1-2), so the warm battery runs at n = 240/arm (new) and n = 100/arm (old); the frozen design N = 120/arm refers to distinct measured queries. The pre-registered \u00a77 battery (repeats 1+) is run as-is.",
+      "Old campaign: 3 SPHP records (rtt 0: query 280a3955 repeat 0, eba80711 repeat 1, f775d1e4 repeat 2) have sphp_hit=null and are excluded from the hit-rate denominators (n=147/150 at rtt 0; the NEW campaign has zero nulls, n=1440). Their valid TTFT values remain in the latency battery."
+    ]
+  },
+  "new": {
+    "campaign": "campaign_v2_confirm_2node_20261013.jsonl",
+    "n_records": 2880,
+    "seed": 42,
+    "B_bootstrap": 1000,
+    "n_permutation": 10000,
+    "alpha": 0.05,
+    "cells": {
+      "rtt0_cold_ttft_mean": {
+        "cell": "rtt0_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1656.77,
+          "median": 1637.22,
+          "cv": 0.1523
+        },
+        "sphp": {
+          "mean": 1258.39,
+          "median": 1194.8,
+          "cv": 0.2199
+        },
+        "delta": -398.38,
+        "delta_ci_bca": [
+          -469.98,
+          -333.5
+        ],
+        "relative_delta_pct": -24.05,
+        "relative_delta_ci_pct": [
+          -28.37,
+          -20.13
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -398.38,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.505,
+          "cliffs_delta": -0.708
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1523,
+            "cv_sphp": 0.2199,
+            "mde": 0.0551,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9991
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0246,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt0_warm_ttft_mean": {
+        "cell": "rtt0_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 510.03,
+          "median": 470.6,
+          "cv": 0.3477
+        },
+        "sphp": {
+          "mean": 488.1,
+          "median": 481.44,
+          "cv": 0.3861
+        },
+        "delta": -21.93,
+        "delta_ci_bca": [
+          -52.94,
+          11.16
+        ],
+        "relative_delta_pct": -4.3,
+        "relative_delta_ci_pct": [
+          -10.38,
+          2.19
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.0932906709329067,
+          "statistic": -21.93,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.12,
+          "cliffs_delta": -0.116
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.3477,
+            "cv_sphp": 0.3861,
+            "mde": 0.0889,
+            "achieved_power_at_observed_rel_d": 0.2725,
+            "achieved_power_at_10pct": 0.8831
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0397,
+            "achieved_power_at_observed_rel_d": 0.8575
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.0932906709329067,
+          "adjusted_p": 0.373163,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt0_cold_ttft_median": {
+        "cell": "rtt0_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1656.77,
+          "median": 1637.22,
+          "cv": 0.1523
+        },
+        "sphp": {
+          "mean": 1258.39,
+          "median": 1194.8,
+          "cv": 0.2199
+        },
+        "delta": -442.41,
+        "delta_ci_bca": [
+          -504.7,
+          -377.6
+        ],
+        "relative_delta_pct": -27.02,
+        "relative_delta_ci_pct": [
+          -30.83,
+          -23.06
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -442.41,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.505,
+          "cliffs_delta": -0.708
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1523,
+            "cv_sphp": 0.2199,
+            "mde": 0.0551,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9991
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0246,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt0_warm_ttft_median": {
+        "cell": "rtt0_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 510.03,
+          "median": 470.6,
+          "cv": 0.3477
+        },
+        "sphp": {
+          "mean": 488.1,
+          "median": 481.44,
+          "cv": 0.3861
+        },
+        "delta": 10.83,
+        "delta_ci_bca": [
+          -110.86,
+          120.53
+        ],
+        "relative_delta_pct": 2.3,
+        "relative_delta_ci_pct": [
+          -23.56,
+          25.61
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.5596440355964404,
+          "statistic": 10.83,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.12,
+          "cliffs_delta": -0.116
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.3477,
+            "cv_sphp": 0.3861,
+            "mde": 0.0889,
+            "achieved_power_at_observed_rel_d": 0.0984,
+            "achieved_power_at_10pct": 0.8831
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0397,
+            "achieved_power_at_observed_rel_d": 0.3215
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.5596440355964404,
+          "adjusted_p": 0.668433,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt15_cold_ttft_mean": {
+        "cell": "rtt15_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1663.8,
+          "median": 1655.99,
+          "cv": 0.1515
+        },
+        "sphp": {
+          "mean": 1204.88,
+          "median": 1161.38,
+          "cv": 0.2714
+        },
+        "delta": -458.92,
+        "delta_ci_bca": [
+          -529.12,
+          -383.43
+        ],
+        "relative_delta_pct": -27.58,
+        "relative_delta_ci_pct": [
+          -31.8,
+          -23.05
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -458.92,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.572,
+          "cliffs_delta": -0.741
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1515,
+            "cv_sphp": 0.2714,
+            "mde": 0.0548,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9992
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0245,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt15_warm_ttft_mean": {
+        "cell": "rtt15_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 531.71,
+          "median": 500.25,
+          "cv": 0.3288
+        },
+        "sphp": {
+          "mean": 523.99,
+          "median": 527.81,
+          "cv": 0.4005
+        },
+        "delta": -7.72,
+        "delta_ci_bca": [
+          -42.92,
+          25.78
+        ],
+        "relative_delta_pct": -1.45,
+        "relative_delta_ci_pct": [
+          -8.07,
+          4.85
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.32986701329867013,
+          "statistic": -7.72,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.04,
+          "cliffs_delta": -0.108
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.3288,
+            "cv_sphp": 0.4005,
+            "mde": 0.0841,
+            "achieved_power_at_observed_rel_d": 0.0699,
+            "achieved_power_at_10pct": 0.9148
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0376,
+            "achieved_power_at_observed_rel_d": 0.1898
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.32986701329867013,
+          "adjusted_p": 0.60026,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt15_cold_ttft_median": {
+        "cell": "rtt15_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1663.8,
+          "median": 1655.99,
+          "cv": 0.1515
+        },
+        "sphp": {
+          "mean": 1204.88,
+          "median": 1161.38,
+          "cv": 0.2714
+        },
+        "delta": -494.61,
+        "delta_ci_bca": [
+          -578.48,
+          -419.91
+        ],
+        "relative_delta_pct": -29.87,
+        "relative_delta_ci_pct": [
+          -34.93,
+          -25.36
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -494.61,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.572,
+          "cliffs_delta": -0.741
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1515,
+            "cv_sphp": 0.2714,
+            "mde": 0.0548,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9992
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0245,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt15_warm_ttft_median": {
+        "cell": "rtt15_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 531.71,
+          "median": 500.25,
+          "cv": 0.3288
+        },
+        "sphp": {
+          "mean": 523.99,
+          "median": 527.81,
+          "cv": 0.4005
+        },
+        "delta": 27.55,
+        "delta_ci_bca": [
+          -92.99,
+          112.62
+        ],
+        "relative_delta_pct": 5.51,
+        "relative_delta_ci_pct": [
+          -18.59,
+          22.51
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.6684331566843316,
+          "statistic": 27.55,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.04,
+          "cliffs_delta": -0.108
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.3288,
+            "cv_sphp": 0.4005,
+            "mde": 0.0841,
+            "achieved_power_at_observed_rel_d": 0.4076,
+            "achieved_power_at_10pct": 0.9148
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0376,
+            "achieved_power_at_observed_rel_d": 0.9713
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.6684331566843316,
+          "adjusted_p": 0.668433,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt40_cold_ttft_mean": {
+        "cell": "rtt40_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1719.96,
+          "median": 1697.13,
+          "cv": 0.1548
+        },
+        "sphp": {
+          "mean": 1313.01,
+          "median": 1267.59,
+          "cv": 0.2022
+        },
+        "delta": -406.95,
+        "delta_ci_bca": [
+          -472.71,
+          -335.37
+        ],
+        "relative_delta_pct": -23.66,
+        "relative_delta_ci_pct": [
+          -27.48,
+          -19.5
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -406.95,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.531,
+          "cliffs_delta": -0.746
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1548,
+            "cv_sphp": 0.2022,
+            "mde": 0.056,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9988
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.025,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt40_warm_ttft_mean": {
+        "cell": "rtt40_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 560.9,
+          "median": 538.75,
+          "cv": 0.3176
+        },
+        "sphp": {
+          "mean": 536.84,
+          "median": 519.5,
+          "cv": 0.3681
+        },
+        "delta": -24.05,
+        "delta_ci_bca": [
+          -56.04,
+          9.96
+        ],
+        "relative_delta_pct": -4.29,
+        "relative_delta_ci_pct": [
+          -9.99,
+          1.78
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.08139186081391861,
+          "statistic": -24.05,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.128,
+          "cliffs_delta": -0.126
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.3176,
+            "cv_sphp": 0.3681,
+            "mde": 0.0812,
+            "achieved_power_at_observed_rel_d": 0.3154,
+            "achieved_power_at_10pct": 0.9318
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0363,
+            "achieved_power_at_observed_rel_d": 0.9111
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.08139186081391861,
+          "adjusted_p": 0.373163,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt40_cold_ttft_median": {
+        "cell": "rtt40_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1719.96,
+          "median": 1697.13,
+          "cv": 0.1548
+        },
+        "sphp": {
+          "mean": 1313.01,
+          "median": 1267.59,
+          "cv": 0.2022
+        },
+        "delta": -429.55,
+        "delta_ci_bca": [
+          -486.59,
+          -361.6
+        ],
+        "relative_delta_pct": -25.31,
+        "relative_delta_ci_pct": [
+          -28.67,
+          -21.31
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -429.55,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.531,
+          "cliffs_delta": -0.746
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1548,
+            "cv_sphp": 0.2022,
+            "mde": 0.056,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9988
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.025,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt40_warm_ttft_median": {
+        "cell": "rtt40_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 560.9,
+          "median": 538.75,
+          "cv": 0.3176
+        },
+        "sphp": {
+          "mean": 536.84,
+          "median": 519.5,
+          "cv": 0.3681
+        },
+        "delta": -19.24,
+        "delta_ci_bca": [
+          -146.81,
+          102.04
+        ],
+        "relative_delta_pct": -3.57,
+        "relative_delta_ci_pct": [
+          -27.25,
+          18.94
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.37516248375162486,
+          "statistic": -19.24,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.128,
+          "cliffs_delta": -0.126
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.3176,
+            "cv_sphp": 0.3681,
+            "mde": 0.0812,
+            "achieved_power_at_observed_rel_d": 0.2187,
+            "achieved_power_at_10pct": 0.9318
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0363,
+            "achieved_power_at_observed_rel_d": 0.7536
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.37516248375162486,
+          "adjusted_p": 0.60026,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt80_cold_ttft_mean": {
+        "cell": "rtt80_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1640.51,
+          "median": 1633.29,
+          "cv": 0.1743
+        },
+        "sphp": {
+          "mean": 1222.48,
+          "median": 1220.43,
+          "cv": 0.2929
+        },
+        "delta": -418.03,
+        "delta_ci_bca": [
+          -506.67,
+          -338.57
+        ],
+        "relative_delta_pct": -25.48,
+        "relative_delta_ci_pct": [
+          -30.88,
+          -20.64
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -418.03,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.29,
+          "cliffs_delta": -0.65
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1743,
+            "cv_sphp": 0.2929,
+            "mde": 0.063,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9935
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0282,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt80_warm_ttft_mean": {
+        "cell": "rtt80_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 587.64,
+          "median": 554.87,
+          "cv": 0.2883
+        },
+        "sphp": {
+          "mean": 579.78,
+          "median": 581.43,
+          "cv": 0.3516
+        },
+        "delta": -7.87,
+        "delta_ci_bca": [
+          -39.18,
+          27.13
+        ],
+        "relative_delta_pct": -1.34,
+        "relative_delta_ci_pct": [
+          -6.67,
+          4.62
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.3183681631836816,
+          "statistic": -7.87,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.042,
+          "cliffs_delta": -0.1
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.2883,
+            "cv_sphp": 0.3516,
+            "mde": 0.0737,
+            "achieved_power_at_observed_rel_d": 0.0733,
+            "achieved_power_at_10pct": 0.9671
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.033,
+            "achieved_power_at_observed_rel_d": 0.2054
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.3183681631836816,
+          "adjusted_p": 0.60026,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt80_cold_ttft_median": {
+        "cell": "rtt80_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 120,
+        "n_sphp": 120,
+        "baseline": {
+          "mean": 1640.51,
+          "median": 1633.29,
+          "cv": 0.1743
+        },
+        "sphp": {
+          "mean": 1222.48,
+          "median": 1220.43,
+          "cv": 0.2929
+        },
+        "delta": -412.85,
+        "delta_ci_bca": [
+          -519.45,
+          -312.83
+        ],
+        "relative_delta_pct": -25.28,
+        "relative_delta_ci_pct": [
+          -31.8,
+          -19.15
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -412.85,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.29,
+          "cliffs_delta": -0.65
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 120,
+              "sphp": 120
+            },
+            "cv_baseline": 0.1743,
+            "cv_sphp": 0.2929,
+            "mde": 0.063,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9935
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0282,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt80_warm_ttft_median": {
+        "cell": "rtt80_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 240,
+        "n_sphp": 240,
+        "baseline": {
+          "mean": 587.64,
+          "median": 554.87,
+          "cv": 0.2883
+        },
+        "sphp": {
+          "mean": 579.78,
+          "median": 581.43,
+          "cv": 0.3516
+        },
+        "delta": 26.56,
+        "delta_ci_bca": [
+          -87.63,
+          127.72
+        ],
+        "relative_delta_pct": 4.79,
+        "relative_delta_ci_pct": [
+          -15.79,
+          23.02
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.6052394760523948,
+          "statistic": 26.56,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.042,
+          "cliffs_delta": -0.1
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 240,
+              "sphp": 240
+            },
+            "cv_baseline": 0.2883,
+            "cv_sphp": 0.3516,
+            "mde": 0.0737,
+            "achieved_power_at_observed_rel_d": 0.4041,
+            "achieved_power_at_10pct": 0.9671
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.033,
+            "achieved_power_at_observed_rel_d": 0.9699
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.6052394760523948,
+          "adjusted_p": 0.668433,
+          "alpha": 0.05,
+          "significant": false
+        }
+      }
+    },
+    "descriptive": {
+      "rtt0_cold_baseline": {
+        "n": 120,
+        "p50": 1637.22,
+        "ci95_p50_bca": [
+          1595.12,
+          1675.22
+        ],
+        "p95": 2183.58,
+        "ci95_p95_bca": [
+          1942.33,
+          2386.91
+        ],
+        "p99": 2431.31,
+        "ci95_p99_bca": [
+          2205.68,
+          2660.69
+        ]
+      },
+      "rtt0_warm_baseline": {
+        "n": 240,
+        "p50": 470.6,
+        "ci95_p50_bca": [
+          396.06,
+          564.57
+        ],
+        "p95": 782.9,
+        "ci95_p95_bca": [
+          757.36,
+          816.96
+        ],
+        "p99": 858.47,
+        "ci95_p99_bca": [
+          815.66,
+          873.87
+        ]
+      },
+      "rtt0_cold_sphp": {
+        "n": 120,
+        "p50": 1194.8,
+        "ci95_p50_bca": [
+          1160.78,
+          1273.12
+        ],
+        "p95": 1766.3,
+        "ci95_p95_bca": [
+          1657.22,
+          1849.6
+        ],
+        "p99": 1895.5,
+        "ci95_p99_bca": [
+          1823.88,
+          1923.21
+        ]
+      },
+      "rtt0_warm_sphp": {
+        "n": 240,
+        "p50": 481.44,
+        "ci95_p50_bca": [
+          396.99,
+          528.55
+        ],
+        "p95": 832.05,
+        "ci95_p95_bca": [
+          762.24,
+          930.56
+        ],
+        "p99": 1010.19,
+        "ci95_p99_bca": [
+          929.9,
+          1051.63
+        ]
+      },
+      "rtt15_cold_baseline": {
+        "n": 120,
+        "p50": 1655.99,
+        "ci95_p50_bca": [
+          1593.57,
+          1704.26
+        ],
+        "p95": 2002.33,
+        "ci95_p95_bca": [
+          1951.0,
+          2285.29
+        ],
+        "p99": 2474.33,
+        "ci95_p99_bca": [
+          2131.38,
+          2746.52
+        ]
+      },
+      "rtt15_warm_baseline": {
+        "n": 240,
+        "p50": 500.25,
+        "ci95_p50_bca": [
+          432.55,
+          596.59
+        ],
+        "p95": 785.04,
+        "ci95_p95_bca": [
+          760.38,
+          828.11
+        ],
+        "p99": 838.44,
+        "ci95_p99_bca": [
+          826.72,
+          905.58
+        ]
+      },
+      "rtt15_cold_sphp": {
+        "n": 120,
+        "p50": 1161.38,
+        "ci95_p50_bca": [
+          1114.96,
+          1227.06
+        ],
+        "p95": 1811.34,
+        "ci95_p95_bca": [
+          1635.76,
+          1992.53
+        ],
+        "p99": 2060.85,
+        "ci95_p99_bca": [
+          1871.82,
+          2138.29
+        ]
+      },
+      "rtt15_warm_sphp": {
+        "n": 240,
+        "p50": 527.81,
+        "ci95_p50_bca": [
+          440.64,
+          551.73
+        ],
+        "p95": 937.79,
+        "ci95_p95_bca": [
+          758.56,
+          1020.55
+        ],
+        "p99": 1266.43,
+        "ci95_p99_bca": [
+          1033.83,
+          1340.9
+        ]
+      },
+      "rtt40_cold_baseline": {
+        "n": 120,
+        "p50": 1697.13,
+        "ci95_p50_bca": [
+          1647.86,
+          1727.52
+        ],
+        "p95": 2258.37,
+        "ci95_p95_bca": [
+          2039.33,
+          2385.06
+        ],
+        "p99": 2392.57,
+        "ci95_p99_bca": [
+          2275.83,
+          2762.82
+        ]
+      },
+      "rtt40_warm_baseline": {
+        "n": 240,
+        "p50": 538.75,
+        "ci95_p50_bca": [
+          456.23,
+          628.57
+        ],
+        "p95": 833.06,
+        "ci95_p95_bca": [
+          789.37,
+          872.05
+        ],
+        "p99": 894.24,
+        "ci95_p99_bca": [
+          868.69,
+          940.82
+        ]
+      },
+      "rtt40_cold_sphp": {
+        "n": 120,
+        "p50": 1267.59,
+        "ci95_p50_bca": [
+          1221.69,
+          1331.12
+        ],
+        "p95": 1756.16,
+        "ci95_p95_bca": [
+          1678.34,
+          2078.35
+        ],
+        "p99": 2132.17,
+        "ci95_p99_bca": [
+          1943.93,
+          2180.06
+        ]
+      },
+      "rtt40_warm_sphp": {
+        "n": 240,
+        "p50": 519.5,
+        "ci95_p50_bca": [
+          436.74,
+          567.9
+        ],
+        "p95": 840.81,
+        "ci95_p95_bca": [
+          806.72,
+          948.83
+        ],
+        "p99": 1170.08,
+        "ci95_p99_bca": [
+          946.85,
+          1201.82
+        ]
+      },
+      "rtt80_cold_baseline": {
+        "n": 120,
+        "p50": 1633.29,
+        "ci95_p50_bca": [
+          1560.38,
+          1676.86
+        ],
+        "p95": 2082.76,
+        "ci95_p95_bca": [
+          1977.02,
+          2441.25
+        ],
+        "p99": 2552.75,
+        "ci95_p99_bca": [
+          2166.54,
+          2604.53
+        ]
+      },
+      "rtt80_warm_baseline": {
+        "n": 240,
+        "p50": 554.87,
+        "ci95_p50_bca": [
+          478.84,
+          633.48
+        ],
+        "p95": 832.31,
+        "ci95_p95_bca": [
+          814.8,
+          865.69
+        ],
+        "p99": 912.76,
+        "ci95_p99_bca": [
+          860.59,
+          1074.26
+        ]
+      },
+      "rtt80_cold_sphp": {
+        "n": 120,
+        "p50": 1220.43,
+        "ci95_p50_bca": [
+          1115.57,
+          1275.53
+        ],
+        "p95": 1881.88,
+        "ci95_p95_bca": [
+          1720.49,
+          1978.03
+        ],
+        "p99": 2164.82,
+        "ci95_p99_bca": [
+          1935.11,
+          2215.5
+        ]
+      },
+      "rtt80_warm_sphp": {
+        "n": 240,
+        "p50": 581.43,
+        "ci95_p50_bca": [
+          505.45,
+          623.34
+        ],
+        "p95": 1006.48,
+        "ci95_p95_bca": [
+          846.4,
+          1096.64
+        ],
+        "p99": 1175.71,
+        "ci95_p99_bca": [
+          1094.58,
+          1300.86
+        ]
+      }
+    },
+    "sphp_hit_rate": {
+      "definition": "sphp_hit == True among SPHP-arm records (null sphp_hit counted as non-hit)",
+      "overall": {
+        "n": 1440,
+        "hits": 1296,
+        "rate": 0.9,
+        "wilson_ci95": [
+          0.8834,
+          0.9144
+        ]
+      },
+      "by_tier": {
+        "rtt0": {
+          "n": 360,
+          "hits": 327,
+          "rate": 0.9083,
+          "wilson_ci95": [
+            0.8741,
+            0.934
+          ]
+        },
+        "rtt15": {
+          "n": 360,
+          "hits": 321,
+          "rate": 0.8917,
+          "wilson_ci95": [
+            0.8553,
+            0.9197
+          ]
+        },
+        "rtt40": {
+          "n": 360,
+          "hits": 330,
+          "rate": 0.9167,
+          "wilson_ci95": [
+            0.8835,
+            0.941
+          ]
+        },
+        "rtt80": {
+          "n": 360,
+          "hits": 318,
+          "rate": 0.8833,
+          "wilson_ci95": [
+            0.8461,
+            0.9125
+          ]
+        }
+      },
+      "by_stratum": {
+        "cold": {
+          "n": 480,
+          "hits": 432,
+          "rate": 0.9,
+          "wilson_ci95": [
+            0.8699,
+            0.9237
+          ]
+        },
+        "warm": {
+          "n": 960,
+          "hits": 864,
+          "rate": 0.9,
+          "wilson_ci95": [
+            0.8794,
+            0.9174
+          ]
+        }
+      }
+    },
+    "sphp_overlap": {
+      "definition": "mean of sphp_overlap over SPHP records with non-null overlap (cold and warm records both)",
+      "overall": {
+        "n": 1440,
+        "mean": 0.6362,
+        "mean_ci95_bca": [
+          0.6294,
+          0.6434
+        ],
+        "median": 0.6
+      },
+      "cold": {
+        "n": 480,
+        "mean": 0.6362,
+        "mean_ci95_bca": [
+          0.6237,
+          0.6483
+        ],
+        "median": 0.6
+      },
+      "warm": {
+        "n": 960,
+        "mean": 0.6362,
+        "mean_ci95_bca": [
+          0.6273,
+          0.6449
+        ],
+        "median": 0.6
+      },
+      "by_tier": {
+        "rtt0": {
+          "n": 360,
+          "mean": 0.6283,
+          "mean_ci95_bca": [
+            0.6139,
+            0.6411
+          ],
+          "median": 0.6
+        },
+        "rtt15": {
+          "n": 360,
+          "mean": 0.64,
+          "mean_ci95_bca": [
+            0.625,
+            0.6522
+          ],
+          "median": 0.6
+        },
+        "rtt40": {
+          "n": 360,
+          "mean": 0.6333,
+          "mean_ci95_bca": [
+            0.6222,
+            0.6444
+          ],
+          "median": 0.6
+        },
+        "rtt80": {
+          "n": 360,
+          "mean": 0.6433,
+          "mean_ci95_bca": [
+            0.6276,
+            0.6604
+          ],
+          "median": 0.6
+        }
+      }
+    }
+  },
+  "old": {
+    "campaign": "campaign_20260918T130756Z.jsonl",
+    "n_records": 1200,
+    "seed": 42,
+    "B_bootstrap": 1000,
+    "n_permutation": 10000,
+    "alpha": 0.05,
+    "cells": {
+      "rtt0_cold_ttft_mean": {
+        "cell": "rtt0_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3633.64,
+          "median": 3675.1,
+          "cv": 0.1283
+        },
+        "sphp": {
+          "mean": 2948.21,
+          "median": 2906.97,
+          "cv": 0.2453
+        },
+        "delta": -685.42,
+        "delta_ci_bca": [
+          -934.91,
+          -450.72
+        ],
+        "relative_delta_pct": -18.86,
+        "relative_delta_ci_pct": [
+          -25.73,
+          -12.4
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -685.42,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.127,
+          "cliffs_delta": -0.614
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.1283,
+            "cv_sphp": 0.2453,
+            "mde": 0.0718,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9737
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0321,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt0_warm_ttft_mean": {
+        "cell": "rtt0_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 817.95,
+          "median": 817.57,
+          "cv": 0.1789
+        },
+        "sphp": {
+          "mean": 738.91,
+          "median": 724.75,
+          "cv": 0.2829
+        },
+        "delta": -79.04,
+        "delta_ci_bca": [
+          -127.11,
+          -28.91
+        ],
+        "relative_delta_pct": -9.66,
+        "relative_delta_ci_pct": [
+          -15.54,
+          -3.53
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.0004999500049995,
+          "statistic": -79.04,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.438,
+          "cliffs_delta": -0.289
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.1789,
+            "cv_sphp": 0.2829,
+            "mde": 0.0708,
+            "achieved_power_at_observed_rel_d": 0.9685,
+            "achieved_power_at_10pct": 0.9768
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0317,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.0004999500049995,
+          "adjusted_p": 0.0032,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt0_cold_ttft_median": {
+        "cell": "rtt0_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3633.64,
+          "median": 3675.1,
+          "cv": 0.1283
+        },
+        "sphp": {
+          "mean": 2948.21,
+          "median": 2906.97,
+          "cv": 0.2453
+        },
+        "delta": -768.13,
+        "delta_ci_bca": [
+          -981.9,
+          -500.08
+        ],
+        "relative_delta_pct": -20.9,
+        "relative_delta_ci_pct": [
+          -26.72,
+          -13.61
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -768.13,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.127,
+          "cliffs_delta": -0.614
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.1283,
+            "cv_sphp": 0.2453,
+            "mde": 0.0718,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9737
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0321,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt0_warm_ttft_median": {
+        "cell": "rtt0_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 817.95,
+          "median": 817.57,
+          "cv": 0.1789
+        },
+        "sphp": {
+          "mean": 738.91,
+          "median": 724.75,
+          "cv": 0.2829
+        },
+        "delta": -92.82,
+        "delta_ci_bca": [
+          -147.35,
+          -29.08
+        ],
+        "relative_delta_pct": -11.35,
+        "relative_delta_ci_pct": [
+          -18.02,
+          -3.56
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.0007999200079992001,
+          "statistic": -92.82,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.438,
+          "cliffs_delta": -0.289
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.1789,
+            "cv_sphp": 0.2829,
+            "mde": 0.0708,
+            "achieved_power_at_observed_rel_d": 0.9942,
+            "achieved_power_at_10pct": 0.9768
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0317,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.0007999200079992001,
+          "adjusted_p": 0.0032,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt15_cold_ttft_mean": {
+        "cell": "rtt15_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3569.72,
+          "median": 3609.68,
+          "cv": 0.139
+        },
+        "sphp": {
+          "mean": 2892.14,
+          "median": 2895.16,
+          "cv": 0.2001
+        },
+        "delta": -677.57,
+        "delta_ci_bca": [
+          -876.17,
+          -469.56
+        ],
+        "relative_delta_pct": -18.98,
+        "relative_delta_ci_pct": [
+          -24.54,
+          -13.15
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -677.57,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.257,
+          "cliffs_delta": -0.63
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.139,
+            "cv_sphp": 0.2001,
+            "mde": 0.0778,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9492
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0348,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt15_warm_ttft_mean": {
+        "cell": "rtt15_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 815.76,
+          "median": 817.13,
+          "cv": 0.1599
+        },
+        "sphp": {
+          "mean": 778.06,
+          "median": 748.0,
+          "cv": 0.2419
+        },
+        "delta": -37.69,
+        "delta_ci_bca": [
+          -79.91,
+          10.72
+        ],
+        "relative_delta_pct": -4.62,
+        "relative_delta_ci_pct": [
+          -9.8,
+          1.31
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.0524947505249475,
+          "statistic": -37.69,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.233,
+          "cliffs_delta": -0.196
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.1599,
+            "cv_sphp": 0.2419,
+            "mde": 0.0633,
+            "achieved_power_at_observed_rel_d": 0.5331,
+            "achieved_power_at_10pct": 0.9931
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0283,
+            "achieved_power_at_observed_rel_d": 0.9954
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.0524947505249475,
+          "adjusted_p": 0.10499,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt15_cold_ttft_median": {
+        "cell": "rtt15_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3569.72,
+          "median": 3609.68,
+          "cv": 0.139
+        },
+        "sphp": {
+          "mean": 2892.14,
+          "median": 2895.16,
+          "cv": 0.2001
+        },
+        "delta": -714.52,
+        "delta_ci_bca": [
+          -935.41,
+          -486.79
+        ],
+        "relative_delta_pct": -19.79,
+        "relative_delta_ci_pct": [
+          -25.91,
+          -13.49
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -714.52,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.257,
+          "cliffs_delta": -0.63
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.139,
+            "cv_sphp": 0.2001,
+            "mde": 0.0778,
+            "achieved_power_at_observed_rel_d": 1.0,
+            "achieved_power_at_10pct": 0.9492
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0348,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt15_warm_ttft_median": {
+        "cell": "rtt15_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 815.76,
+          "median": 817.13,
+          "cv": 0.1599
+        },
+        "sphp": {
+          "mean": 778.06,
+          "median": 748.0,
+          "cv": 0.2419
+        },
+        "delta": -69.12,
+        "delta_ci_bca": [
+          -132.44,
+          -4.44
+        ],
+        "relative_delta_pct": -8.46,
+        "relative_delta_ci_pct": [
+          -16.21,
+          -0.54
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.0058994100589941,
+          "statistic": -69.12,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.233,
+          "cliffs_delta": -0.196
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.1599,
+            "cv_sphp": 0.2419,
+            "mde": 0.0633,
+            "achieved_power_at_observed_rel_d": 0.963,
+            "achieved_power_at_10pct": 0.9931
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0283,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.0058994100589941,
+          "adjusted_p": 0.015732,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt40_cold_ttft_mean": {
+        "cell": "rtt40_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3555.69,
+          "median": 3524.13,
+          "cv": 0.1376
+        },
+        "sphp": {
+          "mean": 2996.78,
+          "median": 3066.85,
+          "cv": 0.206
+        },
+        "delta": -558.91,
+        "delta_ci_bca": [
+          -776.61,
+          -337.52
+        ],
+        "relative_delta_pct": -15.72,
+        "relative_delta_ci_pct": [
+          -21.84,
+          -9.49
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -558.91,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.004,
+          "cliffs_delta": -0.553
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.1376,
+            "cv_sphp": 0.206,
+            "mde": 0.0771,
+            "achieved_power_at_observed_rel_d": 0.9999,
+            "achieved_power_at_10pct": 0.9529
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0345,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt40_warm_ttft_mean": {
+        "cell": "rtt40_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 817.06,
+          "median": 804.43,
+          "cv": 0.178
+        },
+        "sphp": {
+          "mean": 842.17,
+          "median": 796.06,
+          "cv": 0.2622
+        },
+        "delta": 25.11,
+        "delta_ci_bca": [
+          -26.06,
+          75.93
+        ],
+        "relative_delta_pct": 3.07,
+        "relative_delta_ci_pct": [
+          -3.19,
+          9.29
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.8307169283071693,
+          "statistic": 25.11,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": 0.134,
+          "cliffs_delta": 0.008
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.178,
+            "cv_sphp": 0.2622,
+            "mde": 0.0705,
+            "achieved_power_at_observed_rel_d": 0.2299,
+            "achieved_power_at_10pct": 0.978
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0315,
+            "achieved_power_at_observed_rel_d": 0.7794
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.8307169283071693,
+          "adjusted_p": 0.830717,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt40_cold_ttft_median": {
+        "cell": "rtt40_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3555.69,
+          "median": 3524.13,
+          "cv": 0.1376
+        },
+        "sphp": {
+          "mean": 2996.78,
+          "median": 3066.85,
+          "cv": 0.206
+        },
+        "delta": -457.28,
+        "delta_ci_bca": [
+          -685.11,
+          -250.89
+        ],
+        "relative_delta_pct": -12.98,
+        "relative_delta_ci_pct": [
+          -19.44,
+          -7.12
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -457.28,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -1.004,
+          "cliffs_delta": -0.553
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.1376,
+            "cv_sphp": 0.206,
+            "mde": 0.0771,
+            "achieved_power_at_observed_rel_d": 0.9967,
+            "achieved_power_at_10pct": 0.9529
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0345,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt40_warm_ttft_median": {
+        "cell": "rtt40_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 817.06,
+          "median": 804.43,
+          "cv": 0.178
+        },
+        "sphp": {
+          "mean": 842.17,
+          "median": 796.06,
+          "cv": 0.2622
+        },
+        "delta": -8.38,
+        "delta_ci_bca": [
+          -66.69,
+          48.71
+        ],
+        "relative_delta_pct": -1.04,
+        "relative_delta_ci_pct": [
+          -8.29,
+          6.06
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.4223577642235776,
+          "statistic": -8.38,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": 0.134,
+          "cliffs_delta": 0.008
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.178,
+            "cv_sphp": 0.2622,
+            "mde": 0.0705,
+            "achieved_power_at_observed_rel_d": 0.0602,
+            "achieved_power_at_10pct": 0.978
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0315,
+            "achieved_power_at_observed_rel_d": 0.147
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.4223577642235776,
+          "adjusted_p": 0.563144,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt80_cold_ttft_mean": {
+        "cell": "rtt80_cold_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3544.63,
+          "median": 3519.94,
+          "cv": 0.1835
+        },
+        "sphp": {
+          "mean": 2982.08,
+          "median": 2940.34,
+          "cv": 0.1891
+        },
+        "delta": -562.55,
+        "delta_ci_bca": [
+          -812.55,
+          -314.16
+        ],
+        "relative_delta_pct": -15.87,
+        "relative_delta_ci_pct": [
+          -22.92,
+          -8.86
+        ],
+        "permutation": {
+          "p_one_sided_less": 9.999000099990002e-05,
+          "statistic": -562.55,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.924,
+          "cliffs_delta": -0.506
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.1835,
+            "cv_sphp": 0.1891,
+            "mde": 0.1027,
+            "achieved_power_at_observed_rel_d": 0.991,
+            "achieved_power_at_10pct": 0.778
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0459,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 9.999000099990002e-05,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true,
+          "adjusted_p_4test_reading": 0.0004,
+          "significant_4test_reading": true
+        }
+      },
+      "rtt80_warm_ttft_mean": {
+        "cell": "rtt80_warm_ttft_mean",
+        "stat": "mean",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 875.04,
+          "median": 851.17,
+          "cv": 0.1456
+        },
+        "sphp": {
+          "mean": 896.85,
+          "median": 847.2,
+          "cv": 0.2427
+        },
+        "delta": 21.81,
+        "delta_ci_bca": [
+          -28.64,
+          68.19
+        ],
+        "relative_delta_pct": 2.49,
+        "relative_delta_ci_pct": [
+          -3.27,
+          7.79
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.7994200579942006,
+          "statistic": 21.81,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": 0.122,
+          "cliffs_delta": -0.03
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.1456,
+            "cv_sphp": 0.2427,
+            "mde": 0.0576,
+            "achieved_power_at_observed_rel_d": 0.2268,
+            "achieved_power_at_10pct": 0.9981
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0258,
+            "achieved_power_at_observed_rel_d": 0.7724
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.7994200579942006,
+          "adjusted_p": 0.830717,
+          "alpha": 0.05,
+          "significant": false
+        }
+      },
+      "rtt80_cold_ttft_median": {
+        "cell": "rtt80_cold_ttft_median",
+        "stat": "median",
+        "n_baseline": 50,
+        "n_sphp": 50,
+        "baseline": {
+          "mean": 3544.63,
+          "median": 3519.94,
+          "cv": 0.1835
+        },
+        "sphp": {
+          "mean": 2982.08,
+          "median": 2940.34,
+          "cv": 0.1891
+        },
+        "delta": -579.61,
+        "delta_ci_bca": [
+          -871.88,
+          -192.02
+        ],
+        "relative_delta_pct": -16.47,
+        "relative_delta_ci_pct": [
+          -24.77,
+          -5.46
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.00019998000199980003,
+          "statistic": -579.61,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": -0.924,
+          "cliffs_delta": -0.506
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 50,
+              "sphp": 50
+            },
+            "cv_baseline": 0.1835,
+            "cv_sphp": 0.1891,
+            "mde": 0.1027,
+            "achieved_power_at_observed_rel_d": 0.9937,
+            "achieved_power_at_10pct": 0.778
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0459,
+            "achieved_power_at_observed_rel_d": 1.0
+          }
+        },
+        "multiplicity": {
+          "method": "Holm (FWER, PRIMARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} cold TTFT",
+          "raw_p": 0.00019998000199980003,
+          "adjusted_p": 0.0008,
+          "alpha": 0.05,
+          "significant": true
+        }
+      },
+      "rtt80_warm_ttft_median": {
+        "cell": "rtt80_warm_ttft_median",
+        "stat": "median",
+        "n_baseline": 100,
+        "n_sphp": 100,
+        "baseline": {
+          "mean": 875.04,
+          "median": 851.17,
+          "cv": 0.1456
+        },
+        "sphp": {
+          "mean": 896.85,
+          "median": 847.2,
+          "cv": 0.2427
+        },
+        "delta": -3.97,
+        "delta_ci_bca": [
+          -48.21,
+          36.76
+        ],
+        "relative_delta_pct": -0.47,
+        "relative_delta_ci_pct": [
+          -5.66,
+          4.32
+        ],
+        "permutation": {
+          "p_one_sided_less": 0.415958404159584,
+          "statistic": -3.97,
+          "n_resamples": 10000,
+          "seed": 42,
+          "alternative": "less",
+          "contiguity": "+1 continuity correction"
+        },
+        "effect_sizes": {
+          "cohens_d": 0.122,
+          "cliffs_delta": -0.03
+        },
+        "power": {
+          "two_sample": {
+            "n_per_arm": {
+              "baseline": 100,
+              "sphp": 100
+            },
+            "cv_baseline": 0.1456,
+            "cv_sphp": 0.2427,
+            "mde": 0.0576,
+            "achieved_power_at_observed_rel_d": 0.0409,
+            "achieved_power_at_10pct": 0.9981
+          },
+          "paired_rho_0p8": {
+            "rho": 0.8,
+            "mde": 0.0258,
+            "achieved_power_at_observed_rel_d": 0.0711
+          }
+        },
+        "multiplicity": {
+          "method": "Benjamini-Hochberg (FDR, SECONDARY family)",
+          "family": "8 tests = 4 RTT tiers x {mean, median} warm TTFT",
+          "raw_p": 0.415958404159584,
+          "adjusted_p": 0.563144,
+          "alpha": 0.05,
+          "significant": false
+        }
+      }
+    },
+    "descriptive": {
+      "rtt0_cold_baseline": {
+        "n": 50,
+        "p50": 3675.1,
+        "ci95_p50_bca": [
+          3580.59,
+          3802.61
+        ],
+        "p95": 4227.01,
+        "ci95_p95_bca": [
+          4127.34,
+          4504.55
+        ],
+        "p99": 4384.48,
+        "ci95_p99_bca": [
+          4208.05,
+          4504.55
+        ]
+      },
+      "rtt0_warm_baseline": {
+        "n": 100,
+        "p50": 817.57,
+        "ci95_p50_bca": [
+          784.87,
+          851.67
+        ],
+        "p95": 1045.37,
+        "ci95_p95_bca": [
+          1004.22,
+          1128.06
+        ],
+        "p99": 1135.99,
+        "ci95_p99_bca": [
+          1056.57,
+          1149.89
+        ]
+      },
+      "rtt0_cold_sphp": {
+        "n": 50,
+        "p50": 2906.97,
+        "ci95_p50_bca": [
+          2711.63,
+          3144.25
+        ],
+        "p95": 3926.71,
+        "ci95_p95_bca": [
+          3765.31,
+          4721.59
+        ],
+        "p99": 4472.12,
+        "ci95_p99_bca": [
+          3925.15,
+          4721.59
+        ]
+      },
+      "rtt0_warm_sphp": {
+        "n": 100,
+        "p50": 724.75,
+        "ci95_p50_bca": [
+          671.2,
+          771.08
+        ],
+        "p95": 1062.86,
+        "ci95_p95_bca": [
+          999.96,
+          1340.58
+        ],
+        "p99": 1340.97,
+        "ci95_p99_bca": [
+          1204.73,
+          1379.36
+        ]
+      },
+      "rtt15_cold_baseline": {
+        "n": 50,
+        "p50": 3609.68,
+        "ci95_p50_bca": [
+          3455.65,
+          3820.88
+        ],
+        "p95": 4251.75,
+        "ci95_p95_bca": [
+          4048.23,
+          4837.24
+        ],
+        "p99": 4572.04,
+        "ci95_p99_bca": [
+          4235.08,
+          4837.24
+        ]
+      },
+      "rtt15_warm_baseline": {
+        "n": 100,
+        "p50": 817.13,
+        "ci95_p50_bca": [
+          773.88,
+          860.88
+        ],
+        "p95": 1012.92,
+        "ci95_p95_bca": [
+          993.07,
+          1047.93
+        ],
+        "p99": 1048.56,
+        "ci95_p99_bca": [
+          1020.16,
+          1111.23
+        ]
+      },
+      "rtt15_cold_sphp": {
+        "n": 50,
+        "p50": 2895.16,
+        "ci95_p50_bca": [
+          2622.08,
+          2972.72
+        ],
+        "p95": 3869.18,
+        "ci95_p95_bca": [
+          3545.73,
+          4264.2
+        ],
+        "p99": 4250.91,
+        "ci95_p99_bca": [
+          3867.17,
+          4413.76
+        ]
+      },
+      "rtt15_warm_sphp": {
+        "n": 100,
+        "p50": 748.0,
+        "ci95_p50_bca": [
+          685.44,
+          793.31
+        ],
+        "p95": 1150.95,
+        "ci95_p95_bca": [
+          1028.63,
+          1237.59
+        ],
+        "p99": 1277.57,
+        "ci95_p99_bca": [
+          1195.06,
+          1283.05
+        ]
+      },
+      "rtt40_cold_baseline": {
+        "n": 50,
+        "p50": 3524.13,
+        "ci95_p50_bca": [
+          3447.73,
+          3613.38
+        ],
+        "p95": 4276.41,
+        "ci95_p95_bca": [
+          4048.97,
+          4955.06
+        ],
+        "p99": 4857.88,
+        "ci95_p99_bca": [
+          4249.85,
+          4955.06
+        ]
+      },
+      "rtt40_warm_baseline": {
+        "n": 100,
+        "p50": 804.43,
+        "ci95_p50_bca": [
+          773.8,
+          830.06
+        ],
+        "p95": 1049.56,
+        "ci95_p95_bca": [
+          1019.13,
+          1171.56
+        ],
+        "p99": 1172.82,
+        "ci95_p99_bca": [
+          1085.48,
+          1298.05
+        ]
+      },
+      "rtt40_cold_sphp": {
+        "n": 50,
+        "p50": 3066.85,
+        "ci95_p50_bca": [
+          2760.59,
+          3224.39
+        ],
+        "p95": 4066.58,
+        "ci95_p95_bca": [
+          3602.58,
+          4612.59
+        ],
+        "p99": 4442.01,
+        "ci95_p99_bca": [
+          3931.72,
+          4612.59
+        ]
+      },
+      "rtt40_warm_sphp": {
+        "n": 100,
+        "p50": 796.06,
+        "ci95_p50_bca": [
+          750.86,
+          841.26
+        ],
+        "p95": 1236.38,
+        "ci95_p95_bca": [
+          1181.38,
+          1378.09
+        ],
+        "p99": 1385.26,
+        "ci95_p99_bca": [
+          1303.98,
+          1428.89
+        ]
+      },
+      "rtt80_cold_baseline": {
+        "n": 50,
+        "p50": 3519.94,
+        "ci95_p50_bca": [
+          3279.66,
+          3735.76
+        ],
+        "p95": 4541.65,
+        "ci95_p95_bca": [
+          4263.81,
+          5005.87
+        ],
+        "p99": 4850.14,
+        "ci95_p99_bca": [
+          4538.79,
+          5005.87
+        ]
+      },
+      "rtt80_warm_baseline": {
+        "n": 100,
+        "p50": 851.17,
+        "ci95_p50_bca": [
+          831.6,
+          876.88
+        ],
+        "p95": 1110.03,
+        "ci95_p95_bca": [
+          1031.26,
+          1213.28
+        ],
+        "p99": 1213.58,
+        "ci95_p99_bca": [
+          1121.19,
+          1243.28
+        ]
+      },
+      "rtt80_cold_sphp": {
+        "n": 50,
+        "p50": 2940.34,
+        "ci95_p50_bca": [
+          2782.07,
+          3143.76
+        ],
+        "p95": 3930.04,
+        "ci95_p95_bca": [
+          3642.13,
+          4439.29
+        ],
+        "p99": 4314.16,
+        "ci95_p99_bca": [
+          3923.92,
+          4439.29
+        ]
+      },
+      "rtt80_warm_sphp": {
+        "n": 100,
+        "p50": 847.2,
+        "ci95_p50_bca": [
+          813.73,
+          876.37
+        ],
+        "p95": 1323.75,
+        "ci95_p95_bca": [
+          1221.39,
+          1511.87
+        ],
+        "p99": 1513.23,
+        "ci95_p99_bca": [
+          1327.25,
+          1647.66
+        ]
+      }
+    },
+    "sphp_hit_rate": {
+      "definition": "sphp_hit == True among SPHP-arm records (null sphp_hit counted as non-hit)",
+      "overall": {
+        "n": 597,
+        "hits": 504,
+        "rate": 0.8442,
+        "wilson_ci95": [
+          0.8129,
+          0.8711
+        ]
+      },
+      "by_tier": {
+        "rtt0": {
+          "n": 147,
+          "hits": 120,
+          "rate": 0.8163,
+          "wilson_ci95": [
+            0.746,
+            0.8706
+          ]
+        },
+        "rtt15": {
+          "n": 150,
+          "hits": 135,
+          "rate": 0.9,
+          "wilson_ci95": [
+            0.8416,
+            0.9385
+          ]
+        },
+        "rtt40": {
+          "n": 150,
+          "hits": 126,
+          "rate": 0.84,
+          "wilson_ci95": [
+            0.773,
+            0.8901
+          ]
+        },
+        "rtt80": {
+          "n": 150,
+          "hits": 123,
+          "rate": 0.82,
+          "wilson_ci95": [
+            0.7508,
+            0.8732
+          ]
+        }
+      },
+      "by_stratum": {
+        "cold": {
+          "n": 199,
+          "hits": 168,
+          "rate": 0.8442,
+          "wilson_ci95": [
+            0.7874,
+            0.888
+          ]
+        },
+        "warm": {
+          "n": 398,
+          "hits": 336,
+          "rate": 0.8442,
+          "wilson_ci95": [
+            0.8053,
+            0.8765
+          ]
+        }
+      }
+    },
+    "sphp_overlap": {
+      "definition": "mean of sphp_overlap over SPHP records with non-null overlap (cold and warm records both)",
+      "overall": {
+        "n": 597,
+        "mean": 0.6241,
+        "mean_ci95_bca": [
+          0.6124,
+          0.635
+        ],
+        "median": 0.6
+      },
+      "cold": {
+        "n": 199,
+        "mean": 0.6241,
+        "mean_ci95_bca": [
+          0.602,
+          0.6412
+        ],
+        "median": 0.6
+      },
+      "warm": {
+        "n": 398,
+        "mean": 0.6241,
+        "mean_ci95_bca": [
+          0.6095,
+          0.6384
+        ],
+        "median": 0.6
+      },
+      "by_tier": {
+        "rtt0": {
+          "n": 147,
+          "mean": 0.6041,
+          "mean_ci95_bca": [
+            0.5823,
+            0.6272
+          ],
+          "median": 0.6
+        },
+        "rtt15": {
+          "n": 150,
+          "mean": 0.64,
+          "mean_ci95_bca": [
+            0.62,
+            0.6587
+          ],
+          "median": 0.6
+        },
+        "rtt40": {
+          "n": 150,
+          "mean": 0.628,
+          "mean_ci95_bca": [
+            0.6053,
+            0.6507
+          ],
+          "median": 0.6
+        },
+        "rtt80": {
+          "n": 150,
+          "mean": 0.624,
+          "mean_ci95_bca": [
+            0.6006,
+            0.6467
+          ],
+          "median": 0.6
+        }
+      }
+    }
+  }
+}
