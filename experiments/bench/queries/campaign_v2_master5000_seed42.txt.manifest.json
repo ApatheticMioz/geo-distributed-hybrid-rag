@@ -1,0 +1,47 @@
+{
+  "schema": "pdc.query_pool_manifest/v1",
+  "generated_at_utc": "2026-10-12T17:37:10Z",
+  "seed": 42,
+  "source": {
+    "path": "/home/apath/Work/PDC/data/msmarco/queries.dev.tsv",
+    "sha256": "757b7e935ff46728be84cbf7d195c3e6ae479d6449d92bbb87b09fe56bebf5ee",
+    "n_queries": 101093
+  },
+  "n": 5000,
+  "sampling": {
+    "type": "uniform",
+    "rng": "numpy.random.default_rng(seed)",
+    "n_source_queries": 101093,
+    "n_eligible_after_exclusion": 100213
+  },
+  "exclusions": [
+    {
+      "path": "/home/apath/Work/PDC/Project/experiments/bench/queries/latency_dev480_seed42.txt",
+      "sha256": "17f1b1fe929ce1e573df876a7b8cdfeb298cbb0c4802befae855ffdd5ffd9d84",
+      "n_queries": 480,
+      "overlap_with_new_pool": 0
+    },
+    {
+      "path": "/home/apath/Work/PDC/Project/experiments/bench/queries/latency_dev60_seed42.txt",
+      "sha256": "da1349265877697b42a8ccfacdecb58b45d77717c63963c0f70afc96a51cfb53",
+      "n_queries": 60,
+      "overlap_with_new_pool": 0
+    },
+    {
+      "path": "/home/apath/Work/PDC/Project/experiments/bench/queries/campaign_v2_core400_seed42.txt",
+      "sha256": "4d9771444799ff4e11510cc9c378c2eb8a5d4869ee208514e478079bb9d6787e",
+      "n_queries": 400,
+      "overlap_with_new_pool": 0
+    }
+  ],
+  "disjointness_asserted": true,
+  "output": {
+    "path": "/home/apath/Work/PDC/Project/experiments/bench/queries/campaign_v2_master5000_seed42.txt",
+    "sha256": "9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa",
+    "line_count": 5000,
+    "first_query_id": "262230",
+    "last_query_id": "1048548",
+    "first_query": "how long is a day on planet pluto",
+    "last_query": "what is peg ratio example"
+  }
+}
