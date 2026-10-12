@@ -1,0 +1,1403 @@
+{
+  "generator": "analysis/costmodel_refit_v2_20261013.py (AB-5)",
+  "new_campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_v2_confirm_2node_20261013.jsonl",
+  "old_campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_20260918T130756Z.jsonl",
+  "new_campaign_n": 2880,
+  "old_campaign_n": 1200,
+  "bw_mbps": 100.0,
+  "top_k": 10,
+  "per_term": {
+    "hydration": {
+      "cold": {
+        "n": 480,
+        "mean_hydrate_resid_ms": -16.88,
+        "std_hydrate_resid_ms": 86.56,
+        "t_hydrate_per_doc_ms": -3.375,
+        "hydrate_per_doc_vs_5doc_default": -1.675,
+        "hydrate_vs_tokcount_slope_ms_per_tok": 0.99148,
+        "hydrate_vs_tokcount_r2": -0.0636,
+        "top_k_distinct": [
+          10
+        ],
+        "note": "top_k is constant (=10) across the campaign, so doc-count linearity is a no-op; the token-count slope tests whether the hydration term secretly scales with generated length."
+      },
+      "warm": {
+        "n": 960,
+        "mean_hydrate_resid_ms": -16.87,
+        "std_hydrate_resid_ms": 149.08,
+        "t_hydrate_per_doc_ms": -3.375,
+        "hydrate_per_doc_vs_5doc_default": -1.675,
+        "hydrate_vs_tokcount_slope_ms_per_tok": -2.45176,
+        "hydrate_vs_tokcount_r2": -0.243,
+        "top_k_distinct": [
+          10
+        ],
+        "note": "top_k is constant (=10) across the campaign, so doc-count linearity is a no-op; the token-count slope tests whether the hydration term secretly scales with generated length."
+      }
+    },
+    "decode": {
+      "new_cold_median_tps": 35.78,
+      "new_warm_median_tps": 35.26,
+      "old_cold_median_tps": 35.56,
+      "old_warm_median_tps": 35.18
+    },
+    "sphp": {
+      "new_cold": {
+        "measured_hit_rate": 0.9,
+        "hit_rate_wilson95": [
+          0.8699,
+          0.9237
+        ],
+        "per_tier_hit_rate": {
+          "0": 0.9083,
+          "15": 0.8917,
+          "40": 0.9167,
+          "80": 0.8833
+        },
+        "miss_penalty_ms": 1076.6,
+        "n_miss": 48
+      },
+      "new_warm": {
+        "measured_hit_rate": 0.9,
+        "hit_rate_wilson95": [
+          0.8794,
+          0.9174
+        ],
+        "per_tier_hit_rate": {
+          "0": 0.9083,
+          "15": 0.8917,
+          "40": 0.9167,
+          "80": 0.8833
+        },
+        "miss_penalty_ms": 124.5,
+        "n_miss": 96
+      },
+      "old_cold": {
+        "measured_hit_rate": 0.84,
+        "hit_rate_wilson95": [
+          0.7829,
+          0.8843
+        ],
+        "per_tier_hit_rate": {
+          "0": 0.8,
+          "15": 0.9,
+          "40": 0.84,
+          "80": 0.82
+        },
+        "miss_penalty_ms": 2697.8,
+        "n_miss": 31
+      },
+      "old_warm": {
+        "measured_hit_rate": 0.84,
+        "hit_rate_wilson95": [
+          0.8009,
+          0.8727
+        ],
+        "per_tier_hit_rate": {
+          "0": 0.8,
+          "15": 0.9,
+          "40": 0.84,
+          "80": 0.82
+        },
+        "miss_penalty_ms": 193.6,
+        "n_miss": 62
+      }
+    },
+    "params": {
+      "new": {
+        "cold": {
+          "n_p2": 480,
+          "n_sphp": 480,
+          "fitted_params": {
+            "t_sparse_base_ms": 603.1518,
+            "t_dense_base_ms": 1091.6676,
+            "t_fusion_base_ms": 0.0159,
+            "t_prefill_base_ms": 568.1346,
+            "decode_tok_per_sec": 35.78,
+            "sphp_hit_rate": 0.9,
+            "t_sphp_miss_penalty_ms": 1076.6
+          },
+          "decode_tps_median": 35.78,
+          "decode_tps_n_excluded": 119,
+          "sphp": {
+            "measured_hit_rate": 0.9,
+            "hit_rate_wilson95": [
+              0.8699,
+              0.9237
+            ],
+            "per_tier_hit_rate": {
+              "0": 0.9083,
+              "15": 0.8917,
+              "40": 0.9167,
+              "80": 0.8833
+            },
+            "miss_penalty_ms": 1076.6,
+            "n_miss": 48
+          },
+          "loto_P2": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 1668.6,
+                "observed_mean_ms": 1656.8,
+                "ape_pct": 0.72
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 1671.0,
+                "observed_mean_ms": 1663.8,
+                "ape_pct": 0.43
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 1663.6,
+                "observed_mean_ms": 1720.0,
+                "ape_pct": 3.28
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 1709.2,
+                "observed_mean_ms": 1640.5,
+                "ape_pct": 4.19
+              }
+            ],
+            "regime_mape_pct": 2.15,
+            "regime_r2": -1.2586
+          },
+          "loto_P2SPHP": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 1354.2,
+                "observed_mean_ms": 1258.4,
+                "ape_pct": 7.61
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 1342.0,
+                "observed_mean_ms": 1204.9,
+                "ape_pct": 11.38
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 1337.5,
+                "observed_mean_ms": 1313.0,
+                "ape_pct": 1.87
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 1350.5,
+                "observed_mean_ms": 1222.5,
+                "ape_pct": 10.47
+              }
+            ],
+            "regime_mape_pct": 7.83,
+            "regime_r2": -5.583
+          },
+          "component_residual_check": {
+            "n": 480,
+            "mape_pct": 4.08,
+            "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+          },
+          "sphp_branch_check": {
+            "hit_branch": {
+              "n": 432,
+              "mape_pct": 8.67
+            },
+            "miss_branch": {
+              "n": 48,
+              "mape_pct": 58.01
+            },
+            "note": "branch-conditional form check with per-record measured components"
+          }
+        },
+        "warm": {
+          "n_p2": 960,
+          "n_sphp": 960,
+          "fitted_params": {
+            "t_sparse_base_ms": 79.1973,
+            "t_dense_base_ms": 113.9576,
+            "t_fusion_base_ms": 0.0151,
+            "t_prefill_base_ms": 423.6075,
+            "decode_tok_per_sec": 35.26,
+            "sphp_hit_rate": 0.9,
+            "t_sphp_miss_penalty_ms": 124.5
+          },
+          "decode_tps_median": 35.26,
+          "decode_tps_n_excluded": 1,
+          "sphp": {
+            "measured_hit_rate": 0.9,
+            "hit_rate_wilson95": [
+              0.8794,
+              0.9174
+            ],
+            "per_tier_hit_rate": {
+              "0": 0.9083,
+              "15": 0.8917,
+              "40": 0.9167,
+              "80": 0.8833
+            },
+            "miss_penalty_ms": 124.5,
+            "n_miss": 96
+          },
+          "loto_P2": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 550.4,
+                "observed_mean_ms": 510.0,
+                "ape_pct": 7.91
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 552.2,
+                "observed_mean_ms": 531.7,
+                "ape_pct": 3.85
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 555.4,
+                "observed_mean_ms": 560.9,
+                "ape_pct": 0.98
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 565.5,
+                "observed_mean_ms": 587.6,
+                "ape_pct": 3.76
+              }
+            ],
+            "regime_mape_pct": 4.13,
+            "regime_r2": 0.2533
+          },
+          "loto_P2SPHP": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 534.9,
+                "observed_mean_ms": 488.1,
+                "ape_pct": 9.59
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 532.6,
+                "observed_mean_ms": 524.0,
+                "ape_pct": 1.64
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 535.6,
+                "observed_mean_ms": 536.8,
+                "ape_pct": 0.22
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 544.9,
+                "observed_mean_ms": 579.8,
+                "ape_pct": 6.01
+              }
+            ],
+            "regime_mape_pct": 4.37,
+            "regime_r2": 0.1897
+          },
+          "component_residual_check": {
+            "n": 960,
+            "mape_pct": 29.24,
+            "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+          },
+          "sphp_branch_check": {
+            "hit_branch": {
+              "n": 864,
+              "mape_pct": 32.8
+            },
+            "miss_branch": {
+              "n": 96,
+              "mape_pct": 21.86
+            },
+            "note": "branch-conditional form check with per-record measured components"
+          }
+        }
+      },
+      "old": {
+        "cold": {
+          "n_p2": 200,
+          "n_sphp": 200,
+          "fitted_params": {
+            "t_sparse_base_ms": 1711.2938,
+            "t_dense_base_ms": 2680.8529,
+            "t_fusion_base_ms": 0.0175,
+            "t_prefill_base_ms": 850.7129,
+            "decode_tok_per_sec": 35.56,
+            "sphp_hit_rate": 0.84,
+            "t_sphp_miss_penalty_ms": 2697.8
+          },
+          "decode_tps_median": 35.56,
+          "decode_tps_n_excluded": 105,
+          "sphp": {
+            "measured_hit_rate": 0.84,
+            "hit_rate_wilson95": [
+              0.7829,
+              0.8843
+            ],
+            "per_tier_hit_rate": {
+              "0": 0.8,
+              "15": 0.9,
+              "40": 0.84,
+              "80": 0.82
+            },
+            "miss_penalty_ms": 2697.8,
+            "n_miss": 31
+          },
+          "loto_P2": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 3518.5,
+                "observed_mean_ms": 3633.6,
+                "ape_pct": 3.17
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 3540.7,
+                "observed_mean_ms": 3569.7,
+                "ape_pct": 0.81
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 3557.7,
+                "observed_mean_ms": 3555.7,
+                "ape_pct": 0.06
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 3582.6,
+                "observed_mean_ms": 3544.6,
+                "ape_pct": 1.07
+              }
+            ],
+            "regime_mape_pct": 1.28,
+            "regime_r2": -2.2672
+          },
+          "loto_P2SPHP": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 3176.2,
+                "observed_mean_ms": 2948.2,
+                "ape_pct": 7.73
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 3323.7,
+                "observed_mean_ms": 2892.1,
+                "ape_pct": 14.92
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 3274.5,
+                "observed_mean_ms": 2996.8,
+                "ape_pct": 9.27
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 3289.0,
+                "observed_mean_ms": 2982.1,
+                "ape_pct": 10.29
+              }
+            ],
+            "regime_mape_pct": 10.55,
+            "regime_r2": -62.1645
+          },
+          "component_residual_check": {
+            "n": 200,
+            "mape_pct": 3.02,
+            "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+          },
+          "sphp_branch_check": {
+            "hit_branch": {
+              "n": 168,
+              "mape_pct": 7.38
+            },
+            "miss_branch": {
+              "n": 31,
+              "mape_pct": 75.84
+            },
+            "note": "branch-conditional form check with per-record measured components"
+          }
+        },
+        "warm": {
+          "n_p2": 400,
+          "n_sphp": 400,
+          "fitted_params": {
+            "t_sparse_base_ms": 74.8028,
+            "t_dense_base_ms": 190.8033,
+            "t_fusion_base_ms": 0.0192,
+            "t_prefill_base_ms": 633.2747,
+            "decode_tok_per_sec": 35.18,
+            "sphp_hit_rate": 0.84,
+            "t_sphp_miss_penalty_ms": 193.6
+          },
+          "decode_tps_median": 35.18,
+          "decode_tps_n_excluded": 0,
+          "sphp": {
+            "measured_hit_rate": 0.84,
+            "hit_rate_wilson95": [
+              0.8009,
+              0.8727
+            ],
+            "per_tier_hit_rate": {
+              "0": 0.8,
+              "15": 0.9,
+              "40": 0.84,
+              "80": 0.82
+            },
+            "miss_penalty_ms": 193.6,
+            "n_miss": 62
+          },
+          "loto_P2": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 830.2,
+                "observed_mean_ms": 817.9,
+                "ape_pct": 1.5
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 837.3,
+                "observed_mean_ms": 815.8,
+                "ape_pct": 2.64
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 851.0,
+                "observed_mean_ms": 817.1,
+                "ape_pct": 4.16
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 851.0,
+                "observed_mean_ms": 875.0,
+                "ape_pct": 2.75
+              }
+            ],
+            "regime_mape_pct": 2.76,
+            "regime_r2": 0.076
+          },
+          "loto_P2SPHP": {
+            "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+            "n_tiers": 4,
+            "per_tier": [
+              {
+                "rtt_ms": 0.0,
+                "predicted_mean_ms": 761.1,
+                "observed_mean_ms": 738.9,
+                "ape_pct": 3.0
+              },
+              {
+                "rtt_ms": 15.0,
+                "predicted_mean_ms": 779.4,
+                "observed_mean_ms": 778.1,
+                "ape_pct": 0.18
+              },
+              {
+                "rtt_ms": 40.0,
+                "predicted_mean_ms": 781.9,
+                "observed_mean_ms": 842.2,
+                "ape_pct": 7.16
+              },
+              {
+                "rtt_ms": 80.0,
+                "predicted_mean_ms": 781.1,
+                "observed_mean_ms": 896.8,
+                "ape_pct": 12.9
+              }
+            ],
+            "regime_mape_pct": 5.81,
+            "regime_r2": -0.2015
+          },
+          "component_residual_check": {
+            "n": 400,
+            "mape_pct": 11.3,
+            "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+          },
+          "sphp_branch_check": {
+            "hit_branch": {
+              "n": 336,
+              "mape_pct": 14.84
+            },
+            "miss_branch": {
+              "n": 62,
+              "mape_pct": 14.77
+            },
+            "note": "branch-conditional form check with per-record measured components"
+          }
+        }
+      },
+      "stored_published": {
+        "cold": {
+          "t_sparse_base_ms": 1711.29,
+          "t_dense_base_ms": 2680.85,
+          "t_fusion_base_ms": 0.0175,
+          "t_prefill_base_ms": 850.71,
+          "decode_tok_per_sec": 35.18,
+          "sphp_hit_rate_measured": 0.84,
+          "t_sphp_miss_penalty_ms": 2697.8
+        },
+        "warm": {
+          "t_sparse_base_ms": 74.8,
+          "t_dense_base_ms": 190.8,
+          "t_fusion_base_ms": 0.0192,
+          "t_prefill_base_ms": 633.27,
+          "decode_tok_per_sec": 35.18,
+          "sphp_hit_rate_measured": 0.84,
+          "t_sphp_miss_penalty_ms": 193.6
+        }
+      }
+    }
+  },
+  "goodness": {
+    "protocol": "leave-one-tier-out, RTT tiers, regime (tier-mean) level, the paper's C3 validation protocol",
+    "old_fit_on_old": {
+      "P2_cold": 1.28,
+      "P2_warm": 2.76,
+      "P2SPHP_cold": 10.55,
+      "P2SPHP_warm": 5.81
+    },
+    "refit_on_new": {
+      "P2_cold": 2.15,
+      "P2_warm": 4.13,
+      "P2SPHP_cold": 7.83,
+      "P2SPHP_warm": 4.37
+    },
+    "old_fit_on_new_transfer": {
+      "cold": {
+        "mape_pct": 114.02,
+        "per_tier": [
+          {
+            "rtt_ms": 0.0,
+            "observed_mean_ms": 1656.8,
+            "predicted_by_oldfit_ms": 3556.6,
+            "ape_pct": 114.67
+          },
+          {
+            "rtt_ms": 15.0,
+            "observed_mean_ms": 1663.8,
+            "predicted_by_oldfit_ms": 3564.1,
+            "ape_pct": 114.21
+          },
+          {
+            "rtt_ms": 40.0,
+            "observed_mean_ms": 1720.0,
+            "predicted_by_oldfit_ms": 3576.6,
+            "ape_pct": 107.95
+          },
+          {
+            "rtt_ms": 80.0,
+            "observed_mean_ms": 1640.5,
+            "predicted_by_oldfit_ms": 3596.6,
+            "ape_pct": 119.24
+          }
+        ]
+      },
+      "warm": {
+        "mape_pct": 58.46,
+        "per_tier": [
+          {
+            "rtt_ms": 0.0,
+            "observed_mean_ms": 510.0,
+            "predicted_by_oldfit_ms": 849.1,
+            "ape_pct": 66.48
+          },
+          {
+            "rtt_ms": 15.0,
+            "observed_mean_ms": 531.7,
+            "predicted_by_oldfit_ms": 856.6,
+            "ape_pct": 61.1
+          },
+          {
+            "rtt_ms": 40.0,
+            "observed_mean_ms": 560.9,
+            "predicted_by_oldfit_ms": 869.1,
+            "ape_pct": 54.95
+          },
+          {
+            "rtt_ms": 80.0,
+            "observed_mean_ms": 587.6,
+            "predicted_by_oldfit_ms": 889.1,
+            "ape_pct": 51.3
+          }
+        ]
+      }
+    }
+  },
+  "crossover": {
+    "note": "P2 vs P2-SPHP: the WAN payload is 104/144 B so the model is monotone in RTT and BW -- there is no interior crossover; the decision is 'always P2-SPHP' with a small, RTT/BW-flat edge.",
+    "new_sphp_advantage": {
+      "min_sphp_advantage_pct": 2.84,
+      "max_sphp_advantage_pct": 3.35,
+      "argmin_topology_counts": {
+        "P2-SPHP": 35,
+        "P2": 0
+      }
+    },
+    "old_sphp_advantage": {
+      "min_sphp_advantage_pct": 7.0,
+      "max_sphp_advantage_pct": 7.83,
+      "argmin_topology_counts": {
+        "P2-SPHP": 35,
+        "P2": 0
+      }
+    }
+  },
+  "policy": {
+    "warm": {
+      "per_tier": [
+        {
+          "rtt_ms": 0.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 543.7,
+          "realized_ms": 488.1,
+          "n": 240,
+          "abs_err_pct": 11.4
+        },
+        {
+          "rtt_ms": 15.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 551.2,
+          "realized_ms": 524.0,
+          "n": 240,
+          "abs_err_pct": 5.2
+        },
+        {
+          "rtt_ms": 40.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 563.7,
+          "realized_ms": 536.8,
+          "n": 240,
+          "abs_err_pct": 5.01
+        },
+        {
+          "rtt_ms": 80.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 583.7,
+          "realized_ms": 579.8,
+          "n": 240,
+          "abs_err_pct": 0.68
+        }
+      ],
+      "pooled_abs_err_pct": 5.57,
+      "selected_variants": {
+        "0.0": "P2-SPHP",
+        "15.0": "P2-SPHP",
+        "40.0": "P2-SPHP",
+        "80.0": "P2-SPHP"
+      }
+    },
+    "cold": {
+      "per_tier": [
+        {
+          "rtt_ms": 0.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 1352.8,
+          "realized_ms": 1258.4,
+          "n": 120,
+          "abs_err_pct": 7.5
+        },
+        {
+          "rtt_ms": 15.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 1360.3,
+          "realized_ms": 1204.9,
+          "n": 120,
+          "abs_err_pct": 12.9
+        },
+        {
+          "rtt_ms": 40.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 1372.8,
+          "realized_ms": 1313.0,
+          "n": 120,
+          "abs_err_pct": 4.55
+        },
+        {
+          "rtt_ms": 80.0,
+          "selected": "P2-SPHP",
+          "pred_ms": 1392.8,
+          "realized_ms": 1222.5,
+          "n": 120,
+          "abs_err_pct": 13.93
+        }
+      ],
+      "pooled_abs_err_pct": 9.72,
+      "selected_variants": {
+        "0.0": "P2-SPHP",
+        "15.0": "P2-SPHP",
+        "40.0": "P2-SPHP",
+        "80.0": "P2-SPHP"
+      }
+    }
+  },
+  "residuals": {
+    "refit_on_new_cold": {
+      "P2": {
+        "n": 480,
+        "mean_resid_ms": 31.44,
+        "std_resid_ms": 265.77,
+        "bias_pct_of_obs": 4.36,
+        "mape_pct": 12.41,
+        "trend_resid_on_rtt_pct_per_ms": 0.0508,
+        "trend_resid_on_tok_pct_per_tok": -0.168225,
+        "curvature_resid_on_prefill_r2": -2.5152,
+        "curvature_resid_on_tok_r2": 0.0082
+      },
+      "P2SPHP_overall": {
+        "n": 480,
+        "mean_resid_ms": 119.99,
+        "std_resid_ms": 311.06,
+        "bias_pct_of_obs": 16.994,
+        "mape_pct": 25.45,
+        "trend_resid_on_rtt_pct_per_ms": 0.0947,
+        "trend_resid_on_tok_pct_per_tok": -0.045996,
+        "curvature_resid_on_prefill_r2": -0.0041,
+        "curvature_resid_on_tok_r2": 0.0002
+      },
+      "P2_per_tier_mean_resid_ms": {
+        "0": 28.1,
+        "15": 28.5,
+        "40": -15.1,
+        "80": 84.3
+      }
+    },
+    "refit_on_new_warm": {
+      "P2": {
+        "n": 960,
+        "mean_resid_ms": 31.9,
+        "std_resid_ms": 175.22,
+        "bias_pct_of_obs": 17.978,
+        "mape_pct": 35.38,
+        "trend_resid_on_rtt_pct_per_ms": -0.1621,
+        "trend_resid_on_tok_pct_per_tok": 0.631094,
+        "curvature_resid_on_prefill_r2": -6.1099,
+        "curvature_resid_on_tok_r2": 0.0557
+      },
+      "P2SPHP_overall": {
+        "n": 960,
+        "mean_resid_ms": 28.44,
+        "std_resid_ms": 200.52,
+        "bias_pct_of_obs": 20.67,
+        "mape_pct": 37.48,
+        "trend_resid_on_rtt_pct_per_ms": -0.1836,
+        "trend_resid_on_tok_pct_per_tok": 0.509624,
+        "curvature_resid_on_prefill_r2": -3.2108,
+        "curvature_resid_on_tok_r2": 0.0146
+      },
+      "P2_per_tier_mean_resid_ms": {
+        "0": 52.6,
+        "15": 38.4,
+        "40": 21.7,
+        "80": 14.9
+      }
+    },
+    "old_fit_on_new_cold": {
+      "P2": {
+        "n": 480,
+        "mean_resid_ms": 1903.2,
+        "std_resid_ms": 265.77,
+        "bias_pct_of_obs": 119.143,
+        "mape_pct": 119.14,
+        "trend_resid_on_rtt_pct_per_ms": 0.0725,
+        "trend_resid_on_tok_pct_per_tok": -0.343999,
+        "curvature_resid_on_prefill_r2": -2.7179,
+        "curvature_resid_on_tok_r2": 0.008
+      },
+      "P2SPHP_overall": {
+        "n": 480,
+        "mean_resid_ms": 2019.82,
+        "std_resid_ms": 311.06,
+        "bias_pct_of_obs": 179.249,
+        "mape_pct": 179.25,
+        "trend_resid_on_rtt_pct_per_ms": 0.1655,
+        "trend_resid_on_tok_pct_per_tok": -0.119783,
+        "curvature_resid_on_prefill_r2": -0.0042,
+        "curvature_resid_on_tok_r2": 0.0002
+      },
+      "P2_per_tier_mean_resid_ms": {
+        "0": 1899.8,
+        "15": 1900.3,
+        "40": 1856.6,
+        "80": 1956.1
+      }
+    },
+    "old_fit_on_new_warm": {
+      "P2": {
+        "n": 960,
+        "mean_resid_ms": 318.41,
+        "std_resid_ms": 175.22,
+        "bias_pct_of_obs": 76.412,
+        "mape_pct": 76.57,
+        "trend_resid_on_rtt_pct_per_ms": -0.2914,
+        "trend_resid_on_tok_pct_per_tok": 0.951705,
+        "curvature_resid_on_prefill_r2": -6.1147,
+        "curvature_resid_on_tok_r2": 0.0561
+      },
+      "P2SPHP_overall": {
+        "n": 960,
+        "mean_resid_ms": 267.31,
+        "std_resid_ms": 200.52,
+        "bias_pct_of_obs": 72.187,
+        "mape_pct": 74.84,
+        "trend_resid_on_rtt_pct_per_ms": -0.3065,
+        "trend_resid_on_tok_pct_per_tok": 0.725649,
+        "curvature_resid_on_prefill_r2": -3.2075,
+        "curvature_resid_on_tok_r2": 0.0145
+      },
+      "P2_per_tier_mean_resid_ms": {
+        "0": 339.1,
+        "15": 324.9,
+        "40": 308.2,
+        "80": 301.5
+      }
+    }
+  },
+  "sphp_branch_check": {
+    "cold": {
+      "hit_branch": {
+        "n": 432,
+        "mape_pct": 8.67
+      },
+      "miss_branch": {
+        "n": 48,
+        "mape_pct": 58.01
+      },
+      "note": "branch-conditional form check with per-record measured components"
+    },
+    "warm": {
+      "hit_branch": {
+        "n": 864,
+        "mape_pct": 32.8
+      },
+      "miss_branch": {
+        "n": 96,
+        "mape_pct": 21.86
+      },
+      "note": "branch-conditional form check with per-record measured components"
+    }
+  },
+  "sphp_formerror": {
+    "cold": {
+      "realized_miss_penalty_ms": {
+        "0": -2.0,
+        "15": 49.8,
+        "40": 138.7,
+        "80": 158.4
+      },
+      "realized_miss_penalty_mean_ms": 86.2,
+      "recorded_wasted_prefill_ms_mean": 1076.6,
+      "gap_realized_minus_recorded_ms": -990.4,
+      "measured_sphp_speedup_pct": 25.18,
+      "modeled_sphp_speedup_pct": 19.48
+    },
+    "warm": {
+      "realized_miss_penalty_ms": {
+        "0": 263.3,
+        "15": 327.9,
+        "40": 288.8,
+        "80": 304.3
+      },
+      "realized_miss_penalty_mean_ms": 296.1,
+      "recorded_wasted_prefill_ms_mean": 124.5,
+      "gap_realized_minus_recorded_ms": 171.6,
+      "measured_sphp_speedup_pct": 2.81,
+      "modeled_sphp_speedup_pct": 3.24
+    }
+  },
+  "new_full": {
+    "campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_v2_confirm_2node_20261013.jsonl",
+    "n_records": 2880,
+    "n_cold": 960,
+    "n_warm": 1920,
+    "tiers": [
+      0.0,
+      15.0,
+      40.0,
+      80.0
+    ],
+    "top_k": [
+      10
+    ],
+    "states": {
+      "cold": {
+        "n_p2": 480,
+        "n_sphp": 480,
+        "fitted_params": {
+          "t_sparse_base_ms": 603.1518,
+          "t_dense_base_ms": 1091.6676,
+          "t_fusion_base_ms": 0.0159,
+          "t_prefill_base_ms": 568.1346,
+          "decode_tok_per_sec": 35.78,
+          "sphp_hit_rate": 0.9,
+          "t_sphp_miss_penalty_ms": 1076.6
+        },
+        "decode_tps_median": 35.78,
+        "decode_tps_n_excluded": 119,
+        "sphp": {
+          "measured_hit_rate": 0.9,
+          "hit_rate_wilson95": [
+            0.8699,
+            0.9237
+          ],
+          "per_tier_hit_rate": {
+            "0": 0.9083,
+            "15": 0.8917,
+            "40": 0.9167,
+            "80": 0.8833
+          },
+          "miss_penalty_ms": 1076.6,
+          "n_miss": 48
+        },
+        "loto_P2": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 1668.6,
+              "observed_mean_ms": 1656.8,
+              "ape_pct": 0.72
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 1671.0,
+              "observed_mean_ms": 1663.8,
+              "ape_pct": 0.43
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 1663.6,
+              "observed_mean_ms": 1720.0,
+              "ape_pct": 3.28
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 1709.2,
+              "observed_mean_ms": 1640.5,
+              "ape_pct": 4.19
+            }
+          ],
+          "regime_mape_pct": 2.15,
+          "regime_r2": -1.2586
+        },
+        "loto_P2SPHP": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 1354.2,
+              "observed_mean_ms": 1258.4,
+              "ape_pct": 7.61
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 1342.0,
+              "observed_mean_ms": 1204.9,
+              "ape_pct": 11.38
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 1337.5,
+              "observed_mean_ms": 1313.0,
+              "ape_pct": 1.87
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 1350.5,
+              "observed_mean_ms": 1222.5,
+              "ape_pct": 10.47
+            }
+          ],
+          "regime_mape_pct": 7.83,
+          "regime_r2": -5.583
+        },
+        "component_residual_check": {
+          "n": 480,
+          "mape_pct": 4.08,
+          "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+        },
+        "sphp_branch_check": {
+          "hit_branch": {
+            "n": 432,
+            "mape_pct": 8.67
+          },
+          "miss_branch": {
+            "n": 48,
+            "mape_pct": 58.01
+          },
+          "note": "branch-conditional form check with per-record measured components"
+        }
+      },
+      "warm": {
+        "n_p2": 960,
+        "n_sphp": 960,
+        "fitted_params": {
+          "t_sparse_base_ms": 79.1973,
+          "t_dense_base_ms": 113.9576,
+          "t_fusion_base_ms": 0.0151,
+          "t_prefill_base_ms": 423.6075,
+          "decode_tok_per_sec": 35.26,
+          "sphp_hit_rate": 0.9,
+          "t_sphp_miss_penalty_ms": 124.5
+        },
+        "decode_tps_median": 35.26,
+        "decode_tps_n_excluded": 1,
+        "sphp": {
+          "measured_hit_rate": 0.9,
+          "hit_rate_wilson95": [
+            0.8794,
+            0.9174
+          ],
+          "per_tier_hit_rate": {
+            "0": 0.9083,
+            "15": 0.8917,
+            "40": 0.9167,
+            "80": 0.8833
+          },
+          "miss_penalty_ms": 124.5,
+          "n_miss": 96
+        },
+        "loto_P2": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 550.4,
+              "observed_mean_ms": 510.0,
+              "ape_pct": 7.91
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 552.2,
+              "observed_mean_ms": 531.7,
+              "ape_pct": 3.85
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 555.4,
+              "observed_mean_ms": 560.9,
+              "ape_pct": 0.98
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 565.5,
+              "observed_mean_ms": 587.6,
+              "ape_pct": 3.76
+            }
+          ],
+          "regime_mape_pct": 4.13,
+          "regime_r2": 0.2533
+        },
+        "loto_P2SPHP": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 534.9,
+              "observed_mean_ms": 488.1,
+              "ape_pct": 9.59
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 532.6,
+              "observed_mean_ms": 524.0,
+              "ape_pct": 1.64
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 535.6,
+              "observed_mean_ms": 536.8,
+              "ape_pct": 0.22
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 544.9,
+              "observed_mean_ms": 579.8,
+              "ape_pct": 6.01
+            }
+          ],
+          "regime_mape_pct": 4.37,
+          "regime_r2": 0.1897
+        },
+        "component_residual_check": {
+          "n": 960,
+          "mape_pct": 29.24,
+          "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+        },
+        "sphp_branch_check": {
+          "hit_branch": {
+            "n": 864,
+            "mape_pct": 32.8
+          },
+          "miss_branch": {
+            "n": 96,
+            "mape_pct": 21.86
+          },
+          "note": "branch-conditional form check with per-record measured components"
+        }
+      }
+    }
+  },
+  "old_full": {
+    "campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_20260918T130756Z.jsonl",
+    "n_records": 1200,
+    "n_cold": 400,
+    "n_warm": 800,
+    "tiers": [
+      0.0,
+      15.0,
+      40.0,
+      80.0
+    ],
+    "top_k": [
+      10
+    ],
+    "states": {
+      "cold": {
+        "n_p2": 200,
+        "n_sphp": 200,
+        "fitted_params": {
+          "t_sparse_base_ms": 1711.2938,
+          "t_dense_base_ms": 2680.8529,
+          "t_fusion_base_ms": 0.0175,
+          "t_prefill_base_ms": 850.7129,
+          "decode_tok_per_sec": 35.56,
+          "sphp_hit_rate": 0.84,
+          "t_sphp_miss_penalty_ms": 2697.8
+        },
+        "decode_tps_median": 35.56,
+        "decode_tps_n_excluded": 105,
+        "sphp": {
+          "measured_hit_rate": 0.84,
+          "hit_rate_wilson95": [
+            0.7829,
+            0.8843
+          ],
+          "per_tier_hit_rate": {
+            "0": 0.8,
+            "15": 0.9,
+            "40": 0.84,
+            "80": 0.82
+          },
+          "miss_penalty_ms": 2697.8,
+          "n_miss": 31
+        },
+        "loto_P2": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 3518.5,
+              "observed_mean_ms": 3633.6,
+              "ape_pct": 3.17
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 3540.7,
+              "observed_mean_ms": 3569.7,
+              "ape_pct": 0.81
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 3557.7,
+              "observed_mean_ms": 3555.7,
+              "ape_pct": 0.06
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 3582.6,
+              "observed_mean_ms": 3544.6,
+              "ape_pct": 1.07
+            }
+          ],
+          "regime_mape_pct": 1.28,
+          "regime_r2": -2.2672
+        },
+        "loto_P2SPHP": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 3176.2,
+              "observed_mean_ms": 2948.2,
+              "ape_pct": 7.73
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 3323.7,
+              "observed_mean_ms": 2892.1,
+              "ape_pct": 14.92
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 3274.5,
+              "observed_mean_ms": 2996.8,
+              "ape_pct": 9.27
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 3289.0,
+              "observed_mean_ms": 2982.1,
+              "ape_pct": 10.29
+            }
+          ],
+          "regime_mape_pct": 10.55,
+          "regime_r2": -62.1645
+        },
+        "component_residual_check": {
+          "n": 200,
+          "mape_pct": 3.02,
+          "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+        },
+        "sphp_branch_check": {
+          "hit_branch": {
+            "n": 168,
+            "mape_pct": 7.38
+          },
+          "miss_branch": {
+            "n": 31,
+            "mape_pct": 75.84
+          },
+          "note": "branch-conditional form check with per-record measured components"
+        }
+      },
+      "warm": {
+        "n_p2": 400,
+        "n_sphp": 400,
+        "fitted_params": {
+          "t_sparse_base_ms": 74.8028,
+          "t_dense_base_ms": 190.8033,
+          "t_fusion_base_ms": 0.0192,
+          "t_prefill_base_ms": 633.2747,
+          "decode_tok_per_sec": 35.18,
+          "sphp_hit_rate": 0.84,
+          "t_sphp_miss_penalty_ms": 193.6
+        },
+        "decode_tps_median": 35.18,
+        "decode_tps_n_excluded": 0,
+        "sphp": {
+          "measured_hit_rate": 0.84,
+          "hit_rate_wilson95": [
+            0.8009,
+            0.8727
+          ],
+          "per_tier_hit_rate": {
+            "0": 0.8,
+            "15": 0.9,
+            "40": 0.84,
+            "80": 0.82
+          },
+          "miss_penalty_ms": 193.6,
+          "n_miss": 62
+        },
+        "loto_P2": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 830.2,
+              "observed_mean_ms": 817.9,
+              "ape_pct": 1.5
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 837.3,
+              "observed_mean_ms": 815.8,
+              "ape_pct": 2.64
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 851.0,
+              "observed_mean_ms": 817.1,
+              "ape_pct": 4.16
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 851.0,
+              "observed_mean_ms": 875.0,
+              "ape_pct": 2.75
+            }
+          ],
+          "regime_mape_pct": 2.76,
+          "regime_r2": 0.076
+        },
+        "loto_P2SPHP": {
+          "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+          "n_tiers": 4,
+          "per_tier": [
+            {
+              "rtt_ms": 0.0,
+              "predicted_mean_ms": 761.1,
+              "observed_mean_ms": 738.9,
+              "ape_pct": 3.0
+            },
+            {
+              "rtt_ms": 15.0,
+              "predicted_mean_ms": 779.4,
+              "observed_mean_ms": 778.1,
+              "ape_pct": 0.18
+            },
+            {
+              "rtt_ms": 40.0,
+              "predicted_mean_ms": 781.9,
+              "observed_mean_ms": 842.2,
+              "ape_pct": 7.16
+            },
+            {
+              "rtt_ms": 80.0,
+              "predicted_mean_ms": 781.1,
+              "observed_mean_ms": 896.8,
+              "ape_pct": 12.9
+            }
+          ],
+          "regime_mape_pct": 5.81,
+          "regime_r2": -0.2015
+        },
+        "component_residual_check": {
+          "n": 400,
+          "mape_pct": 11.3,
+          "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
+        },
+        "sphp_branch_check": {
+          "hit_branch": {
+            "n": 336,
+            "mape_pct": 14.84
+          },
+          "miss_branch": {
+            "n": 62,
+            "mape_pct": 14.77
+          },
+          "note": "branch-conditional form check with per-record measured components"
+        }
+      }
+    }
+  }
+}
