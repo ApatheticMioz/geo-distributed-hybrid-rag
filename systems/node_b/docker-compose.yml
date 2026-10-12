@@ -1,6 +1,6 @@
 services:
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:1.19.0
     container_name: qdrant_node_b
     restart: unless-stopped
     ports:

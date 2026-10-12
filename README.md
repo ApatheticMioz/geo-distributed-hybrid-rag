@@ -107,7 +107,14 @@ python3 scripts/policy_demo.py --queries experiments/bench/queries/latency_dev48
 
 ## Status
 
-Branch **`two-node-deployment`**. The **2-node milestone is complete** (Node A
-generation + Node B gateway measured across all four WAN regimes; cost model
-fitted and validated; RQ3 policy demo live). The **3-node variant is pending
-Node C bring-up** (2026-09-19) — see `NODE_C_CHECKLIST.md`.
+- **Active branch** — `feat/three-node-study` (this tree). The 2-node
+  milestone is complete and its data remain the current baseline.
+- **2-node campaign — done** (2026-09-18): Node A generation + Node B gateway
+  measured across all four WAN regimes; cost model fitted and validated; RQ3
+  policy demo live.
+- **3-node code — landed, bring-up in progress**: Node C (sparse + user-facing
+  tier) is offline at last report; see `NODE_C_CHECKLIST.md`.
+- **Node B dense-leg fix — post-dates the campaign**: the issue #6 fix
+  (gRPC `prefer_grpc` + named `pdc_qdrant_storage` volume) landed after
+  2026-09-18, so the **2-node re-baseline is planned** to re-measure Node B
+  under the corrected dense path.

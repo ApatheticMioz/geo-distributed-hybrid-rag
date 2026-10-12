@@ -54,3 +54,4 @@ llama3-awq
 .scratch/
 .evo/
 .pytest_cache/
+.claude/
