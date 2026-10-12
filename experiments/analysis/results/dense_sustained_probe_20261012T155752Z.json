@@ -1,0 +1,19 @@
+{
+  "probe": "dense_leg_sustained_load",
+  "node": "B (10.8.0.2:8000)",
+  "run_start_utc": "2026-10-12T15:57:52.938Z",
+  "run_end_utc": "2026-10-12T15:58:56.779Z",
+  "n": 60,
+  "pool_file": "experiments/bench/queries/latency_dev60_seed42.txt",
+  "mode": "dense",
+  "retrieval_only": true,
+  "top_k": 10,
+  "p50_ms": 1023.26,
+  "p95_ms": 1494.64,
+  "mean_ms": 1055.19,
+  "min_ms": 585.1,
+  "max_ms": 1706.32,
+  "errors": 0,
+  "verdict": "PASS",
+  "verdict_criteria": "p95 < 3000 ms AND max < 10000 ms AND 0 errors"
+}
