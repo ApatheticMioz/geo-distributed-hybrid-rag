@@ -394,3 +394,304 @@ def test_real_v2_slice_selection_master_pool():
     assert len({q for a in plan for q in a["measured"]}) == 8 * 120
 
 
+# ---------------------------------------------------------------------------
+# v2: resumable runs (--resume)
+# ---------------------------------------------------------------------------
+def _rec(run_id, rtt, loss, mode, variant, query, rep, **kw):
+    """Build a minimal v2-style JSONL record for the resume tests."""
+    r = {
+        "run_id": run_id,
+        "timestamp": "2026-01-01T00:00:00Z",
+        "query_id": kw.get("query_id", None),
+        "query": query,
+        "rtt_ms": rtt,
+        "loss_pct": loss,
+        "mode": mode,
+        "variant": variant,
+        "repeat_index": rep,
+        "top_k": 10,
+        "netem_applied": (rtt != 0 or loss != 0),
+    }
+    if "error" in kw:
+        r["error"] = kw["error"]
+    return r
+
+
+def test_find_resumable_jsonl_explicit_run_id(tmp_path):
+    path, ambig = campaign.find_resumable_jsonl(tmp_path, "20260101T000000Z")
+    assert ambig is None
+    assert path == tmp_path / "campaign_20260101T000000Z.jsonl"
+
+
+def test_find_resumable_jsonl_none(tmp_path):
+    path, ambig = campaign.find_resumable_jsonl(tmp_path, None)
+    assert path is None and ambig is None
+
+
+def test_find_resumable_jsonl_single(tmp_path):
+    (tmp_path / "campaign_A.jsonl").write_text("{}\n")
+    (tmp_path / "summary_A.csv").write_text("x\n")  # ignored
+    path, ambig = campaign.find_resumable_jsonl(tmp_path, None)
+    assert ambig is None
+    assert path == tmp_path / "campaign_A.jsonl"
+
+
+def test_find_resumable_jsonl_ambiguous(tmp_path):
+    (tmp_path / "campaign_A.jsonl").write_text("{}\n")
+    (tmp_path / "campaign_B.jsonl").write_text("{}\n")
+    path, ambig = campaign.find_resumable_jsonl(tmp_path, None)
+    assert path is None and ambig == "ambiguous"
+
+
+def test_load_jsonl_records_clean(tmp_path):
+    p = tmp_path / "c.jsonl"
+    p.write_text("{\"a\":1}\n{\"a\":2}\n", encoding="utf-8")
+    recs, trunc = campaign.load_jsonl_records(p)
+    assert recs == [{"a": 1}, {"a": 2}]
+    assert trunc == 0
+
+
+def test_load_jsonl_records_missing(tmp_path):
+    recs, trunc = campaign.load_jsonl_records(tmp_path / "nope.jsonl")
+    assert recs == [] and trunc == 0
+
+
+def test_load_jsonl_records_truncated_last_line(tmp_path):
+    # Three complete records then a truncated/corrupt final line (crash
+    # mid-write) with no trailing newline.
+    p = tmp_path / "c.jsonl"
+    body = '{\"q\":\"a\"}\n{\"q\":\"b\"}\n{\"q\":\"c\"}\n'
+    p.write_text(body + '{\"q\":\"d", \'trunc\'=', encoding="utf-8")
+    recs, trunc = campaign.load_jsonl_records(p)
+    assert [r["q"] for r in recs] == ["a", "b", "c"]
+    assert trunc == 1  # the broken final line is tolerated + warned
+
+
+def test_load_jsonl_records_blank_lines_ignored(tmp_path):
+    p = tmp_path / "c.jsonl"
+    p.write_text("\n{\"q\":\"a\"}\n\n\n", encoding="utf-8")
+    recs, trunc = campaign.load_jsonl_records(p)
+    assert [r["q"] for r in recs] == ["a"] and trunc == 0
+
+
+def test_extract_completed_triples():
+    recs = [
+        _rec("rid", 0, 0, "hybrid", "baseline", "q1", 0),
+        _rec("rid", 0, 0, "hybrid", "baseline", "q1", 1),
+        # an error record: query_id is None but the query TEXT is present,
+        # so it still forms a distinct completed triple (would not if keyed
+        # on query_id).
+        _rec("rid", 15, 0, "hybrid", "sphp", "q2", 0, error="boom"),
+    ]
+    trip = campaign.extract_completed_triples(recs)
+    assert ("0ms-0%-hybrid-baseline", "q1", 0) in trip
+    assert ("0ms-0%-hybrid-baseline", "q1", 1) in trip
+    assert ("15ms-0%-hybrid-sphp", "q2", 0) in trip
+    assert len(trip) == 3
+    # identity matches what the runner builds for a (rtt, loss, mode, variant,
+    # query, repeat) — cross-check the arm-key rendering.
+    ident = campaign.record_identity(
+        _rec("rid", 0, 0, "hybrid", "baseline", "q1", 0))
+    assert ident == ("0ms-0%-hybrid-baseline", "q1", 0)
+
+
+def test_resume_flag_in_parser():
+    ap = campaign.build_parser()
+    args = ap.parse_args(["--pool", "x.txt", "--resume", "--dry-run"])
+    assert args.resume is True
+    args2 = ap.parse_args(["--pool", "x.txt", "--dry-run"])
+    assert args2.resume is False
+    args3 = ap.parse_args(["--pool", "x.txt", "--run-id", "20260101T000000Z",
+                           "--dry-run"])
+    assert args3.run_id == "20260101T000000Z"
+
+
+# ---------------------------------------------------------------------------
+# v2: --resume driver-level integration (network/netem/health mocked)
+# ---------------------------------------------------------------------------
+def _v2_env(tmp_path):
+    """Build a tiny v2 (8 arms) plan + pool and return (args, all_queries,
+    manifest, arm_plan, line_start, line_end, pool_path)."""
+    pool = tmp_path / "pool.txt"
+    n = 24  # 8 arms x (N=2 + W=1)
+    pool.write_text("\n".join(f"q{i}" for i in range(n)) + "\n",
+                    encoding="utf-8")
+    man = campaign.verify_pool_manifest.__wrapped__ if False else None
+    manifest = {"_verified_sha256": campaign.sha256_file(str(pool)), "n": n}
+
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(pool),
+        "--query-sample", "2",
+        "--warmups", "1",
+        "--repeats", "2",
+        "--gateway-url", "http://gw.test",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    campaign.resolve_mode_defaults(args)
+
+    arms = campaign.build_arm_list(args)
+    assert len(arms) == 8
+    all_queries = campaign.load_queries(str(pool))
+    line_start, line_end = campaign.v2_line_range(
+        "confirmatory", len(arms), args.query_sample, args.warmups)
+    arm_plan = campaign.select_pool_slices(
+        all_queries, arms, args.query_sample, args.warmups,
+        line_start, line_end)
+    return args, all_queries, manifest, arm_plan, line_start, line_end
+
+
+def _patch_net(monkeypatch, posted):
+    """Patch all external side effects; record measured/warmup POSTs."""
+    def fake_health(url, timeout=15):
+        return True
+    def fake_gate(rtt, when, dry_run):
+        return {"rtt_ms": rtt, "when": when,
+                "status": "skipped-baseline" if rtt == 0 else "PASS",
+                "baseline_median_ms": None, "shaped_median_ms": 5.0,
+                "added_rtt_ms": 5.0, "output_tail": ""}
+    def fake_apply(rtt, loss, dry_run):
+        return False
+    def fake_clear(dry_run):
+        return None
+    def fake_http(url, payload, timeout):
+        posted.append(dict(payload))
+        return {"query_id": "1", "top_k": payload.get("top_k"),
+                "timings": {"ttft_ms": 1.0, "total_ms": 2.0,
+                             "sparse_ms": 0, "dense_ms": 0, "fusion_ms": 0,
+                             "decode_ms": 0, "simulated_wan_ms": 0},
+                "token_count": 3, "decode_tps": 4.0,
+                "sphp_hit": True, "sphp_overlap": 0.5}
+    monkeypatch.setattr(campaign, "check_health", fake_health)
+    monkeypatch.setattr(campaign, "run_fidelity_gate", fake_gate)
+    monkeypatch.setattr(campaign, "apply_netem_link_b", fake_apply)
+    monkeypatch.setattr(campaign, "clear_netem", fake_clear)
+    monkeypatch.setattr(campaign, "http_post_json", fake_http)
+
+
+def test_v2_fresh_run_writes_all_and_summary(tmp_path, monkeypatch):
+    args, all_q, man, plan, ls, le = _v2_env(tmp_path)
+    args.resume = False
+    args.run_id = "FRESH"
+    posted = []
+    _patch_net(monkeypatch, posted)
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2(args, all_q, man, plan, ls, le)
+    assert ei.value.code == 0
+    # 8 arms x (W=1 + N=2 x R=2) = 8 warmups + 32 measured = 40 POSTs
+    assert len(posted) == 40
+    jsonl = tmp_path / "out" / "campaign_FRESH.jsonl"
+    recs, trunc = campaign.load_jsonl_records(jsonl)
+    assert trunc == 0
+    assert len(recs) == 32  # measured only (warmups never recorded)
+    summary = json.loads((tmp_path / "out" / "summary_FRESH.json").read_text())
+    assert summary["status"] == "completed"
+    assert summary["n_ok"] == 32 and summary["n_errors"] == 0
+    assert summary["n_warmup_ok"] == 8
+    assert len(summary["summary"]) == 8  # one row per arm
+
+
+def test_v2_resume_skips_exactly_completed(tmp_path, monkeypatch):
+    args, all_q, man, plan, ls, le = _v2_env(tmp_path)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    jsonl = out_dir / "campaign_RES.jsonl"
+
+    # Pre-populate the FIRST arm's (rtt=0,loss=0,hybrid,baseline) measured
+    # records: it consumes pool lines 1..3 -> warmup q0, measured q1,q2.
+    # With R=2 that's (q1,0),(q1,1),(q2,0),(q2,1) -> all 4 completed.
+    pre = []
+    for q in ("q1", "q2"):
+        for rep in range(2):
+            pre.append(_rec("RES", 0, 0, "hybrid", "baseline", q, rep))
+    jsonl.write_text("".join(json.dumps(r) + "\n" for r in pre),
+                     encoding="utf-8")
+
+    args.resume = True
+    args.run_id = "RES"
+    posted = []
+    _patch_net(monkeypatch, posted)
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2(args, all_q, man, plan, ls, le)
+    assert ei.value.code == 0
+
+    posted_queries = [p["query"] for p in posted]
+    # The two pre-measured queries of the first arm were skipped: they must
+    # NOT have been re-POSTed (they only ever appear as that arm's measured
+    # queries, never as warmups of another arm).
+    assert "q1" not in posted_queries
+    assert "q2" not in posted_queries
+    # Warmups are always re-run: the first arm's warmup q0 IS posted again.
+    assert "q0" in posted_queries
+    # 4 measured skipped of the 32 total measured; all 8 warmups re-run:
+    # 8 warmups + (32 - 4) measured = 36 POSTs.
+    assert len(posted) == 36
+    # Final JSONL = 4 pre-existing + 28 new measured = 32 measured records.
+    recs, trunc = campaign.load_jsonl_records(jsonl)
+    assert trunc == 0
+    assert len(recs) == 32
+    # Summary reflects the FULL data (seeded + new), identical to a one-shot
+    # run: n_ok = 32 measured, 8 warmups.
+    summary = json.loads((out_dir / "summary_RES.json").read_text())
+    assert summary["status"] == "completed"
+    assert summary["n_ok"] == 32 and summary["n_warmup_ok"] == 8
+    assert len(summary["summary"]) == 8
+
+
+def test_v2_resume_with_truncated_last_line(tmp_path, monkeypatch):
+    args, all_q, man, plan, ls, le = _v2_env(tmp_path)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    jsonl = out_dir / "campaign_TR.jsonl"
+    # One good completed record + a truncated final line (crash mid-write).
+    good = _rec("TR", 0, 0, "hybrid", "baseline", "q1", 0)
+    # A real q2 rep-0 record whose final bytes are cut off mid-write (no
+    # closing brace) -> the loader skips the line but its "query" field
+    # (present before the cut) still marks the (arm, q2, 0) triple complete.
+    q2_rec = json.dumps(_rec("TR", 0, 0, "hybrid", "baseline", "q2", 0))
+    truncated = q2_rec[:len(q2_rec) - 5]
+    jsonl.write_text(json.dumps(good) + "\n" + truncated, encoding="utf-8")
+
+    args.resume = True
+    args.run_id = "TR"
+    posted = []
+    _patch_net(monkeypatch, posted)
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2(args, all_q, man, plan, ls, le)
+    assert ei.value.code == 0  # ran to completion despite the corrupt line
+    # First arm: warmup q0, measured q1,q2 (R=2).  The good record made
+    # (q1, rep0) completed -> skipped; q1 rep1 was never completed ->
+    # re-measured, so q1 is POSTed EXACTLY ONCE.  The TRUNCATED q2 line was
+    # dropped, so neither (q2, rep0) nor (q2, rep1) is in the completed set
+    # -> both re-measured, so q2 is POSTed TWICE.  Warmup q0 is always re-run.
+    posted_counts = {q: sum(1 for p in posted if p.get("query") == q)
+                     for q in ("q0", "q1", "q2")}
+    assert posted_counts["q0"] == 1  # warmup re-run
+    assert posted_counts["q1"] == 1  # rep0 skipped, rep1 re-measured
+    assert posted_counts["q2"] == 2  # both reps re-measured (line was corrupt)
+    recs, trunc = campaign.load_jsonl_records(jsonl)
+    assert trunc == 1  # the broken line is still flagged as truncated
+    # final file holds the good q1 rep0 (from before) plus all re-measured.
+    assert any(r["query"] == "q1" and r["repeat_index"] == 0 for r in recs)
+    assert any(r["query"] == "q2" and r["repeat_index"] == 0 for r in recs)
+    assert any(r["query"] == "q2" and r["repeat_index"] == 1 for r in recs)
+
+
+def test_v2_no_resume_existing_file_aborts(tmp_path, monkeypatch):
+    args, all_q, man, plan, ls, le = _v2_env(tmp_path)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "campaign_DONE.jsonl").write_text(
+        json.dumps(_rec("DONE", 0, 0, "hybrid", "baseline", "q1", 0)) + "\n",
+        encoding="utf-8")
+    posted = []
+    _patch_net(monkeypatch, posted)
+    # NO --resume, but pinned to the existing run id -> must abort.
+    args.resume = False
+    args.run_id = "DONE"
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2(args, all_q, man, plan, ls, le)
+    assert ei.value.code == 1
+    # No HTTP was performed (aborted before any request).
+    assert posted == []
+
