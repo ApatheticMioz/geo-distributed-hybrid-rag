@@ -13,7 +13,7 @@ branch synchronization occur through the remote Git repository (`origin`).
 | From \ To | Node A (`pc`) | Node B (`laptop`) | Node C (`friend-laptop`) | Remote (`origin`) |
 |:---|:---|:---|:---|:---|
 | **Node A (PC)** | Local (WSL2) | `ssh laptop` / `ssh laptop-wg` | `ssh friend-laptop` / `ssh friend-wg` | Full push / pull |
-| **Node B (Laptop)** | `ssh pc` / `ssh pc-wg` | Local (PowerShell 7) | `ssh friend-laptop` / `ssh friend-wg` | Full push / pull |
+| **Node B (Laptop)** | `ssh pc` / `ssh pc-wg` ⚠️ (see §1) | Local (PowerShell 7) | `ssh friend-laptop` / `ssh friend-wg` | Full push / pull |
 | **Node C (Friend's Laptop)** | *No SSH access* | *No SSH access* | Local (PowerShell 7 / Git Bash) | Full push / pull |
 
 > **Key Access Rules:**
@@ -44,10 +44,20 @@ The generation host (RTX 3090 + vLLM). Runs in WSL2 Ubuntu on PC.
 | Orchestrator gRPC | `:50052` (`GenerationOrchestrator`) |
 | Orchestrator HTTP | `:8001` (FastAPI) |
 | Orchestrator PID / Log | `/tmp/pdc_node_a_orchestrator.pid` / `/tmp/pdc_node_a_orchestrator.log` |
+| WireGuard tunnel | `wg_a` @ `10.8.0.1`, public endpoint `182.184.161.242:51820` (DDNS); A is the **hub** of the hub-and-spoke topology (spokes B, C) — see `docs/RUNBOOK.md` "WireGuard hub-relay bring-up" |
 
 **Lifecycle** (orchestrator only):
 * Start: `bash scripts/node_a/start_stack.sh`
 * Stop: `bash scripts/node_a/stop_stack.sh`
+
+**SSH / firewall ground truth (2026-10-12):**
+* Node A's **sshd has no inbound firewall rule for TCP 22 on any profile**
+  (default-inbound is Block everywhere). Consequently the `ssh pc` path from
+  Node B (matrix row above) is **currently non-functional** until an
+  `OpenSSH Server In` inbound allow rule is added on A.
+* Node A's WSL-side `~/.ssh/config` contains **no `Host pc` block** — the
+  `~/.ssh/config` ground-truth claim in §Ground-Truth Sources below only
+  holds for the *other* aliases (`laptop`, `friend-laptop`).
 
 ---
 
@@ -59,6 +69,7 @@ The dense-retrieval + RRF-fusion gateway (GTX 1660 Ti). Runs native Windows + Po
 |:---|:---|
 | Clone root | `D:\Work\Semester6\NLP\Project_Laptop` |
 | WireGuard IP | `10.8.0.2` (SSH alias: `laptop-wg`, legacy `node-b`) |
+| WireGuard tunnel | name **`wg`** (single peer A, endpoint `192.168.0.10:51820` — A's LAN IP; A and B share the `192.168.0.0/24` LAN), **`AllowedIps 10.8.0.0/24`** (required for C→B relayed traffic; the default `10.8.0.1/32` silently drops it). Config: `Data\Configurations\wg.conf.dpapi` (DPAPI-encrypted); last plaintext base `wg.conf.bak_ncwg2` (2026-09-29). Reinstall names the tunnel after the **file basename** |
 | Tailscale IP | `100.99.79.108` (SSH alias: `laptop`) |
 | LAN IP | `192.168.0.142` (SSH alias: `laptop-lan`) |
 | Remote shell | **PowerShell 7.6.6 (`pwsh.exe`)** |
@@ -96,6 +107,10 @@ The sparse-retrieval (Tantivy BM25) + user-facing gateway tier. Clients send req
 
 **Gateway Lifecycle**:
 * Launch: `start_gateway_c.bat` (or `schtasks /Run /TN pdc_gateway_c`)
+* **Precondition:** the `pdc_gateway_c` scheduled task must be **ENABLED**
+  first — `schtasks /Change /TN pdc_gateway_c /ENABLE` — or `/Run` fails
+  silently. If the task was found Disabled, enable it and then `schtasks
+  /Run`; the gateway comes up in ~10 s (verified 2026-10-12).
 * Verification: `curl.exe -s http://127.0.0.1:8000/health`
 * **Remote Ops Pattern (from A or B)**: Always use single-line commands when issuing commands over SSH into Node C.
 
@@ -152,7 +167,7 @@ wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh 15 5
 
 ## Ground-Truth Sources
 
-- `~/.ssh/config` (on Node A & Node B) — `laptop` (100.99.79.108), `pc` (100.92.1.107), `friend-laptop` (100.101.11.23)
+- `~/.ssh/config` (on Node A & Node B) — `laptop` (100.99.79.108), `friend-laptop` (100.101.11.23). **Not** `pc`: Node A's WSL `~/.ssh/config` has no `Host pc` block (2026-10-12); the Tailscale IP `100.92.1.107` for A is reached, if at all, by other means.
 - `scripts/node_a/start_stack.sh`, `stop_stack.sh` — orchestrator lifecycle, ports 50052/8001
 - `start_gateway.bat`, `start_gateway_c.bat` — Node B & Node C gateway launch contracts
 - `systems/node_b/docker-compose.yml` — Qdrant `qdrant_node_b`, named volume `pdc_qdrant_storage`

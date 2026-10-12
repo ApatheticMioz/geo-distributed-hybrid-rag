@@ -15,6 +15,7 @@ All commands run from the repo root on Node A (this WSL host) unless stated.
 |------|-------|
 | Node B restructure cutover (`node_B/` → `systems/node_b/`, commit `1d76c8e`) — **do once before the deploy loop works** | `docs/B_MIGRATION.md` |
 | Node C bring-up (WireGuard peer `10.8.0.3/24`, venv, Tantivy index transfer, preflight, e2e smoke) | `scripts/node_c_prep/NODE_C_CHECKLIST.md` |
+| WireGuard hub-relay bring-up (A relays C↔B — forwarding + firewall re-apply; the 3-node topology only works if this is done) | §3, "WireGuard hub-relay bring-up" below |
 
 ---
 
@@ -162,6 +163,64 @@ wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/clear.sh
 shaped ping; PASS if the RTT delta is within ±30% of `RTT_MS`) and always
 clears in a trap. Validate shaping **before** a measured window; never leave a
 shaped path active behind a crashed run.
+
+### WireGuard hub-relay bring-up (A relays C↔B)
+
+**Topology is hub-and-spoke via A, not full mesh** (verified live 2026-10-12):
+
+```
+            LAN 192.168.0.0/24
+   C (10.8.0.3) ──public Internet / DDNS── A (10.8.0.1, hub) ──B (10.8.0.2)
+   WireGuardTunnel$wg0      182.184.161.242:51820     tunnel "wg"
+   AllowedIps 10.8.0.0/24   A endpoint 192.168.0.10:51820
+                                     AllowedIps 10.8.0.0/24
+```
+
+- **A (hub):** `WireGuardTunnel$wg_a` @ `10.8.0.1`, public endpoint
+  `182.184.161.242:51820` (DDNS). Single peers: B and C.
+- **B (spoke):** tunnel **`wg`** @ `10.8.0.2`, single peer A, endpoint A's
+  **LAN** IP `192.168.0.10:51820` (A and B share the `192.168.0.0/24` LAN).
+  B's `AllowedIps` **must** be `10.8.0.0/24` — the narrow `10.8.0.1/32`
+  default silently drops C→B traffic: under WireGuard cryptokey routing,
+  the inner C→B packet is addressed `10.8.0.3 → 10.8.0.2`, and B only
+  accepts it because the source `10.8.0.3` falls inside B's `AllowedIps`;
+  `10.8.0.1/32` does not contain it, so the packet is discarded.
+  B's `wg.conf` is stored DPAPI-encrypted as `Data\Configurations\wg.conf.dpapi`;
+  the last plaintext base is `wg.conf.bak_ncwg2` (2026-09-29, ncwg2 round).
+  Re-installing a tunnel via `wireguard.exe /uninstalltunnelservice <name>` +
+  `/installtunnelservice <path>` names the new tunnel after the **file
+  basename** — name the file to preserve the tunnel name `wg`.
+- **C (spoke):** `WireGuardTunnel$wg0` @ `10.8.0.3`, single peer A,
+  `AllowedIps 10.8.0.0/24`, over the public Internet (DDNS).
+
+**A-side admin requirements (PowerShell, admin).** Both are mandatory for C↔B
+traffic; neither survives an `wg_a` interface recreation (tunnel restart or
+reboot) — **re-apply after every such event**:
+
+```powershell
+# 1. Enable IP forwarding on the WireGuard iface (IPv4 + IPv6):
+Set-NetIPInterface -InterfaceAlias wg_a -Forwarding Enabled
+
+# 2. Allow relayed 10.8.0.0/24 traffic in the Windows firewall (any protocol; the relay path is WireGuard UDP):
+New-NetFirewallRule -DisplayName 'WG Relay 10.8.0.0-24 In' `
+    -Direction Inbound -RemoteAddress 10.8.0.0/24 -Profile Any -Action Allow
+```
+
+*Persistence (optional):* a `schtasks` ONSTART task re-running the two
+commands at each boot. Manual re-apply after restarts is the default and
+sufficient for campaign days.
+
+**Smoke check (3 lines, from Node C; all must succeed before a measured
+window):**
+
+```bash
+ssh friend-laptop "Test-NetConnection 10.8.0.1 -Port 50052 -InformationLevel Quiet"   # C→A gRPC, expect True
+ssh friend-laptop "Test-NetConnection 10.8.0.2 -Port 8000 -InformationLevel Quiet"    # C→B gateway (relayed via A), expect True
+ssh friend-laptop "curl.exe -s http://127.0.0.1:8000/health"                          # C gateway itself, expect {"status":"ok","node":"C"}
+```
+
+`C→B:8000` passing is the definitive proof that A's relay (forwarding +
+firewall + B's widened `AllowedIps`) is in place.
 
 ---
 
