@@ -94,7 +94,7 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -688,6 +688,17 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Per-request HTTP timeout (seconds)")
     ap.add_argument("--dry-run", action="store_true",
                     help="Print the plan only: no netem, no HTTP, no output files")
+    ap.add_argument("--resume", action="store_true",
+                    help="v2: resume an interrupted run — open the existing "
+                         "campaign_<run-id>.jsonl in append mode, skip (arm, "
+                         "query, repeat) triples already measured, and re-run "
+                         "warmups. Without --run-id, a single "
+                         "campaign_*.jsonl in the out-dir is auto-detected "
+                         "(ambiguous if more than one).")
+    ap.add_argument("--run-id", default=None, metavar="ID",
+                    help="v2: fixed run id (campaign_<ID>.jsonl) instead of a "
+                         "fresh timestamped one; combine with --resume to "
+                         "target a specific interrupted file.")
     ap.add_argument("--out-dir", default="experiments/bench/campaigns",
                     help="Directory for JSONL/CSV/JSON outputs")
     return ap
@@ -1076,6 +1087,92 @@ def write_summary_outputs(
 
 
 # ---------------------------------------------------------------------------
+# v2: resumable runs (--resume)
+# ---------------------------------------------------------------------------
+def load_jsonl_records(path) -> Tuple[List[Dict[str, Any]], int]:
+    """Read a JSONL file into a list of parsed record dicts.
+
+    Tolerates a TRUNCATED last line (a crash mid-write leaves a partial
+    JSON object on the final line): that line is skipped and a warning is
+    emitted, and all complete lines before it are returned.  Blank lines are
+    ignored.  ``path`` may be a ``str`` or ``Path``.
+
+    Returns ``(records, n_truncated)`` where ``n_truncated`` is the number of
+    truncated/incomplete lines skipped (0 for a clean file).
+    """
+    p = Path(path)
+    if not p.is_file():
+        return [], 0
+    records: List[Dict[str, Any]] = []
+    n_truncated = 0
+    with open(p, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.rstrip("\n")
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                # Incomplete JSON: a crash mid-write.  Tolerate + warn; a
+                # mid-write record is by definition not a complete record.
+                n_truncated += 1
+                print(f"WARNING: skipping truncated/corrupt JSONL line in {p} "
+                      f"(first 80 chars: {line[:80]!r})", file=sys.stderr)
+    return records, n_truncated
+
+
+def record_identity(rec: Dict[str, Any]) -> Tuple[str, str, int]:
+    """The identity of a measured (arm, query, repeat) record for resume.
+
+    Returns ``(f"{rtt}ms-{loss}%-{mode}-{variant}", query, repeat_index)``.
+
+    The arm key is rendered from the record's own fields (``rtt_ms``/
+    ``loss_pct``/``mode``/``variant``) so it matches ``arm_key`` used by the
+    runner, and the query is the record's ``query`` TEXT (always present and
+    unique per arm by the disjoint-slice construction).  The query text is
+    used rather than ``query_id`` because ``query_id`` is ``None`` on error
+    records (the gateway never responded), which would make two error records
+    of the same arm+repeat indistinguishable.
+    """
+    arm = f"{rec.get('rtt_ms')}ms-{rec.get('loss_pct')}%-{rec.get('mode')}-{rec.get('variant')}"
+    return (arm, rec.get("query"), rec.get("repeat_index"))
+
+
+def extract_completed_triples(
+    records: List[Dict[str, Any]],
+) -> Set[Tuple[str, str, int]]:
+    """Build the set of (arm_key, query, repeat_index) triples already
+    present in a JSONL (i.e. already measured — warmups are never recorded)."""
+    return {record_identity(r) for r in records
+            if r.get("query") is not None}
+
+
+def find_resumable_jsonl(
+    out_dir, run_id: Optional[str] = None,
+) -> Tuple[Optional[Path], Optional[str]]:
+    """Resolve which ``campaign_<run-id>.jsonl`` a resume should target.
+
+    If ``run_id`` is given, return ``<out-dir>/campaign_<run-id>.jsonl``
+    (regardless of whether it exists yet).  Otherwise auto-detect the
+    existing ``campaign_*.jsonl`` files in ``out_dir``: return the single one
+    if exactly one, ``(None, None)`` if none, and ``(None, "ambiguous")`` if
+    more than one (the caller aborts — refusing to guess which file to
+    append to).
+    """
+    d = Path(out_dir)
+    if run_id is not None:
+        return d / f"campaign_{run_id}.jsonl", None
+    if not d.is_dir():
+        return None, None
+    existing = sorted(d.glob("campaign_*.jsonl"))
+    if not existing:
+        return None, None
+    if len(existing) > 1:
+        return None, "ambiguous"
+    return existing[0], None
+
+
+# ---------------------------------------------------------------------------
 # v2 run
 # ---------------------------------------------------------------------------
 def run_campaign_v2(
@@ -1105,9 +1202,48 @@ def run_campaign_v2(
         sys.exit(1)
     print(f"Gateway healthy: {args.gateway_url}")
 
-    run_id = _run_id()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Resolve the run id / target JSONL -------------------------------
+    #   * explicit --run-id pins it (targets a specific file, e.g. to resume
+    #     a particular interrupted run);
+    #   * --resume without --run-id auto-detects the single existing
+    #     campaign_*.jsonl in the out-dir (abort if ambiguous, fresh if none);
+    #   * otherwise a fresh timestamped run id (the historical behaviour).
+    resume = bool(getattr(args, "resume", False))
+    explicit_run_id = getattr(args, "run_id", None)
+    if explicit_run_id is not None:
+        run_id = explicit_run_id
+    elif resume:
+        target, ambig = find_resumable_jsonl(out_dir, None)
+        if ambig == "ambiguous":
+            existing = sorted(out_dir.glob("campaign_*.jsonl"))
+            print(f"ERROR: --resume without --run-id is ambiguous: "
+                  f"{len(existing)} campaign_*.jsonl files in {out_dir}: "
+                  f"{[str(q) for q in existing]}. Pass --run-id to pick one.",
+                  file=sys.stderr)
+            sys.exit(1)
+        if target is None:
+            run_id = _run_id()
+            print("NOTE: --resume but no existing campaign_*.jsonl found in "
+                  f"{out_dir}; starting a fresh run.")
+        else:
+            run_id = target.stem.replace("campaign_", "")
+            print(f"Resuming existing JSONL: {target}")
+    else:
+        run_id = _run_id()
+
+    jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
+
+    # Guard against accidentally re-running over a finished/previous result:
+    # if the target file already exists and we are NOT resuming, abort.
+    if jsonl_path.exists() and not resume:
+        print(f"ERROR: {jsonl_path} already exists. Re-running would overwrite "
+              f"an existing result file. Pass --resume to append and skip "
+              f"already-measured records, or omit --run-id for a fresh run.",
+              file=sys.stderr)
+        sys.exit(1)
 
     # Design §5.1: the campaign manifest is written BEFORE any request.
     manifest_path = out_dir / "campaign_v2_manifest.json"
@@ -1122,7 +1258,14 @@ def run_campaign_v2(
     # Clean slate before any shaping.
     clear_netem(dry_run=False)
 
-    jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
+    # --- Resume: seed completed-triple set + in-memory accumulators -------
+    # The end-of-run summary writers (CSV/JSON) summarize the IN-MEMORY
+    # ``arms_recs`` (they do not re-read the JSONL), so on a resume we seed
+    # ``arms_recs``/``n_ok``/``n_err`` from the existing file's records.  This
+    # makes the summary identical whether the JSONL was written in one
+    # session or across a resume.  Warmups are never recorded, so they are
+    # never in the skip set and are always re-run (cheap/idempotent).
+    skip_triples: Set[Tuple[str, str, int]] = set()
     arms_recs: Dict[Tuple[int, int, str, str], List[Dict[str, Any]]] = {}
     gates_log: List[Dict[str, Any]] = []
     n_ok = 0
@@ -1131,6 +1274,23 @@ def run_campaign_v2(
     n_warmup_err = 0
     exit_code = 0
     abort_reason: Optional[str] = None
+    if resume:
+        existing_recs, n_trunc = load_jsonl_records(jsonl_path)
+        skip_triples = extract_completed_triples(existing_recs)
+        for r in existing_recs:
+            arm_key = (r.get("rtt_ms"), r.get("loss_pct"),
+                       r.get("mode"), r.get("variant"))
+            arms_recs.setdefault(arm_key, []).append(r)
+            if "error" in r:
+                n_err += 1
+            else:
+                n_ok += 1
+        if existing_recs or n_trunc:
+            print(f"Resume: {len(existing_recs)} records already present in "
+                  f"{jsonl_path.name} ({len(skip_triples)} completed triples); "
+                  f"{n_trunc} truncated line(s) skipped.")
+        else:
+            print(f"Resume: {jsonl_path.name} is empty; starting fresh.")
 
     def _finalize() -> None:
         """Write summary outputs (partial data stays valid) and exit."""
@@ -1180,7 +1340,10 @@ def run_campaign_v2(
         print("Done.")
         sys.exit(exit_code)
 
-    jsonl_f = open(jsonl_path, "w", encoding="utf-8")
+    # Append on resume (records already written are preserved and re-read at
+    # finalize time); plain "w" otherwise (fresh run, guarded above against
+    # clobbering an existing file).
+    jsonl_f = open(jsonl_path, "a" if resume else "w", encoding="utf-8")
     try:
         for rtt in args.rtt_tiers:
             for loss in args.loss_tiers:
@@ -1245,8 +1408,20 @@ def run_campaign_v2(
                                       f"failed: {e}", file=sys.stderr)
 
                         # Measured: N queries x R repeats back-to-back.
+                        # On resume, a (arm, query, repeat) triple already
+                        # present in the JSONL is already measured -> skip it
+                        # (never re-POST, never re-write).  Warmups above are
+                        # NOT gated: they are cheap/idempotent and are always
+                        # re-run.
+                        n_arm_skipped = 0
                         for query in measured_queries:
                             for rep in range(args.repeats):
+                                triple = (
+                                    f"{rtt}ms-{loss}%-{mode}-{variant}",
+                                    query, rep)
+                                if triple in skip_triples:
+                                    n_arm_skipped += 1
+                                    continue
                                 try:
                                     res = http_post_json(endpoint, {
                                         "query": query,
@@ -1280,9 +1455,14 @@ def run_campaign_v2(
                                     }
                                     rec["error"] = str(e)
                                     n_err += 1
+                                skip_triples.add(triple)
                                 jsonl_f.write(json.dumps(rec) + "\n")
                                 jsonl_f.flush()
                                 arms_recs.setdefault(arm_key, []).append(rec)
+                        if n_arm_skipped:
+                            print(f"    [resume] {arm_label(mode, variant)}: "
+                                  f"skipped {n_arm_skipped} already-measured "
+                                  f"(arm, query, repeat) record(s)")
 
                 # --- tier close: 0-error assertion (design §6.4) ---
                 tier_err = sum(
