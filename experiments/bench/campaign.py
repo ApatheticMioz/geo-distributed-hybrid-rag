@@ -38,8 +38,8 @@ The runner is intentionally stdlib-only so it can run from the orchestration
 host against the live gateway.  ``--dry-run`` prints the plan only: no netem,
 no HTTP, no output files.
 
-Usage (the paper's final matrix — 4 WAN regimes x SPHP on/off, hybrid mode):
-    python3 benchmarks/campaign.py \
+Usage (v1 — the paper's final matrix: 4 WAN regimes x SPHP on/off, hybrid mode):
+    python3 experiments/bench/campaign.py \
         --gateway-url http://10.8.0.2:8000 \
         --queries experiments/bench/queries/latency_dev480_seed42.txt \
         --rtt-tiers 0 15 40 80 \
@@ -48,33 +48,69 @@ Usage (the paper's final matrix — 4 WAN regimes x SPHP on/off, hybrid mode):
         --sphp-axis \
         --query-sample 50 --seed 42 \
         --warmups 5 --repeats 3 \
-        --out-dir benchmarks/campaigns
+        --out-dir experiments/bench/campaigns
 
     # Plan only (no netem, no HTTP, no files):
-    python3 benchmarks/campaign.py --dry-run
+    python3 experiments/bench/campaign.py --dry-run
+
+Usage (Campaign v2 — confirmatory 2-node matrix, per
+``docs/campaign_v2_design.md`` @ 1f911ef):
+    python3 experiments/bench/campaign.py \
+        --pool experiments/bench/queries/campaign_v2_master5000_seed42.txt \
+        --dry-run
+
+    # Real run (defaults in --pool mode implement the design: RTT
+    # {0,15,40,80} x loss {0} x {P2, P2-SPHP}, N=120/arm, W=10, R=3,
+    # arms consuming lines 1..1040 of the pool, per-tier 11-ping fidelity
+    # gates, 0-error tier assertion):
+    python3 experiments/bench/campaign.py \
+        --pool experiments/bench/queries/campaign_v2_master5000_seed42.txt
+
+``--pool FILE`` (mutually exclusive with ``--queries``) activates v2 mode:
+the pool file is verified against its ``FILE.manifest.json`` sidecar
+(sha256 + n + line_count must all match — fail fast), arm query slices are
+the design's fixed line-ranges of the pool file (contiguous, arm-ordered,
+disjoint by construction — the pool file itself is the seeded shuffle),
+shaping uses the explicit-link contract (``apply.sh --link-b <RTT> <LOSS>``,
+``validate.sh --link-b <RTT>`` — no positional args), and the driver writes
+``<out-dir>/campaign_v2_manifest.json`` before any request.
+
+Scope note: 3-node / RQ2 dropout / genuine-WAN run types are designed in
+``docs/campaign_v2_design.md`` but are **WS-CM workstream** extension points
+(see ``V2_RUN_SPECS``); this slice implements the confirmatory 2-node path
+only.
 """
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import random
+import re
 import subprocess
 import sys
 import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 _HERE = Path(__file__).resolve().parent
-PROJECT_ROOT = _HERE.parent
+# Note: v1 used _HERE.parent here, which silently pointed NETEM_DIR at a
+# non-existent experiments/bench/scripts/netem (run_netem would then just
+# report "script not found"); _HERE.parent.parent is the actual repo root.
+PROJECT_ROOT = _HERE.parent.parent
 NETEM_DIR = PROJECT_ROOT / "scripts" / "netem"
 APPLY_SH = NETEM_DIR / "apply.sh"
 CLEAR_SH = NETEM_DIR / "clear.sh"
+VALIDATE_SH = NETEM_DIR / "validate.sh"
+
+DESIGN_DOC = "docs/campaign_v2_design.md"
+DESIGN_COMMIT = "1f911ef"
 
 VALID_MODES = ("hybrid", "sparse", "dense")
 
@@ -88,6 +124,35 @@ RESPONSE_FIELDS = ("token_count", "decode_tps")
 # SPHP fields (present only when the sphp axis is exercised).
 SPHP_FIELDS = ("sphp_hit", "sphp_overlap", "wasted_prefill_ms")
 
+# ---------------------------------------------------------------------------
+# v2: confirmatory run types (design §5.1 line-range spec)
+# ---------------------------------------------------------------------------
+# Design-frozen pool line-ranges (1-based, inclusive start).  The end of each
+# run's range is derived from the run's arms x (N + W).  Only the confirmatory
+# core run is implemented in this slice; the WS-CM run types below are
+# extension points (design §5.1) and intentionally NOT registered here.
+#
+#   "loss-sweep":    {"pool_line_start": 1041},  # 6 arms x (50+5)  = 330  [WS-CM]
+#   "three_node":    {"pool_line_start": 1371},  # 6 arms x (80+10) = 540  [WS-CM]
+#   "dropout":       {"pool_line_start": 1911},  # 2 arms x (60+5)  = 130  [WS-CM]
+#   "genuine_wan":   {"pool_line_start": 2041},  # 2 arms x (100+5) = 210  [WS-CM]
+V2_RUN_SPECS: Dict[str, Dict[str, Any]] = {
+    "confirmatory": {
+        "pool_line_start": 1,
+        "label": "v2 confirmatory core (2-node)",
+    },
+}
+
+V1_DEFAULT_QUERIES = "experiments/bench/queries/latency_dev480_seed42.txt"
+
+
+class ManifestError(Exception):
+    """Pool file and its manifest sidecar disagree (or the sidecar is absent)."""
+
+
+class CampaignAborted(Exception):
+    """Fidelity-gate or 0-error-tier failure: stop the campaign, keep data."""
+
 
 # ---------------------------------------------------------------------------
 # Small helpers
@@ -98,6 +163,15 @@ def _now_iso() -> str:
 
 def _run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def sha256_file(path: str) -> str:
+    """Streaming sha256 of a file (hex digest)."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def load_queries(path: str) -> List[str]:
@@ -125,6 +199,162 @@ def resolve_queries_path(path: str) -> str:
     return path  # let load_queries raise a clear error
 
 
+# ---------------------------------------------------------------------------
+# v2: pool manifest verification (design §5.1)
+# ---------------------------------------------------------------------------
+def verify_pool_manifest(pool_path: str) -> Dict[str, Any]:
+    """Verify a v2 pool file against its ``<pool>.manifest.json`` sidecar.
+
+    Checks (all must pass; the first failure raises ``ManifestError``):
+      1. the sidecar exists and is valid JSON with schema
+         ``pdc.query_pool_manifest/v1`` and an ``output`` object;
+      2. sha256(pool file) == manifest ``output.sha256``;
+      3. manifest ``n`` == manifest ``output.line_count``;
+      4. actual non-blank line count of the pool file == ``n``.
+
+    Returns the parsed manifest dict (with ``"_verified_sha256"`` added).
+    """
+    p = Path(pool_path)
+    man_path = p.with_name(p.name + ".manifest.json")
+    if not man_path.is_file():
+        raise ManifestError(
+            f"pool manifest sidecar not found: {man_path} "
+            f"(required for --pool usage; generate it with make_query_pool.py)")
+    try:
+        man = json.loads(man_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ManifestError(f"pool manifest is not valid JSON: {man_path}: {e}")
+    if man.get("schema") != "pdc.query_pool_manifest/v1":
+        raise ManifestError(
+            f"pool manifest schema mismatch: {man.get('schema')!r} != "
+            f"'pdc.query_pool_manifest/v1' ({man_path})")
+    out = man.get("output")
+    if not isinstance(out, dict):
+        raise ManifestError(f"pool manifest missing 'output' object: {man_path}")
+
+    actual_sha = sha256_file(str(p))
+    if out.get("sha256") != actual_sha:
+        raise ManifestError(
+            f"pool sha256 mismatch for {p}: file={actual_sha} "
+            f"manifest={out.get('sha256')} ({man_path})")
+
+    n = man.get("n")
+    line_count = out.get("line_count")
+    if not isinstance(n, int) or not isinstance(line_count, int):
+        raise ManifestError(f"pool manifest n/line_count must be ints: {man_path}")
+    if n != line_count:
+        raise ManifestError(
+            f"pool manifest internally inconsistent: n={n} != line_count={line_count} "
+            f"({man_path})")
+    actual_lines = len(load_queries(str(p)))
+    if actual_lines != n:
+        raise ManifestError(
+            f"pool line count mismatch for {p}: file has {actual_lines} "
+            f"non-blank lines, manifest says n={n} ({man_path})")
+
+    man["_verified_sha256"] = actual_sha
+    return man
+
+
+# ---------------------------------------------------------------------------
+# v2: line-range slice selection (design §5.1 — fixed, arm-ordered ranges)
+# ---------------------------------------------------------------------------
+def v2_line_range(run_name: str, n_arms: int, n: int, warmups: int) -> Tuple[int, int]:
+    """Return the (1-based, inclusive) pool line range for a v2 run type.
+
+    ``start`` is frozen per run type in ``V2_RUN_SPECS`` (design §5.1);
+    ``end = start + n_arms * (n + warmups) - 1``.
+    """
+    spec = V2_RUN_SPECS.get(run_name)
+    if spec is None:
+        raise ValueError(
+            f"unknown v2 run type {run_name!r}; registered run types: "
+            f"{sorted(V2_RUN_SPECS)}. (3-node/dropout/genuine-WAN are WS-CM "
+            f"extension points, not implemented in this slice.)")
+    start = spec["pool_line_start"]
+    end = start + n_arms * (n + warmups) - 1
+    return start, end
+
+
+def select_pool_slices(
+    all_queries: List[str],
+    arms: List[Tuple[int, int, str, str]],
+    n: int,
+    warmups: int,
+    line_start: int,
+    line_end: int,
+) -> List[Dict[str, Any]]:
+    """Assign each arm a DISJOINT contiguous slice of the pool's line range.
+
+    The pool file is itself the seeded shuffle (generator's job); the driver
+    consumes it in fixed, arm-ordered line ranges per the design §5.1
+    spec, so no further shuffling happens here.  Arm ``i`` gets pool lines
+    ``[line_start + i*(N+W) .. line_start + (i+1)*(N+W) - 1]`` (1-based); the
+    first ``warmups`` lines of each slice are that arm's warmups (executed
+    but not recorded), the remaining ``n`` are its measured sample.
+
+    Fails fast (``ValueError``) if the range exceeds the file, if the slice
+    contents contain duplicates, or if any two slices intersect (they cannot
+    by construction — the disjointness assertion below is a belt-and-braces
+    check feeding the manifest's disjointness field).
+
+    Returns one dict per arm (in arm order) with the same keys as
+    ``build_arm_query_plan`` plus nothing renamed.
+    """
+    n_arms = len(arms)
+    per_arm = n + warmups
+    required = line_end - line_start + 1
+    if required != n_arms * per_arm:
+        raise ValueError(
+            f"line range [{line_start}, {line_end}] holds {required} lines but "
+            f"{n_arms} arms x (N={n} + W={warmups}) = {n_arms * per_arm} are "
+            f"required (recompute the range from the design spec)")
+    available = len(all_queries)
+    if line_start < 1 or line_end > available:
+        raise ValueError(
+            f"pool line range [{line_start}, {line_end}] out of bounds: "
+            f"the pool file has {available} non-blank lines")
+
+    block = all_queries[line_start - 1:line_end]
+    if len(set(block)) != len(block):
+        raise ValueError(
+            f"duplicate queries inside pool range [{line_start}, {line_end}]: "
+            f"the pool file must hold distinct queries (re-run the generator)")
+
+    plan: List[Dict[str, Any]] = []
+    for i, (rtt, loss, mode, variant) in enumerate(arms):
+        start = (line_start - 1) + i * per_arm
+        end = start + per_arm
+        slice_ = block[i * per_arm:(i + 1) * per_arm]
+        plan.append({
+            "rtt_ms": rtt,
+            "loss_pct": loss,
+            "mode": mode,
+            "variant": variant,
+            "warmups": slice_[:warmups],
+            "measured": slice_[warmups:end - start],
+            "pool_start": start,
+            "pool_end": end,
+        })
+
+    assert slices_disjoint(plan), "internal error: slices are not disjoint"
+    return plan
+
+
+def slices_disjoint(plan: List[Dict[str, Any]]) -> bool:
+    """Pairwise disjointness assertion over an arm plan's query slices
+    (warmups + measured, per design §5.1)."""
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            if sets[i] & sets[j]:
+                return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# v1: seeded shuffled-pool slice selection (unchanged)
+# ---------------------------------------------------------------------------
 def build_arm_query_plan(
     all_queries: List[str],
     arms: List[Tuple[int, int, str, str]],
@@ -221,13 +451,14 @@ def mean_std(values: List[float]) -> Tuple[float, float]:
 # ---------------------------------------------------------------------------
 # netem
 # ---------------------------------------------------------------------------
-def run_netem(script: Path, *args: str) -> Tuple[bool, str]:
+def run_netem(script: Path, *args: str,
+              timeout: int = 60) -> Tuple[bool, str]:
     """Run a netem shell script; return (ok, combined_output)."""
     if not script.is_file():
         return False, f"script not found: {script}"
     cmd = ["bash", str(script)] + [str(a) for a in args]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         out = (proc.stdout or "").strip()
         err = (proc.stderr or "").strip()
         combined = "\n".join(x for x in (out, err) if x)
@@ -236,17 +467,19 @@ def run_netem(script: Path, *args: str) -> Tuple[bool, str]:
         return False, f"exception: {e}"
 
 
-def apply_netem(rtt: int, loss: int, dry_run: bool) -> bool:
-    """Apply one-way WAN shaping for a (rtt, loss) regime.
+def apply_netem_link_b(rtt: int, loss: int, dry_run: bool) -> bool:
+    """Apply the 2-node (link-B) shaping regime via the explicit-link
+    contract: ``apply.sh --link-b <RTT> <LOSS>`` (no positional args — the
+    current apply.sh forbids them).
 
     Skipped for dry-run or the unshaped baseline (rtt=0 and loss=0).
     Returns True only if the qdisc was actually applied.
     """
     if dry_run or (rtt == 0 and loss == 0):
         return False
-    ok, out = run_netem(APPLY_SH, rtt, loss)
+    ok, out = run_netem(APPLY_SH, "--link-b", rtt, loss)
     if ok:
-        print(f"    [netem] applied rtt={rtt}ms loss={loss}%")
+        print(f"    [netem] applied --link-b rtt={rtt}ms loss={loss}%")
     else:
         print(f"    [netem] WARNING: apply.sh failed (rtt={rtt} loss={loss}): {out}",
               file=sys.stderr)
@@ -262,6 +495,115 @@ def clear_netem(dry_run: bool) -> None:
         print("    [netem] cleared")
     else:
         print(f"    [netem] WARNING: clear.sh failed: {out}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# v2: fidelity gate (design §6 — 11-ping median, ±30% added-RTT window)
+# ---------------------------------------------------------------------------
+def stratum_for_repeat(repeat_index: int) -> str:
+    """Design §5.2: repeat 0 = cold-prefix stratum, repeats 1..R-1 = warm."""
+    return "cold" if repeat_index == 0 else "warm"
+
+
+def parse_fidelity_gate_output(out: str) -> Dict[str, Optional[float]]:
+    """Extract the medians from ``validate.sh`` output (pure; '' -> zeros)."""
+    def _g(pat: str) -> Optional[float]:
+        m = re.search(pat, out)
+        return float(m.group(1)) if m else None
+    return {
+        "baseline_median_ms": _g(r"Baseline median RTT\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms"),
+        "shaped_median_ms": _g(r"Shaped median RTT\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms"),
+        "added_rtt_ms": _g(r"Added RTT \(Observed\):\s*([0-9]+(?:\.[0-9]+)?)\s*ms"),
+    }
+
+
+def run_fidelity_gate(rtt: int, when: str, dry_run: bool) -> Dict[str, Any]:
+    """Run the per-tier 11-ping fidelity gate for a 2-node link-B regime.
+
+    ``validate.sh --link-b <RTT>`` clears, measures the baseline median,
+    re-applies the shaping, measures the shaped median, enforces the ±30%
+    window on the added RTT, and (trap) clears again on exit — so a gate
+    call always leaves the link unshaped; the caller re-applies afterwards.
+    The unshaped baseline tier (rtt=0) has no gate (validate requires >= 1
+    ms): it is recorded as ``skipped-baseline``.
+
+    ``when`` is "pre" (before the tier's arms) or "post" (at tier close).
+    """
+    if dry_run:
+        return {"rtt_ms": rtt, "when": when,
+                "status": "planned" if rtt > 0 else "skipped-baseline"}
+    if rtt <= 0:
+        return {"rtt_ms": 0, "when": when, "status": "skipped-baseline",
+                "baseline_median_ms": None, "shaped_median_ms": None,
+                "added_rtt_ms": None, "output_tail": ""}
+    ok, out = run_netem(VALIDATE_SH, "--link-b", rtt, timeout=300)
+    parsed = parse_fidelity_gate_output(out)
+    rec: Dict[str, Any] = {
+        "rtt_ms": rtt,
+        "when": when,
+        "status": "PASS" if ok else "FAIL",
+        **parsed,
+        "output_tail": (out or "")[-500:],
+    }
+    return rec
+
+
+# ---------------------------------------------------------------------------
+# v2: campaign manifest (design §5.1 — written before any request)
+# ---------------------------------------------------------------------------
+def build_campaign_manifest(
+    run_id: str,
+    run_name: str,
+    pool_path: str,
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+    plan: List[Dict[str, Any]],
+    n: int,
+    warmups: int,
+    repeats: int,
+    seed: int,
+) -> Dict[str, Any]:
+    """Build the ``campaign_v2_manifest.json`` document (design §5.1)."""
+    disjoint = slices_disjoint(plan)
+    return {
+        "schema": "pdc.campaign_manifest/v2",
+        "design_doc": DESIGN_DOC,
+        "design_commit": DESIGN_COMMIT,
+        "run_id": run_id,
+        "generated_at_utc": _now_iso(),
+        "run": run_name,
+        "pool": {
+            "path": pool_path,
+            "sha256": manifest.get("_verified_sha256"),
+            "manifest_path": str(Path(pool_path).with_name(
+                Path(pool_path).name + ".manifest.json")),
+            "n": manifest.get("n"),
+            "line_start": line_start,
+            "line_end": line_end,
+        },
+        "seed": seed,
+        "n_per_arm": n,
+        "warmups_per_arm": warmups,
+        "repeats_per_query": repeats,
+        "arms": [
+            {
+                "rtt_ms": a["rtt_ms"],
+                "loss_pct": a["loss_pct"],
+                "mode": a["mode"],
+                "variant": a["variant"],
+                "pool_start": a["pool_start"] + 1,   # 1-based line numbers
+                "pool_end": a["pool_end"],
+                "warmups": a["warmups"],
+                "measured": a["measured"],
+            } for a in plan
+        ],
+        "disjointness": {
+            "asserted": disjoint,
+            "n_slices": len(plan),
+            "pairwise_intersection_size": 0 if disjoint else -1,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -291,34 +633,55 @@ def check_health(gateway: str, timeout: int = 15) -> bool:
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="Final-matrix campaign runner for the Node B hybrid RAG gateway.",
+        description="Final-matrix campaign runner for the Node B hybrid RAG "
+                    "gateway (v1 matrix + Campaign v2 confirmatory mode via "
+                    "--pool).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     ap.add_argument("--gateway-url", default="http://10.8.0.2:8000",
                     help="Node B gateway base URL")
-    ap.add_argument("--queries", default="experiments/bench/queries/latency_dev480_seed42.txt",
-                    help="Path to a one-query-per-line text file")
+    ap.add_argument("--queries", default=V1_DEFAULT_QUERIES,
+                    help="v1 mode: path to a one-query-per-line text file "
+                         "(mutually exclusive with --pool)")
+    ap.add_argument("--pool", default=None, metavar="FILE",
+                    help="v2 mode (Campaign v2, design docs/campaign_v2_design.md): "
+                         "a query-pool file with a .manifest.json sidecar "
+                         "(sha256 + n verified at startup; arm slices are the "
+                         "design's fixed line-ranges, not a seeded shuffle)")
+    ap.add_argument("--run", default="confirmatory", choices=sorted(V2_RUN_SPECS),
+                    help="v2 run type (3-node/dropout/genuine-WAN are WS-CM "
+                         "extension points, not registered here)")
     ap.add_argument("--rtt-tiers", nargs="+", type=int,
                     default=[0, 15, 40, 80],
-                    help="One-way RTT tiers (ms) to sweep (paper tiers)")
-    ap.add_argument("--loss-tiers", nargs="+", type=int, default=[0, 1],
-                    help="Packet-loss tiers (%%) to sweep")
-    ap.add_argument("--modes", nargs="+", default=["hybrid", "dense", "sparse"],
+                    help="Full-round-trip RTT tiers (ms) to sweep (paper tiers)")
+    ap.add_argument("--loss-tiers", nargs="+", type=int, default=None,
+                    help="Packet-loss tiers (%%) to sweep "
+                         "(default: v1 [0, 1]; v2 [0] — the confirmatory core "
+                         "is loss-free)")
+    ap.add_argument("--modes", nargs="+", default=None,
                     choices=VALID_MODES,
-                    help="Retrieval modes to sweep")
+                    help="Retrieval modes to sweep "
+                         "(default: v1 [hybrid dense sparse]; v2 [hybrid])")
     ap.add_argument("--sphp-axis", action="store_true",
+                    default=argparse.SUPPRESS,
                     help="For mode=hybrid, run two variants per tier "
-                         "(sphp=false baseline and sphp=true); dense/sparse run once")
-    ap.add_argument("--query-sample", type=int, default=50,
-                    help="Number of measured queries per arm (N)")
+                         "(sphp=false baseline and sphp=true); dense/sparse "
+                         "run once. (Default: off for v1, on for v2 — the "
+                         "confirmatory core IS the P2 vs P2-SPHP axis; "
+                         "pass --sphp-axis explicitly in v1 mode to force on)")
+    ap.add_argument("--query-sample", type=int, default=None,
+                    help="Number of measured queries per arm, N "
+                         "(default: v1 50; v2 120 per the frozen powered N)")
     ap.add_argument("--seed", type=int, default=42,
-                    help="RNG seed for the query sample (reproducible)")
+                    help="RNG seed (v1 pool shuffle; recorded in the v2 "
+                         "manifest — the v2 pool file itself is pre-seeded "
+                         "by the generator)")
     ap.add_argument("--repeats", type=int, default=3,
-                    help="Back-to-back repeats per measured query (R); "
-                         "repeat 0 is the cold-prefix reference")
-    ap.add_argument("--warmups", type=int, default=5,
-                    help="Warmup queries per (tier, mode, variant) arm (W); "
-                         "executed but not recorded")
+                    help="Back-to-back repeats per measured query, R; "
+                         "repeat 0 is the cold-prefix stratum")
+    ap.add_argument("--warmups", type=int, default=None,
+                    help="Warmup queries per arm, W; executed but not "
+                         "recorded (default: v1 5; v2 10 per design §5.2)")
     ap.add_argument("--top-k", type=int, default=10,
                     help="top_k sent to the gateway")
     ap.add_argument("--timeout", type=int, default=120,
@@ -328,6 +691,48 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--out-dir", default="experiments/bench/campaigns",
                     help="Directory for JSONL/CSV/JSON outputs")
     return ap
+
+
+def is_v2(args: argparse.Namespace) -> bool:
+    """v2 (Campaign v2) mode is activated by --pool (v2 = --pool is set)."""
+    return args.pool is not None
+
+
+def resolve_mode_defaults(args: argparse.Namespace) -> None:
+    """Resolve the per-mode sentinel defaults in place.
+
+    v1: modes=[hybrid,dense,sparse], sphp_axis=False, loss=[0,1],
+        N=50, W=5 (the historical CLI surface, unchanged).
+    v2 (--pool): modes=[hybrid], sphp_axis=True, loss=[0], N=120, W=10
+        (the frozen confirmatory core of docs/campaign_v2_design.md).
+    An explicitly provided value always wins.
+    """
+    if is_v2(args):
+        if args.modes is None:
+            args.modes = ["hybrid"]
+        # store_true with default=SUPPRESS: the attribute is absent unless
+        # the flag was passed.  v2 default: axis ON (the confirmatory core
+        # is the P2 vs P2-SPHP comparison).
+        if not getattr(args, "sphp_axis", False):
+            args.sphp_axis = True
+        if args.loss_tiers is None:
+            args.loss_tiers = [0]
+        if args.query_sample is None:
+            args.query_sample = 120
+        if args.warmups is None:
+            args.warmups = 10
+    else:
+        if args.modes is None:
+            args.modes = ["hybrid", "dense", "sparse"]
+        # v1 default: axis OFF (unchanged CLI surface) unless the flag was
+        # explicitly passed.
+        args.sphp_axis = bool(getattr(args, "sphp_axis", False))
+        if args.loss_tiers is None:
+            args.loss_tiers = [0, 1]
+        if args.query_sample is None:
+            args.query_sample = 50
+        if args.warmups is None:
+            args.warmups = 5
 
 
 # ---------------------------------------------------------------------------
@@ -347,12 +752,21 @@ def sphp_flag_for_variant(variant: str) -> bool:
     return variant == "sphp"
 
 
+def arm_label(mode: str, variant: str) -> str:
+    """Design arm key for a (mode, variant): hybrid/baseline -> P2,
+    hybrid/sphp -> P2-SPHP, else the mode name."""
+    if mode == "hybrid":
+        return "P2" if variant == "baseline" else "P2-SPHP"
+    return mode
+
+
 def build_arm_list(args: argparse.Namespace) -> List[Tuple[int, int, str, str]]:
     """Return the full ordered arm list: (rtt, loss, mode, variant).
 
     Order is regime-major (rtt x loss), then mode, then variant — the same
-    order the runner executes arms in.  Used both to size the per-arm query
-    pool and to drive the dry-run plan so the two always agree.
+    order the runner executes arms in (design §6: "4 RTT regimes
+    sequentially, P2 → P2-SPHP per regime").  Used both to size the per-arm
+    query pool and to drive the dry-run plan so the two always agree.
     """
     arms: List[Tuple[int, int, str, str]] = []
     for rtt in args.rtt_tiers:
@@ -389,7 +803,7 @@ def print_plan(args: argparse.Namespace, all_queries: List[str],
     print("=" * 78)
     print(f"  gateway      : {args.gateway_url}")
     print(f"  queries file : {args.queries} ({len(all_queries)} queries total)")
-    print(f"  query sample : N={args.query_sample} measured + W={args.warmups} warmups "
+    print(f"  query sample : N={args.query_sample} measured + W={args.warmups} "
           f"per arm (seed={args.seed})")
     print(f"  query pool   : {n_arms} arms x {per_arm} = {n_arms * per_arm} "
           f"distinct queries (disjoint per arm)")
@@ -430,6 +844,86 @@ def print_plan(args: argparse.Namespace, all_queries: List[str],
     print("  DRY RUN complete. No network calls, no netem, no files were made.")
 
 
+def print_plan_v2(args: argparse.Namespace, all_queries: List[str],
+                  arm_plan: List[Dict[str, Any]], manifest: Dict[str, Any],
+                  line_start: int, line_end: int) -> None:
+    """Dry-run plan for the v2 confirmatory mode (no netem, no HTTP, no files)."""
+    n_arms = len(arm_plan)
+    per_arm = args.query_sample + args.warmups
+    n_measured_per_arm = len(arm_plan[0]["measured"]) * args.repeats
+    n_warmups_per_arm = len(arm_plan[0]["warmups"])
+    n_total_per_arm = n_warmups_per_arm + n_measured_per_arm
+    n_measured = n_arms * n_measured_per_arm
+    n_warmups = n_arms * n_warmups_per_arm
+    n_total = n_arms * n_total_per_arm
+    disjoint = slices_disjoint(arm_plan)
+
+    print("=" * 78)
+    print("CAMPAIGN V2 — CONFIRMATORY 2-NODE MATRIX — DRY RUN")
+    print("=" * 78)
+    print(f"  design doc   : {DESIGN_DOC} (commit {DESIGN_COMMIT})")
+    print(f"  run type     : {args.run}  ({V2_RUN_SPECS[args.run]['label']})")
+    print(f"  gateway      : {args.gateway_url}")
+    print(f"  pool file    : {args.pool}  ({len(all_queries)} lines, "
+          f"sha256={manifest.get('_verified_sha256')})")
+    print(f"  pool manifest: VERIFIED OK (sha256 + n={manifest.get('n')} "
+          f"+ line_count all match)")
+    print(f"  pool lines   : {line_start}..{line_end} of the pool file "
+          f"(design §5.1 line-range spec)")
+    print(f"  rtt tiers    : {args.rtt_tiers} ms (full round-trip)")
+    print(f"  loss tiers   : {args.loss_tiers} %")
+    print(f"  arms         : {n_arms} = RTT x {{P2, P2-SPHP}} "
+          f"(mode=hybrid, sphp axis on)")
+    print(f"  per arm      : W={args.warmups} warmups + N={args.query_sample} "
+          f"x R={args.repeats} = {n_total_per_arm} requests "
+          f"({n_measured_per_arm} measured + {n_warmups_per_arm} warmups)")
+    print(f"  per tier     : {len(args.modes) * (2 if args.sphp_axis else 1)} arms "
+          f"-> {n_total_per_arm * len(args.modes) * (2 if args.sphp_axis else 1)} "
+          f"requests per RTT tier")
+    print(f"  TOTAL        : {n_total} requests "
+          f"({n_measured} measured + {n_warmups} warmups)")
+    print(f"  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm "
+          f"(no cache flush exists; §5.2)")
+    print(f"  fidelity gate: pre- AND post- each shaped tier: "
+          f"validate.sh --link-b <rtt> (11-ping median, ±30% added-RTT window); "
+          f"FAIL aborts the campaign; baseline tier (rtt=0) has no gate")
+    print(f"  0-error gate : any n_errors > 0 at a tier close fails the "
+          f"campaign (design §6.4; 2-node core is 0, not ≤1%)")
+    print(f"  campaign manifest: would be written to "
+          f"{args.out_dir}/campaign_v2_manifest.json before any request")
+    print("-" * 78)
+    print("  Execution plan (regimes sequentially; arms P2 -> P2-SPHP per tier):")
+    for rtt in args.rtt_tiers:
+        for loss in args.loss_tiers:
+            shaped = not (rtt == 0 and loss == 0)
+            tag = "shaped: apply --link-b " \
+                  f"{rtt} {loss}; gate pre+post" if shaped else "baseline: no netem, no gate"
+            tier_arms = [a for a in arm_plan
+                         if a["rtt_ms"] == rtt and a["loss_pct"] == loss]
+            n_tier_total = sum(len(a["warmups"]) + len(a["measured"]) * args.repeats
+                               for a in tier_arms)
+            n_tier_measured = sum(len(a["measured"]) * args.repeats
+                                  for a in tier_arms)
+            print(f"    regime rtt={rtt:>3}ms loss={loss}%  [{tag}]")
+            for mode in args.modes:
+                for variant in variants_for_mode(mode, args.sphp_axis):
+                    arm = next(a for a in tier_arms
+                               if a["mode"] == mode and a["variant"] == variant)
+                    a_total = len(arm["warmups"]) + len(arm["measured"]) * args.repeats
+                    print(f"        arm {arm_label(mode, variant):<9} "
+                          f"(mode={mode} variant={variant})  "
+                          f"-> pool lines {arm['pool_start'] + 1}..{arm['pool_end']}  "
+                          f"({len(arm['warmups'])}W + {len(arm['measured'])}x{args.repeats}R "
+                          f"= {a_total} req)")
+            print(f"        tier subtotal: {n_tier_total} requests "
+                  f"({n_tier_measured} measured)")
+    print("-" * 78)
+    print(f"  manifest disjointness: {len(arm_plan)} arm slices, pairwise "
+          f"intersection == {'0 (asserted OK)' if disjoint else 'NON-EMPTY (FAIL)'}")
+    print("-" * 78)
+    print("  DRY RUN complete. No network calls, no netem, no files were made.")
+
+
 # ---------------------------------------------------------------------------
 # Record building
 # ---------------------------------------------------------------------------
@@ -443,8 +937,15 @@ def build_record(
     query: str,
     res: Dict[str, Any],
     netem_applied: bool,
+    extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Flatten a /query/benchmark response into a single JSONL record."""
+    """Flatten a /query/benchmark response into a single JSONL record.
+
+    The record is a SUPERSET of the v1 schema (no v1 field is renamed).
+    ``extra`` carries the v2 additions (design §"record-field additions"):
+    stratum, rtt_ping_median_ms, netem_link_c_applied, netem_link_b_applied,
+    pool manifest hash — all optional, None-valued when not applicable.
+    """
     timings = res.get("timings", {}) or {}
     rec: Dict[str, Any] = {
         "run_id": run_id,
@@ -471,7 +972,40 @@ def build_record(
             rec[f] = res.get(f)
         elif f in timings:
             rec[f] = timings.get(f)
+    if extra:
+        rec.update(extra)
     return rec
+
+
+def v2_record_extra(
+    mode: str,
+    repeat_index: int,
+    rtt: int,
+    loss: int,
+    gate: Dict[str, Any],
+    pool_path: str,
+    manifest: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The v2 record-field additions (design §3.2/§5; all additive).
+
+    - stratum: 'cold' (repeat 0) / 'warm' (repeats 1..R-1), design §5.2;
+    - rtt_ping_median_ms: the pre-tier gate's shaped 11-ping median (None
+      for the baseline tier — design §6 "per regime transition");
+    - netem_link_b_applied / netem_link_c_applied: per-leg targets; link C
+      is None for the 2-node core (reserved for WS-CM 3-node arms, §3.2).
+    - pool provenance: pool name + verified sha256 (the manifest hash).
+    """
+    netem_b = None
+    if not (rtt == 0 and loss == 0):
+        netem_b = {"rtt_ms": rtt, "loss_pct": loss}
+    return {
+        "stratum": stratum_for_repeat(repeat_index),
+        "rtt_ping_median_ms": gate.get("shaped_median_ms"),
+        "netem_link_b_applied": netem_b,
+        "netem_link_c_applied": None,  # WS-CM 3-node extension point
+        "pool_file": Path(pool_path).name,
+        "pool_manifest_sha256": manifest.get("_verified_sha256"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -521,13 +1055,286 @@ def summarize_arm(recs: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def write_summary_outputs(
+    out_dir: Path,
+    run_id: str,
+    summary_rows: List[Dict[str, Any]],
+    summary_doc: Dict[str, Any],
+) -> Tuple[Path, Path]:
+    """Write the summary CSV + JSON; return the paths."""
+    csv_path = out_dir / f"summary_{run_id}.csv"
+    json_path = out_dir / f"summary_{run_id}.json"
+    if summary_rows:
+        fieldnames = list(summary_rows[0].keys())
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(summary_rows)
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(summary_doc, f, indent=2)
+    return csv_path, json_path
+
+
+# ---------------------------------------------------------------------------
+# v2 run
+# ---------------------------------------------------------------------------
+def run_campaign_v2(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    manifest: Dict[str, Any],
+    arm_plan: List[Dict[str, Any]],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Execute the v2 confirmatory 2-node matrix (design §6 procedure).
+
+    Per shaped RTT tier: pre-tier fidelity gate (fail fast on FAIL),
+    apply --link-b, per-arm /health check + warmups + measured repeats
+    (JSONL with v2 record-field additions), tier close (0-error assertion,
+    post-tier gate, clear).  Writes <out-dir>/campaign_v2_manifest.json
+    before any request.  Exit 1 (with partial artifacts kept) on gate or
+    0-error failure — data up to the failure is valid.
+    """
+    pool_path = str(args.pool)
+    endpoint = args.gateway_url.rstrip("/") + "/query/benchmark"
+
+    # Health check (fail fast if the gateway is down).
+    if not check_health(args.gateway_url, timeout=15):
+        print(f"ERROR: gateway health check failed at {args.gateway_url}/health",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"Gateway healthy: {args.gateway_url}")
+
+    run_id = _run_id()
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Design §5.1: the campaign manifest is written BEFORE any request.
+    manifest_path = out_dir / "campaign_v2_manifest.json"
+    manifest_doc = build_campaign_manifest(
+        run_id, args.run, pool_path, manifest, line_start, line_end,
+        arm_plan, args.query_sample, args.warmups, args.repeats, args.seed)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_doc, f, indent=2)
+    print(f"Manifest written: {manifest_path} "
+          f"(disjointness asserted: {manifest_doc['disjointness']['asserted']})")
+
+    # Clean slate before any shaping.
+    clear_netem(dry_run=False)
+
+    jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
+    arms_recs: Dict[Tuple[int, int, str, str], List[Dict[str, Any]]] = {}
+    gates_log: List[Dict[str, Any]] = []
+    n_ok = 0
+    n_err = 0
+    n_warmup_ok = 0
+    n_warmup_err = 0
+    exit_code = 0
+    abort_reason: Optional[str] = None
+
+    def _finalize() -> None:
+        """Write summary outputs (partial data stays valid) and exit."""
+        summary_rows: List[Dict[str, Any]] = []
+        for (rtt, loss, mode, variant), recs in arms_recs.items():
+            row = summarize_arm(recs)
+            row = {"rtt_ms": rtt, "loss_pct": loss, "mode": mode,
+                   "variant": variant, **row}
+            summary_rows.append(row)
+        summary_rows.sort(key=lambda r: (r["rtt_ms"], r["loss_pct"],
+                                         r["mode"], r["variant"]))
+        summary_doc = {
+            "schema": "pdc.campaign_summary/v2",
+            "design_doc": DESIGN_DOC,
+            "design_commit": DESIGN_COMMIT,
+            "run": args.run,
+            "run_id": run_id,
+            "generated_at": _now_iso(),
+            "status": "completed" if abort_reason is None else "aborted",
+            "abort_reason": abort_reason,
+            "gateway_url": args.gateway_url,
+            "pool": manifest_doc["pool"],
+            "line_range": [line_start, line_end],
+            "seed": args.seed,
+            "query_sample": args.query_sample,
+            "warmups": args.warmups,
+            "repeats": args.repeats,
+            "rtt_tiers": args.rtt_tiers,
+            "loss_tiers": args.loss_tiers,
+            "modes": args.modes,
+            "sphp_axis": args.sphp_axis,
+            "top_k": args.top_k,
+            "fidelity_gates": gates_log,
+            "n_ok": n_ok,
+            "n_errors": n_err,
+            "n_warmup_ok": n_warmup_ok,
+            "n_warmup_errors": n_warmup_err,
+            "summary": summary_rows,
+        }
+        csv_path, json_path = write_summary_outputs(
+            out_dir, run_id, summary_rows, summary_doc)
+        print(f"\nJSONL   : {jsonl_path}")
+        print(f"CSV     : {csv_path}")
+        print(f"JSON    : {json_path}")
+        if abort_reason is not None:
+            print(f"CAMPAIGN ABORTED: {abort_reason}", file=sys.stderr)
+        print("Done.")
+        sys.exit(exit_code)
+
+    jsonl_f = open(jsonl_path, "w", encoding="utf-8")
+    try:
+        for rtt in args.rtt_tiers:
+            for loss in args.loss_tiers:
+                shaped = not (rtt == 0 and loss == 0)
+                print(f"\n=== regime rtt={rtt}ms loss={loss}% "
+                      f"[{'shaped' if shaped else 'baseline'}] ===")
+
+                # --- pre-tier fidelity gate (design §6) ---
+                pre_gate = run_fidelity_gate(rtt, "pre", dry_run=False)
+                gates_log.append(pre_gate)
+                if rtt > 0:
+                    print(f"    [gate pre]  rtt={rtt}: {pre_gate['status']} "
+                          f"(baseline={pre_gate.get('baseline_median_ms')} ms, "
+                          f"shaped={pre_gate.get('shaped_median_ms')} ms, "
+                          f"added={pre_gate.get('added_rtt_ms')} ms)")
+                    if pre_gate["status"] != "PASS":
+                        clear_netem(dry_run=False)
+                        abort_reason = (f"pre-tier fidelity gate FAIL at "
+                                        f"rtt={rtt}ms: {pre_gate.get('output_tail','').strip()[-200:]}")
+                        exit_code = 1
+                        _finalize()
+                else:
+                    print("    [gate pre]  rtt=0: skipped-baseline (no shaping, no gate)")
+
+                netem_applied = apply_netem_link_b(rtt, loss, dry_run=False)
+
+                # --- arms (P2 -> P2-SPHP per regime) ---
+                for mode in args.modes:
+                    for variant in variants_for_mode(mode, args.sphp_axis):
+                        if not check_health(args.gateway_url, timeout=15):
+                            clear_netem(dry_run=False)
+                            abort_reason = (f"gateway /health failed before arm "
+                                            f"{arm_label(mode, variant)} at rtt={rtt}ms")
+                            exit_code = 1
+                            _finalize()
+                        sphp = sphp_flag_for_variant(variant)
+                        arm_key = (rtt, loss, mode, variant)
+                        arm = next(a for a in arm_plan
+                                   if (a["rtt_ms"], a["loss_pct"], a["mode"],
+                                       a["variant"]) == arm_key)
+                        warmup_queries = arm["warmups"]
+                        measured_queries = arm["measured"]
+                        extra = v2_record_extra(
+                            mode, 0, rtt, loss, pre_gate, pool_path, manifest)
+                        print(f"  arm {arm_label(mode, variant):<9} "
+                              f"(mode={mode} variant={variant} sphp={sphp})  "
+                              f"pool lines {arm['pool_start'] + 1}..{arm['pool_end']}")
+
+                        # Warmups: executed but NOT recorded (disjoint slice).
+                        for w, wq in enumerate(warmup_queries):
+                            try:
+                                http_post_json(endpoint, {
+                                    "query": wq,
+                                    "top_k": args.top_k,
+                                    "mode": mode,
+                                    "sphp": sphp,
+                                }, timeout=args.timeout)
+                                n_warmup_ok += 1
+                            except Exception as e:
+                                n_warmup_err += 1
+                                print(f"    [warmup] {mode}/{variant} w={w} "
+                                      f"failed: {e}", file=sys.stderr)
+
+                        # Measured: N queries x R repeats back-to-back.
+                        for query in measured_queries:
+                            for rep in range(args.repeats):
+                                try:
+                                    res = http_post_json(endpoint, {
+                                        "query": query,
+                                        "top_k": args.top_k,
+                                        "mode": mode,
+                                        "sphp": sphp,
+                                    }, timeout=args.timeout)
+                                    rec = build_record(
+                                        run_id, rtt, loss, mode, variant, rep,
+                                        query, res, netem_applied,
+                                        extra=v2_record_extra(
+                                            mode, rep, rtt, loss, pre_gate,
+                                            pool_path, manifest))
+                                    n_ok += 1
+                                except Exception as e:
+                                    rec: Dict[str, Any] = {
+                                        "run_id": run_id,
+                                        "timestamp": _now_iso(),
+                                        "query_id": None,
+                                        "query": query,
+                                        "rtt_ms": rtt,
+                                        "loss_pct": loss,
+                                        "mode": mode,
+                                        "variant": variant,
+                                        "repeat_index": rep,
+                                        "top_k": args.top_k,
+                                        "netem_applied": netem_applied,
+                                        **v2_record_extra(
+                                            mode, rep, rtt, loss, pre_gate,
+                                            pool_path, manifest),
+                                    }
+                                    rec["error"] = str(e)
+                                    n_err += 1
+                                jsonl_f.write(json.dumps(rec) + "\n")
+                                jsonl_f.flush()
+                                arms_recs.setdefault(arm_key, []).append(rec)
+
+                # --- tier close: 0-error assertion (design §6.4) ---
+                tier_err = sum(
+                    len([r for r in recs if "error" in r])
+                    for (t, l, _, _), recs in arms_recs.items()
+                    if t == rtt and l == loss)
+                if tier_err > 0:
+                    post_gate = run_fidelity_gate(rtt, "post", dry_run=False)
+                    gates_log.append(post_gate)
+                    clear_netem(dry_run=False)
+                    abort_reason = (f"0-error tier assertion FAILED at rtt={rtt}ms "
+                                    f"({tier_err} error records; the 2-node core "
+                                    f"requires 0 — design §6.4; re-run the tier)")
+                    exit_code = 1
+                    _finalize()
+
+                # --- post-tier fidelity gate (design §6; clears netem on exit) ---
+                post_gate = run_fidelity_gate(rtt, "post", dry_run=False)
+                gates_log.append(post_gate)
+                if rtt > 0:
+                    print(f"    [gate post] rtt={rtt}: {post_gate['status']} "
+                          f"(shaped={post_gate.get('shaped_median_ms')} ms, "
+                          f"added={post_gate.get('added_rtt_ms')} ms)")
+                    if post_gate["status"] != "PASS":
+                        clear_netem(dry_run=False)
+                        abort_reason = (f"post-tier fidelity gate FAIL at rtt={rtt}ms: "
+                                        f"{post_gate.get('output_tail','').strip()[-200:]}")
+                        exit_code = 1
+                        _finalize()
+                else:
+                    print("    [gate post] rtt=0: skipped-baseline (no shaping, no gate)")
+
+                clear_netem(dry_run=False)
+    finally:
+        jsonl_f.close()
+
+    _finalize()
+    _finalize()
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main() -> None:
     args = build_parser().parse_args()
 
-    queries_path = resolve_queries_path(args.queries)
+    if is_v2(args) and args.queries != V1_DEFAULT_QUERIES:
+        print("ERROR: --pool and --queries are mutually exclusive "
+              "(v2 uses the pool file and its manifest sidecar)", file=sys.stderr)
+        sys.exit(1)
+
+    queries_path = resolve_queries_path(args.pool if is_v2(args) else args.queries)
     try:
         all_queries = load_queries(queries_path)
     except FileNotFoundError as e:
@@ -537,9 +1344,40 @@ def main() -> None:
         print(f"ERROR: no queries loaded from {queries_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Build the full arm list FIRST, then assign each arm a disjoint slice of a
-    # seeded query pool (fail fast if the file cannot supply n_arms*(N+W)).
+    # v2: verify the pool against its manifest sidecar BEFORE anything else
+    # (fail fast on any sha256 / n / line_count mismatch).
+    manifest: Optional[Dict[str, Any]] = None
+    if is_v2(args):
+        try:
+            manifest = verify_pool_manifest(queries_path)
+        except ManifestError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    resolve_mode_defaults(args)
+
+    # Build the full arm list FIRST, then assign each arm its query slice.
     arms = build_arm_list(args)
+
+    if is_v2(args):
+        line_start, line_end = v2_line_range(
+            args.run, len(arms), args.query_sample, args.warmups)
+        try:
+            arm_plan = select_pool_slices(
+                all_queries, arms, args.query_sample, args.warmups,
+                line_start, line_end)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+        if args.dry_run:
+            print_plan_v2(args, all_queries, arm_plan, manifest,
+                          line_start, line_end)
+            return
+        run_campaign_v2(args, all_queries, manifest, arm_plan,
+                        line_start, line_end)
+        return
+
+    # ------------------------------ v1 path --------------------------------
     try:
         arm_plan = build_arm_query_plan(
             all_queries, arms, args.query_sample, args.warmups, args.seed)
@@ -589,7 +1427,7 @@ def main() -> None:
                 shaped = not (rtt == 0 and loss == 0)
                 print(f"\n=== regime rtt={rtt}ms loss={loss}% "
                       f"[{'shaped' if shaped else 'baseline'}] ===")
-                netem_applied = apply_netem(rtt, loss, dry_run=False)
+                netem_applied = apply_netem_link_b(rtt, loss, dry_run=False)
 
                 for mode in args.modes:
                     for variant in variants_for_mode(mode, args.sphp_axis):
