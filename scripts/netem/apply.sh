@@ -141,8 +141,15 @@ tc qdisc del dev "$IFB" root 2>/dev/null || true
 ip link del dev "$IFB" 2>/dev/null || true
 
 # --- Setup IFB device for ingress mirror ---------------------------------------
-modprobe ifb || { echo "FATAL: 'modprobe ifb' failed." >&2; exit 1; }
-ip link add dev "$IFB" type ifb
+# numifbs=0 suppresses the module's default auto-creation of ifb0 (numifbs=2),
+# so the explicit `ip link add` below owns the device lifecycle. (The param is
+# a no-op if the module is already loaded; in that case ifb0 may pre-exist, so
+# the add is guarded below.) Cold-start without numifbs=0 collided: the
+# auto-created ifb0 made `ip link add` fail with RTNETLINK: File exists.
+modprobe ifb numifbs=0 || { echo "FATAL: 'modprobe ifb' failed." >&2; exit 1; }
+if ! ip link show dev "$IFB" >/dev/null 2>&1; then
+  ip link add dev "$IFB" type ifb
+fi
 ip link set dev "$IFB" up
 
 # --- Setup Egress HTB on IFACE -------------------------------------------------
