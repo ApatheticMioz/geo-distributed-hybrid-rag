@@ -21,7 +21,7 @@ Node B  10.8.0.2   (edge gateway — laptop: Intel i7-10750H, GTX 1660 Ti)
   ▼
 Node A  10.8.0.1   (generation — RTX 3090 workstation, 24 GB VRAM)
   │  • local SQLite store: full 8,841,823-passage MS MARCO corpus (O(1) hydration)
-  │  • vLLM serving Qwen3.8-27B, W4A16-quantized (AWQ)
+  │  • vLLM 0.30.0 serving Qwen3.8-27B, W4A16 (AutoRound, compressed-tensors)
   │  • per-request think suppression (chat-template kwargs) so TTFT
   │    measures the answer stream, not chain-of-thought tokens
   │  gRPC stream over WireGuard (decoded token stream)
@@ -37,7 +37,9 @@ document identifiers cross the link, not the corpus text.
 
 **Generation backend (Node A, `systems/node_a/implementation/src/config.py`):**
 external OpenAI-compatible endpoint `http://127.0.0.1:18020/v1`, model
-`qwen3.8-27b`, AWQ quantization, `GPU_MEMORY_UTILIZATION=0.90`,
+`qwen3.8-27b` (served checkpoint
+`born2bewild/Qwen3.8-27B-W4A16-AutoRound-fast`, AutoRound-derived
+compressed-tensors W4A16), `GPU_MEMORY_UTILIZATION=0.90`,
 `MAX_MODEL_LEN=4096`, `ENFORCE_EAGER=True`, `MAX_TOKENS=512`,
 `TEMPERATURE=0.2`, `RRF_K=60`, `T_THRESHOLD_MS=160`.
 

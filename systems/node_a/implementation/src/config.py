@@ -23,11 +23,15 @@ EXTERNAL_ENDPOINT: str = "http://127.0.0.1:18020/v1"
 EXTERNAL_MODEL: str = "qwen3.8-27b"
 
 # Mode
-MOCK_MODE: bool = False  # True: skip vLLM/AWQ model loading, return simulated responses
+MOCK_MODE: bool = False  # True: skip vLLM model loading, return simulated responses
 
 # vLLM options
+# External backend (GENERATION_BACKEND="external") serves the AutoRound-derived
+# compressed-tensors W4A16 checkpoint: born2bewild/Qwen3.8-27B-W4A16-AutoRound-fast.
+# QUANTIZATION below applies only to the unused in-process vLLM branch and
+# matches that checkpoint's quant_method.
 GPU_MEMORY_UTILIZATION: float = 0.90
-QUANTIZATION: str = "awq"
+QUANTIZATION: str = "compressed-tensors"
 MAX_MODEL_LEN: int = 4096
 ENFORCE_EAGER: bool = True
 
