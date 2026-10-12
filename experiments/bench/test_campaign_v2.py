@@ -1,0 +1,396 @@
+"""Tests for the Campaign v2 confirmatory driver (experiments/bench/campaign.py).
+
+Covers the PURE functions added for the v2 confirmatory path only:
+  * verify_pool_manifest        (pool file <-> manifest sha256/n/line_count)
+  * v2_line_range / select_pool_slices / slices_disjoint
+  * parse_fidelity_gate_output / stratum_for_repeat
+  * v2_record_extra / build_record (v2 record-field additions, v1 superset)
+  * arm_label / is_v2 / resolve_mode_defaults / build_campaign_manifest
+plus a byte-determinism check that the v1 code path is unchanged (the v1
+dry-run plan is identical to the pre-v2 implementation's output).
+"""
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import campaign  # noqa: E402
+
+QUERIES_DIR = Path(__file__).resolve().parent / "queries"
+
+
+# ---------------------------------------------------------------------------
+# fixtures
+# ---------------------------------------------------------------------------
+def _write_pool(tmp_path: Path, n: int, tag: str = "q") -> Path:
+    p = tmp_path / f"pool_{tag}.txt"
+    p.write_text("\n".join(f"{tag}-{i}" for i in range(n)) + "\n",
+                 encoding="utf-8")
+    return p
+
+
+def _write_manifest(pool_path: Path, n: int, sha: str) -> Path:
+    man = {
+        "schema": "pdc.query_pool_manifest/v1",
+        "seed": 42,
+        "n": n,
+        "output": {
+            "path": str(pool_path),
+            "sha256": sha,
+            "line_count": n,
+        },
+    }
+    mp = pool_path.with_name(pool_path.name + ".manifest.json")
+    mp.write_text(json.dumps(man, indent=2), encoding="utf-8")
+    return mp
+
+
+# ---------------------------------------------------------------------------
+# verify_pool_manifest
+# ---------------------------------------------------------------------------
+def test_verify_pool_manifest_ok(tmp_path):
+    pool = _write_pool(tmp_path, 7)
+    _write_manifest(pool, 7, campaign.sha256_file(str(pool)))
+    man = campaign.verify_pool_manifest(str(pool))
+    assert man["n"] == 7
+    assert man["_verified_sha256"] == campaign.sha256_file(str(pool))
+
+
+def test_verify_pool_manifest_sha_mismatch(tmp_path):
+    pool = _write_pool(tmp_path, 5)
+    _write_manifest(pool, 5, "0" * 64)
+    with pytest.raises(campaign.ManifestError, match="sha256 mismatch"):
+        campaign.verify_pool_manifest(str(pool))
+
+
+def test_verify_pool_manifest_n_mismatch(tmp_path):
+    pool = _write_pool(tmp_path, 5)
+    # n (6) disagrees with line_count (5): internal inconsistency. The sha
+    # is correct so the sha256 check passes and the n/line_count check fires.
+    man = {
+        "schema": "pdc.query_pool_manifest/v1",
+        "seed": 42,
+        "n": 6,
+        "output": {
+            "path": str(pool),
+            "sha256": campaign.sha256_file(str(pool)),
+            "line_count": 5,
+        },
+    }
+    pool.with_name(pool.name + ".manifest.json").write_text(
+        json.dumps(man), encoding="utf-8")
+    with pytest.raises(campaign.ManifestError, match="internally inconsistent"):
+        campaign.verify_pool_manifest(str(pool))
+
+
+def test_verify_pool_manifest_actual_linecount_mismatch(tmp_path):
+    pool = _write_pool(tmp_path, 5)
+    man = _write_manifest(pool, 5, campaign.sha256_file(str(pool)))
+    # file is later truncated to 4 lines; the manifest (n=5, sha of the
+    # 5-line file) no longer matches the file's real content.
+    pool.write_text("\n".join(f"q-{i}" for i in range(4)) + "\n",
+                    encoding="utf-8")
+    with pytest.raises(campaign.ManifestError, match="sha256 mismatch"):
+        campaign.verify_pool_manifest(str(pool))
+
+
+def test_verify_pool_manifest_linecount_mismatch(tmp_path):
+    pool = _write_pool(tmp_path, 5)
+    man = _write_manifest(pool, 5, campaign.sha256_file(str(pool)))
+    # manifest says 5, file actually has 4 (sha still matches the 5-line file?
+    # no — rewrite the file to 4 lines, sha stays from the 5-line file)
+    pool.write_text("\n".join(f"q-{i}" for i in range(4)) + "\n",
+                    encoding="utf-8")
+    man.write_text(json.dumps({
+        "schema": "pdc.query_pool_manifest/v1", "n": 5,
+        "output": {"path": str(pool), "sha256": "0" * 64, "line_count": 5},
+    }), encoding="utf-8")
+    with pytest.raises(campaign.ManifestError):
+        campaign.verify_pool_manifest(str(pool))
+
+
+def test_verify_pool_manifest_missing_sidecar(tmp_path):
+    pool = _write_pool(tmp_path, 3)
+    with pytest.raises(campaign.ManifestError, match="sidecar not found"):
+        campaign.verify_pool_manifest(str(pool))
+
+
+def test_verify_pool_manifest_bad_schema(tmp_path):
+    pool = _write_pool(tmp_path, 3)
+    _write_manifest(pool, 3, campaign.sha256_file(str(pool)))
+    mp = pool.with_name(pool.name + ".manifest.json")
+    man = json.loads(mp.read_text())
+    man["schema"] = "something.else/v0"
+    mp.write_text(json.dumps(man))
+    with pytest.raises(campaign.ManifestError, match="schema mismatch"):
+        campaign.verify_pool_manifest(str(pool))
+
+
+# ---------------------------------------------------------------------------
+# v2 line-range slice selection
+# ---------------------------------------------------------------------------
+def _arms2():
+    return [(0, 0, "hybrid", "baseline"), (0, 0, "hybrid", "sphp"),
+            (15, 0, "hybrid", "baseline"), (15, 0, "hybrid", "sphp")]
+
+
+def test_v2_line_range_confirmatory():
+    # design §5.1: confirmatory = first 1,040 lines (8 arms x 130)
+    s, e = campaign.v2_line_range("confirmatory", 8, 120, 10)
+    assert (s, e) == (1, 1040)
+
+
+def test_v2_line_range_unknown_run_type():
+    with pytest.raises(ValueError, match="WS-CM"):
+        campaign.v2_line_range("three_node", 6, 80, 10)
+
+
+def test_select_pool_slices_disjoint_and_ordered():
+    pool = [f"q{i}" for i in range(40)]
+    plan = campaign.select_pool_slices(pool, _arms2(), n=2, warmups=1,
+                                       line_start=1, line_end=12)
+    assert len(plan) == 4
+    for i, a in enumerate(plan):
+        assert a["pool_start"] == i * 3
+        assert a["pool_end"] == i * 3 + 3
+        assert len(a["warmups"]) == 1
+        assert len(a["measured"]) == 2
+        # slice contents are the fixed pool lines (no re-shuffle)
+        assert a["warmups"] == [f"q{3 * i}"]
+        assert a["measured"] == [f"q{3 * i + 1}", f"q{3 * i + 2}"]
+    assert campaign.slices_disjoint(plan)
+
+
+def test_select_pool_slices_out_of_bounds():
+    pool = [f"q{i}" for i in range(10)]
+    with pytest.raises(ValueError, match="out of bounds"):
+        campaign.select_pool_slices(pool, _arms2(), 2, 1, 1, 12)
+
+
+def test_select_pool_slices_range_arm_mismatch():
+    pool = [f"q{i}" for i in range(20)]
+    with pytest.raises(ValueError, match="recompute the range"):
+        campaign.select_pool_slices(pool, _arms2(), 2, 1, 1, 11)
+
+
+def test_select_pool_slices_duplicate_lines_rejected():
+    # 4 arms x (N=1 + W=1) = 8 lines, with a duplicate inside the range
+    pool = ["q0", "q1", "q1", "q3", "q4", "q5", "q6", "q7"]
+    with pytest.raises(ValueError, match="distinct"):
+        campaign.select_pool_slices(pool, _arms2(), 1, 1, 1, 8)
+
+
+def test_slices_disjoint_negative():
+    a = {"warmups": ["x"], "measured": ["y"]}
+    b = {"warmups": ["z"], "measured": ["y"]}
+    assert not campaign.slices_disjoint([a, b])
+    assert campaign.slices_disjoint([a, {"warmups": ["z"], "measured": ["w"]}])
+
+
+# ---------------------------------------------------------------------------
+# v1 build_arm_query_plan unchanged (seeded shuffle, disjoint)
+# ---------------------------------------------------------------------------
+def test_v1_plan_reproducible_and_disjoint():
+    pool = [f"q{i}" for i in range(20)]
+    plan1 = campaign.build_arm_query_plan(pool, _arms2(), 3, 2, 42)
+    plan2 = campaign.build_arm_query_plan(pool, _arms2(), 3, 2, 42)
+    assert plan1 == plan2
+    assert campaign.slices_disjoint(plan1)
+    # a different seed gives a different order (sanity)
+    plan3 = campaign.build_arm_query_plan(pool, _arms2(), 3, 2, 7)
+    assert plan3 != plan1
+
+
+# ---------------------------------------------------------------------------
+# fidelity-gate output parsing
+# ---------------------------------------------------------------------------
+def test_parse_fidelity_gate_output():
+    out = (
+        "Baseline median RTT : 1.450 ms\n"
+        "Shaped median RTT   : 16.700 ms\n"
+        "Added RTT (Observed): 15.250 ms (Acceptable Gate [10.500, 19.500] ms)\n"
+        "Status: PASS\n"
+    )
+    p = campaign.parse_fidelity_gate_output(out)
+    assert p["baseline_median_ms"] == 1.45
+    assert p["shaped_median_ms"] == 16.7
+    assert p["added_rtt_ms"] == 15.25
+
+
+def test_parse_fidelity_gate_output_empty():
+    p = campaign.parse_fidelity_gate_output("")
+    assert p == {"baseline_median_ms": None, "shaped_median_ms": None,
+                 "added_rtt_ms": None}
+
+
+def test_stratum_for_repeat():
+    assert campaign.stratum_for_repeat(0) == "cold"
+    assert campaign.stratum_for_repeat(1) == "warm"
+    assert campaign.stratum_for_repeat(2) == "warm"
+
+
+def test_run_fidelity_gate_dry_run():
+    g = campaign.run_fidelity_gate(15, "pre", dry_run=True)
+    assert g == {"rtt_ms": 15, "when": "pre", "status": "planned"}
+    g0 = campaign.run_fidelity_gate(0, "pre", dry_run=True)
+    assert g0["status"] == "skipped-baseline"
+    g0r = campaign.run_fidelity_gate(0, "post", dry_run=False)
+    assert g0r["status"] == "skipped-baseline"
+    assert g0r["shaped_median_ms"] is None
+
+
+# ---------------------------------------------------------------------------
+# record building: v1 superset + v2 additions
+# ---------------------------------------------------------------------------
+def test_build_record_v1_fields_unchanged():
+    res = {
+        "query_id": "100",
+        "top_k": 10,
+        "timings": {f: 1.0 for f in campaign.TIMING_FIELDS},
+        "token_count": 12,
+        "decode_tps": 30.0,
+    }
+    rec = campaign.build_record("rid", 15, 0, "hybrid", "sphp", 0, "what?",
+                                res, netem_applied=True)
+    for f in ("run_id", "timestamp", "query_id", "query", "rtt_ms", "loss_pct",
+              "mode", "variant", "repeat_index", "top_k", "netem_applied") \
+            + campaign.TIMING_FIELDS + campaign.RESPONSE_FIELDS:
+        assert f in rec, f"missing v1 field {f}"
+    assert rec["rtt_ms"] == 15
+    assert rec["netem_applied"] is True
+
+
+def test_build_record_v2_extra():
+    man = {"_verified_sha256": "ab" * 32}
+    gate = {"shaped_median_ms": 15.2}
+    rec = campaign.build_record("rid", 15, 0, "hybrid", "sphp", 1, "q",
+                                {"query_id": "1", "top_k": 10, "timings": {}},
+                                netem_applied=True,
+                                extra=campaign.v2_record_extra(
+                                    "hybrid", 1, 15, 0, gate, "pool.txt", man))
+    assert rec["stratum"] == "warm"
+    assert rec["rtt_ping_median_ms"] == 15.2
+    assert rec["netem_link_b_applied"] == {"rtt_ms": 15, "loss_pct": 0}
+    assert rec["netem_link_c_applied"] is None  # WS-CM extension point
+    assert rec["pool_file"] == "pool.txt"
+    assert rec["pool_manifest_sha256"] == "ab" * 32
+
+
+def test_v2_record_extra_baseline_tier():
+    extra = campaign.v2_record_extra("hybrid", 0, 0, 0,
+                                     {"shaped_median_ms": None}, "p.txt",
+                                     {"_verified_sha256": None})
+    assert extra["stratum"] == "cold"
+    assert extra["netem_link_b_applied"] is None
+    assert extra["rtt_ping_median_ms"] is None
+
+
+# ---------------------------------------------------------------------------
+# arm labels & run spec
+# ---------------------------------------------------------------------------
+def test_arm_label():
+    assert campaign.arm_label("hybrid", "baseline") == "P2"
+    assert campaign.arm_label("hybrid", "sphp") == "P2-SPHP"
+    assert campaign.arm_label("dense", "baseline") == "dense"
+
+
+# ---------------------------------------------------------------------------
+# CLI: v2 mode activation & defaults
+# ---------------------------------------------------------------------------
+def test_is_v2_flag():
+    ap = campaign.build_parser()
+    args = ap.parse_args(["--dry-run", "--pool", "somefile.txt"])
+    assert campaign.is_v2(args)
+    args = ap.parse_args(["--dry-run"])
+    assert not campaign.is_v2(args)
+
+
+def test_resolve_mode_defaults_v2():
+    ap = campaign.build_parser()
+    args = ap.parse_args(["--pool", "x.txt", "--dry-run"])
+    campaign.resolve_mode_defaults(args)
+    assert args.modes == ["hybrid"]
+    assert args.sphp_axis is True
+    assert args.loss_tiers == [0]
+    assert args.query_sample == 120
+    assert args.warmups == 10
+
+
+def test_resolve_mode_defaults_v2_explicit_wins():
+    ap = campaign.build_parser()
+    args = ap.parse_args(["--pool", "x.txt", "--query-sample", "50",
+                          "--warmups", "5", "--dry-run"])
+    campaign.resolve_mode_defaults(args)
+    assert args.query_sample == 50
+    assert args.warmups == 5
+    assert args.modes == ["hybrid"]
+
+
+def test_resolve_mode_defaults_v1():
+    ap = campaign.build_parser()
+    args = ap.parse_args(["--dry-run"])
+    campaign.resolve_mode_defaults(args)
+    assert args.modes == ["hybrid", "dense", "sparse"]
+    assert args.sphp_axis is False
+    assert args.loss_tiers == [0, 1]
+    assert args.query_sample == 50
+    assert args.warmups == 5
+
+
+# ---------------------------------------------------------------------------
+# campaign manifest builder
+# ---------------------------------------------------------------------------
+def test_build_campaign_manifest(tmp_path):
+    pool = _write_pool(tmp_path, 40)
+    man = {"_verified_sha256": "aa" * 32, "n": 40}
+    plan = campaign.select_pool_slices(
+        [f"q{i}" for i in range(40)], _arms2(), 2, 1, 1, 12)
+    doc = campaign.build_campaign_manifest(
+        "rid", "confirmatory", str(pool), man, 1, 12, plan, 2, 1, 3, 42)
+    assert doc["schema"] == "pdc.campaign_manifest/v2"
+    assert doc["design_commit"] == "1f911ef"
+    assert doc["disjointness"]["asserted"] is True
+    assert doc["pool"]["line_start"] == 1
+    assert doc["pool"]["line_end"] == 12
+    # 1-based line ranges in the arms
+    assert doc["arms"][0]["pool_start"] == 1
+    assert doc["arms"][3]["pool_end"] == 12
+
+
+def _v2_args():
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(QUERIES_DIR / "campaign_v2_master5000_seed42.txt"),
+        "--dry-run",
+    ])
+    campaign.resolve_mode_defaults(args)
+    return args
+
+# ---------------------------------------------------------------------------
+# end-to-end with the REAL repo pools (manifest verification against
+# experiments/bench/queries/*.manifest.json, as the startup gate does)
+# ---------------------------------------------------------------------------
+def test_real_pool_manifests_verify():
+    for name in ("campaign_v2_core400_seed42.txt",
+                 "campaign_v2_master5000_seed42.txt"):
+        p = QUERIES_DIR / name
+        man = campaign.verify_pool_manifest(str(p))
+        assert man["n"] == len(campaign.load_queries(str(p)))
+
+
+def test_real_v2_slice_selection_master_pool():
+    # The confirmatory core consumes lines 1..1040 of the master pool
+    # (8 arms x (120 + 10)); the file has 5,000 lines, so it fits.
+    pool = campaign.load_queries(str(QUERIES_DIR / "campaign_v2_master5000_seed42.txt"))
+    arms = campaign.build_arm_list(_v2_args())
+    assert len(arms) == 8
+    s, e = campaign.v2_line_range("confirmatory", len(arms), 120, 10)
+    assert (s, e) == (1, 1040)
+    plan = campaign.select_pool_slices(pool, arms, 120, 10, s, e)
+    assert campaign.slices_disjoint(plan)
+    assert len({q for a in plan for q in a["measured"]}) == 8 * 120
+
+

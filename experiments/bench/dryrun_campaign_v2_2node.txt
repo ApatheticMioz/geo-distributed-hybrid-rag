@@ -1,0 +1,64 @@
+==============================================================================
+CAMPAIGN V2 — CONFIRMATORY 2-NODE MATRIX — DRY RUN
+==============================================================================
+  design doc   : docs/campaign_v2_design.md (commit 1f911ef)
+  run type     : confirmatory  (v2 confirmatory core (2-node))
+  gateway      : http://10.8.0.2:8000
+  pool file    : experiments/bench/queries/campaign_v2_master5000_seed42.txt  (5000 lines, sha256=9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa)
+  pool manifest: VERIFIED OK (sha256 + n=5000 + line_count all match)
+  pool lines   : 1..1040 of the pool file (design §5.1 line-range spec)
+  rtt tiers    : [0, 15, 40, 80] ms (full round-trip)
+  loss tiers   : [0] %
+  arms         : 8 = RTT x {P2, P2-SPHP} (mode=hybrid, sphp axis on)
+  per arm      : W=10 warmups + N=120 x R=3 = 370 requests (360 measured + 10 warmups)
+  per tier     : 2 arms -> 740 requests per RTT tier
+  TOTAL        : 2960 requests (2880 measured + 80 warmups)
+  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm (no cache flush exists; §5.2)
+  fidelity gate: pre- AND post- each shaped tier: validate.sh --link-b <rtt> (11-ping median, ±30% added-RTT window); FAIL aborts the campaign; baseline tier (rtt=0) has no gate
+  0-error gate : any n_errors > 0 at a tier close fails the campaign (design §6.4; 2-node core is 0, not ≤1%)
+  campaign manifest: would be written to experiments/bench/campaigns/campaign_v2_manifest.json before any request
+------------------------------------------------------------------------------
+  Execution plan (regimes sequentially; arms P2 -> P2-SPHP per tier):
+    regime rtt=  0ms loss=0%  [baseline: no netem, no gate]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 1..130  (10W + 120x3R = 370 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 131..260  (10W + 120x3R = 370 req)
+        tier subtotal: 740 requests (720 measured)
+    regime rtt= 15ms loss=0%  [shaped: apply --link-b 15 0; gate pre+post]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 261..390  (10W + 120x3R = 370 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 391..520  (10W + 120x3R = 370 req)
+        tier subtotal: 740 requests (720 measured)
+    regime rtt= 40ms loss=0%  [shaped: apply --link-b 40 0; gate pre+post]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 521..650  (10W + 120x3R = 370 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 651..780  (10W + 120x3R = 370 req)
+        tier subtotal: 740 requests (720 measured)
+    regime rtt= 80ms loss=0%  [shaped: apply --link-b 80 0; gate pre+post]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 781..910  (10W + 120x3R = 370 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 911..1040  (10W + 120x3R = 370 req)
+        tier subtotal: 740 requests (720 measured)
+------------------------------------------------------------------------------
+  manifest disjointness: 8 arm slices, pairwise intersection == 0 (asserted OK)
+------------------------------------------------------------------------------
+  DRY RUN complete. No network calls, no netem, no files were made.
+
+# ---------------------------------------------------------------------------
+# Evidence notes (appended by the driver author; not produced by --dry-run):
+#
+# * Pool used: experiments/bench/queries/campaign_v2_master5000_seed42.txt
+#   (5000 lines, seed 42). The design §5.1 names a single
+#   "campaign_v2_dev2250_seed42.txt" pool; the repo instead ships two
+#   generated pools (core400 / master5000, commits f463608/cb08e88). The
+#   master5000 pool satisfies the design's line-range spec: the confirmatory
+#   core consumes lines 1..1040 exactly as pre-registered, leaving
+#   lines 1041..2250 for the loss sweep / WS-CM / genuine-WAN runs.
+#   (The core400 pool cannot host the 1040-line confirmatory range.)
+#
+# * Deviation vs design §4.3 totals table: the table lists the confirmatory
+#   core as 28,800 measured / 28,880 total, but 8 arms x 120 N x 3 R =
+#   2,880 measured; 8 x 10 W = 80 warmups; 2,960 total. The table's
+#   "measured" figure is a 10x typo (the 28,880 "total" also embeds it;
+#   the correct total is 2,960). The warmup figure (80) is correct, and the
+#   driver computes all totals arithmetically from N, R, W, arms — never
+#   from the table — so this dry-run is the arithmetically correct plan.
+#   Runtime implication: ~2,960 full-generation requests x ~3 s ~= 2.5 h,
+#   not the ~24 h the table implies (one overnight batch suffices).
+# ---------------------------------------------------------------------------
