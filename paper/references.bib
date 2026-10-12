@@ -57,19 +57,20 @@
 
 @inproceedings{cormack2009rrf,
   title     = {Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods},
-  author    = {Cormack, Gordon V. and Clarke, Charles L. A. and Buettcher, Stefan},
+  author    = {Cormack, Gordon V. and Clarke, Charles L. A. and B{\"u}ttcher, Stefan},
   booktitle = {Proceedings of the 32nd International {ACM} {SIGIR} Conference on Research and Development in Information Retrieval},
   year      = {2009},
-  pages     = {135--142}
+  pages     = {135--142},
+  doi       = {10.1145/1571941.1572114}
 }
 
-@misc{chen2024bge,
-  title         = {{M3}-Embeddings: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings through Symmetric Distillation},
-  author        = {Chen, Jianlv and Xiao, Shitao and Zhang, Peitian and Luo, Kun and Lian, Defu and Jiang, Zhengbao},
-  year          = {2024},
-  eprint        = {2402.03216},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.CL}
+@inproceedings{chen2024bge,
+  title     = {{M3}-Embedding: Multi-Linguality, Multi-Functionality, Multi-Granularity Text Embeddings Through Self-Knowledge Distillation},
+  author    = {Chen, Jianlyu and Xiao, Shitao and Zhang, Peitian and Luo, Kun and Lian, Defu and Liu, Zheng},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL 2024},
+  year      = {2024},
+  pages     = {2318--2335},
+  doi       = {10.18653/v1/2024.findings-acl.137}
 }
 
 @inproceedings{khattab2020colbert,
@@ -103,9 +104,9 @@
 @inproceedings{leviathan2023speculative,
   title     = {Fast Inference from Transformers via Speculative Decoding},
   author    = {Leviathan, Yaniv and Kalman, Matan and Matias, Yossi},
-  booktitle = {International Conference on Machine Learning (ICML)},
+  booktitle = {Proceedings of the 40th International Conference on Machine Learning (ICML), {PMLR} 202},
   year      = {2023},
-  pages     = {2992--3003}
+  pages     = {19274--19286}
 }
 
 @misc{chen2023speculative,
@@ -126,7 +127,7 @@
 
 @misc{llama2024,
   title         = {The {Llama} 3 Herd of Models},
-  author        = {{Llama Team}},
+  author        = {Grattafiori, Aaron and Dubey, Abhimanyu and Jauhri, Abhinav and Pandey, Abhinav and Kadian, Abhishek and Al{-}Dahle, Ahmad and Letman, Aiesha and Mathur, Akhil and Schelten, Alan and Vaughan, Alex and Yang, Amy and Fan, Angela and Goyal, Anirudh and Hartshorn, Anthony and Yang, Aobo and Mitra, Archi and others},
   year          = {2024},
   eprint        = {2407.21783},
   archivePrefix = {arXiv},
@@ -138,11 +139,11 @@
 % 4. Geo-Distributed & Edge Systems
 % ----------------------------------------------------------------------------
 @inproceedings{kang2017neurosurgeon,
-  title     = {Neurosurgeon: Hybrid Cloud-Edge Inference Services},
-  author    = {Kang, Wei and others},
-  booktitle = {Proceedings of the 2017 {ACM} International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+  title     = {Neurosurgeon: Collaborative Intelligence Between the Cloud and Mobile Edge},
+  author    = {Kang, Yiping and Hauswald, Johann and Gao, Cao and Rovinski, Austin and Mudge, Trevor and Mars, Jason and Tang, Lingjia},
+  booktitle = {Proceedings of the Twenty-Second International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
   year      = {2017},
-  pages     = {433--446}
+  pages     = {615--629}
 }
 
 @inproceedings{teerapittayanon2017ddnn,
@@ -291,25 +292,25 @@
 
 @article{janus2025,
   title   = {Janus: Joint Prefill/Decode Disaggregation with {KV}-Cache-Aware Multi-Cloud Routing for Edge-Adjacent {LLM} Serving},
-  author  = {Aruna and Kaliraj and Sudha and Sureka and others},
+  author  = {Aruna, K. B. and Kaliraj, V. and Sudha, I. and Sureka, V.},
   journal = {EAI Endorsed Transactions on the Internet of Things},
   year    = {2025},
-  note    = {DOI 10.4108/eetiot.13349}
+  doi     = {10.4108/eetiot.13349}
 }
 
 @inproceedings{speculativerag2025,
   title     = {Speculative {RAG}: Enhancing Retrieval-Augmented Generation through Drafting},
-  author    = {Wang, Y. and others},
+  author    = {Wang, Zilong and Wang, Zifeng and Le, Long and Zheng, Huaixiu Steven and Mishra, Swaroop and Perot, Vincent and Zhang, Yuwei and Mattapalli, Anush and Taly, Ankur and Shang, Jingbo and Lee, Chen{-}Yu and Pfister, Tomas},
   booktitle = {International Conference on Learning Representations (ICLR)},
   year      = {2025}
 }
 
 @inproceedings{omnia2025,
-  title     = {Efficient {RAG} Serving through Speculative Scheduling},
-  author    = {Omnia and others},
-  booktitle = {Proceedings of the {ACM} International Conference for High Performance Computing, Networking, Storage and Analysis (HPDC)},
-  year      = {2025},
-  note      = {DOI 10.1145/3806645.3807814}
+  title     = {Omnia: Efficient {RAG} Serving through Speculative Scheduling},
+  author    = {Fu, Rongtian and Li, Shigang and Xu, Youxuan and Wu, Tong and Ma, Zhi and Shi, Jinliang},
+  booktitle = {Proceedings of the 35th International Symposium on High-Performance Parallel and Distributed Computing (HPDC '26)},
+  year      = {2026},
+  doi       = {10.1145/3806645.3807814}
 }
 
 % --- LR-2a: speculation families (prefetch / client / OS speculation) ---
@@ -353,24 +354,26 @@
 
 @inproceedings{zhong2024distserve,
   title     = {{DistServe}: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving},
-  author    = {Zhong, Yinmin and Liu, Zhen and Gu, Jinah and Jin, Xuan and Chen, Jian and Park, Minja and Liu, Yibo and Pang, Jiayuan and Sheng, Ying and Han, Song and others},
-  booktitle = {Proceedings of the 17th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
-  year      = {2024}
+  author    = {Zhong, Yinmin and Liu, Shengyu and Chen, Junda and Hu, Jianbo and Zhu, Yibo and Liu, Xuanzhe and Jin, Xin and Zhang, Hao},
+  booktitle = {18th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2024},
+  pages     = {193--210}
 }
 
 @inproceedings{li2023alpaserve,
   title     = {AlpaServe: Statistical Multiplexing with Model Parallelism for Deep Learning Serving},
   author    = {Li, Zhuohan and Zheng, Lianmin and Zhong, Yinmin and Liu, Vincent and Sheng, Ying and Jin, Xin and Huang, Yanping and Chen, Zhifeng and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
-  booktitle = {Proceedings of the 16th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  booktitle = {17th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
   year      = {2023},
   pages     = {663--679}
 }
 
 @inproceedings{gujarati2020clockwork,
   title     = {Serving {DNNs} like Clockwork: Performance Predictability from the Bottom Up},
-  author    = {Gujarati, Abhinav and Karimi, Reza and others},
-  booktitle = {Proceedings of the 13th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
-  year      = {2020}
+  author    = {Gujarati, Arpan and Karimi, Reza and Alzayat, Safya and Hao, Wei and Kaufmann, Antoine and Vigfusson, Ymir and Mace, Jonathan},
+  booktitle = {14th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2020},
+  pages     = {443--462}
 }
 
 @article{cao2000mg1kps,
@@ -453,4 +456,32 @@
   eprint        = {2506.00054},
   archivePrefix = {arXiv},
   primaryClass  = {cs.IR}
+}
+
+
+% ----------------------------------------------------------------------------
+% 9. Served checkpoint & quantization method (2026-09-30 issue #5 repair)
+%    The paper serves Qwen3.8-27B W4A16 (AutoRound, compressed-tensors INT4)
+%    under vLLM. The Qwen3 technical report (arXiv:2505.09388) covers the
+%    Qwen3 family (0.6B--235B, no 27B); Qwen3.8-27B is a separate ~Aug 2026
+%    release cited via its Hugging Face model card.
+% ----------------------------------------------------------------------------
+
+@misc{qwen38hf2026,
+  title        = {Qwen3.8-27B (Hugging Face model card)},
+  author       = {{Qwen Team}},
+  howpublished = {\url{https://huggingface.co/Qwen/Qwen3.8-27B}},
+  year         = {2026},
+  note         = {Qwen3.8-27B release; W4A16 AutoRound-quantized checkpoint \url{https://huggingface.co/born2bewild/Qwen3.8-27B-W4A16-AutoRound-fast}}
+}
+
+@inproceedings{autoround2024,
+  title     = {Optimize Weight Rounding via Signed Gradient Descent for the Quantization of {LLM}s},
+  author    = {Cheng, Wenhua and Zhang, Weiwei and Shen, Haihao and Cai, Yiyang and He, Xin and Lv, Kaokao and Liu, Yi},
+  booktitle = {Findings of the Association for Computational Linguistics: {EMNLP} 2024},
+  year      = {2024},
+  eprint    = {2309.05516},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  note      = {AutoRound / SignRound; INT4 (W4A16) via compressed-tensors}
 }
