@@ -91,25 +91,28 @@ gate.  Queries enter at Node C (the user-facing gateway).  The RQ2 dropout
 and genuine-WAN run types remain WS-CM extension points (see
 ``V2_RUN_SPECS``).
 
-The three-node stress run (``--run three-node-stress``) registers the CM-5
-per-leg-loss stress/loss run type: the 3-node per-leg float-loss cells
-{0.5, 1, 2}%% (B leg / C leg / both legs — the design's per-leg cell
-conventions) crossed with the 3-node (B, C) RTT cells (15, 15) / (40, 15) /
-(80, 15), i.e. 3 loss x 3 RTT x 2 arms (3node-P2, 3node-SPHP-from-C) = 12
-arms consuming pool lines 2041..2700 of the master pool (660 lines = 12 x
-55; disjoint from every other registered run type).  Each cell shapes BOTH
-legs independently via ``apply.sh --link-b <RTT_B> <LOSS_B> --link-c
+The three-node stress run (``--run three-node-stress``) implements the CM-5
+per-leg loss/RTT stress matrix (design §3.4, finalized in b239833): the 27
+per-leg float-loss cells — three loss tiers {0.5, 1, 2}%% x three
+leg-placements (B leg / C leg / both) x three (B, C) RTT cells
+(15,15)/(40,15)/(80,15), with the C leg frozen at 15 ms — crossed with the
+two 3-node arms {3node-P2, 3node-SPHP-from-C} = 54 arms, at N = 15 /
+W = 2 / R = 1 (design §4.3) -> 54 arms x (15 + 2) = 918 pool lines -> pool
+band 2921..3838 (design §5.1 final allocation; the band fits with ZERO
+slack and is disjoint from every other registered band).  Descriptive /
+BH secondary — no confirmatory claims.  Each cell shapes BOTH legs
+independently via ``apply.sh --link-b <RTT_B> <LOSS_B> --link-c
 <RTT_C> <LOSS_C>`` (float loss — the fractional-loss netem fix lands in the
 sibling commit; the driver depends on that script interface, it does not
 re-implement the qdisc logic).  A per-leg 11-ping ±30%% added-RTT fidelity
-gate (with the script's loss readback) runs pre- AND post- every cell; an
-unshaped (0, 0) sanity sample (a small pre-flight block from the unused pool
-tail, 0-error gate — abort on any error) confirms the link is healthy before
-loss is applied; the shaped cells REPORT their per-cell error rate WITHOUT
-aborting (loss-driven errors are the signal, not a campaign failure).  The
-summary carries the key deliverable: per-cell SPHP-from-C hit rate with a
-Wilson 95%% CI, imported from ``experiments/analysis/stats.py::wilson_ci``
-(not re-implemented).
+gate (with the script's loss readback) runs pre- AND post- every cell; the
+(0,0) unshaped sanity pre-flight (20 requests from the FREE pool tail
+3839.., 0-error gate — abort on any error) confirms the link is healthy
+before loss is applied; the shaped cells REPORT their per-cell error rate
+WITHOUT aborting (loss-driven errors are the signal, not a campaign
+failure).  The summary carries the key deliverable: per-cell SPHP-from-C
+hit rate with a Wilson 95%% CI, imported from
+``experiments/analysis/stats.py::wilson_ci`` (not re-implemented).
 
 The loss-sweep run (``--run loss-sweep``) implements the amended design's
 H4 exploratory sweep (design §3.1, amended 2026-10-14): the 2-node / link-B
@@ -221,10 +224,9 @@ SPHP_FIELDS = ("sphp_hit", "sphp_overlap", "wasted_prefill_ms")
 #   "loss-sweep":    lines 2041..2700 (12 arms x (50+5) = 660)   [implemented]
 #                      + per-RTT-tier loss-0 sanity samples from free tail 3839..
 #   "three-node":    lines 1371..1910 (6 arms x (80+10) = 540)   [implemented]
-#   "three-node-stress": STALE — pre-b239833 band 2041..3390; re-key to the
-#                      FINAL §5.1 band 2921..3838 (54 arms x (15+2) = 918) in
-#                      the CM-5 follow-up (the amended loss-sweep now owns
-#                      2041..2700, so this overlap is a known pre-rekey gap).
+#   "three-node-stress": lines 2921..3838 (54 arms x (15+2) = 918)    [implemented]
+#                      + (0,0) unshaped sanity pre-flight from free tail 3839..
+#                      (the CM-5 band fits with zero slack — b239833 §5.1)
 #   "dropout":       {"pool_line_start": 1911},  # 2 arms x (60+5)  = 130  [WS-CM, not yet registered]
 #   "genuine_wan":   {"pool_line_start": 2041},  # 2 arms x (100+5) = 210  [WS-CM, not yet registered]
 #
@@ -296,26 +298,28 @@ V2_RUN_SPECS: Dict[str, Dict[str, Any]] = {
         "variants": ["baseline", "sphp"],
         "n": 80, "warmups": 10, "repeats": 3,
     },
-    # CM-5 three-node per-leg loss/RTT stress matrix (amended design
-    # §3.2/§4.3).  The three per-leg float-loss tiers (0.5, 1, 2)%%
+    # CM-5 three-node per-leg loss/RTT stress matrix (final design §3.4,
+    # finalized in b239833; descriptive / BH secondary — no confirmatory
+    # claims).  The three per-leg float-loss tiers (0.5, 1, 2)%%
     # (B leg / C leg / both legs — the design's per-leg cell conventions)
     # crossed with the 3-node (B, C) RTT cells (15,15)/(40,15)/(80,15):
-    # 3 tiers x 3 leg-placements x 3 RTT = 27 (B, C, lossB, lossC) cells
+    # 3 RTT x 3 tiers x 3 leg-placements = 27 (B, C, lossB, lossC) cells
     # x 2 arms (3node-P2, 3node-SPHP-from-C) = 54 arms.  The C leg stays
-    # at 15 ms (the user-facing sparse leg, design §3.2); the B leg carries
-    # the swept RTT.  N = 20/arm, W = 5, R = 3 (design §4.3 exploratory
-    # N) — 54 arms x (20+5) = 1,350 pool lines -> 2041..3390 (disjoint
-    # from confirmatory 1..1040, loss-sweep 1041..1370, three-node
-    # 1371..1910, dropout 1911..2040, and the unallocated 2041..2250 design
-    # band).  The (0,0) cell is a small 0-error SANITY pre-flight sample
-    # from the unused pool tail (3391..); any error aborts (the unshaped
-    # link must be healthy before loss is applied).  The measured cells
-    # REPORT their per-cell error rate WITHOUT aborting (loss-driven
-    # errors are the signal, not a campaign failure).  The summary carries
-    # the key deliverable: per-cell SPHP-from-C hit rate with a Wilson 95%
-    # CI (imported from stats.py, not reimplemented).
+    # at 15 ms (the user-facing sparse leg, design §3.2/§3.4); the B leg
+    # carries the swept RTT.  N = 15/arm, W = 2, R = 1 (design §4.3)
+    # — 54 arms x (15+2) = 54 x 17 = 918 pool lines -> 2921..3838 (the
+    # FINAL §5.1 allocation; the band fits with ZERO slack and is
+    # disjoint from confirmatory 1..1040, the reserved 1041..1370 gap,
+    # three-node 1371..1910, dropout 1911..2040, loss-sweep 2041..2700,
+    # and CM-4 genuine-WAN 2701..2920).  The (0,0) unshaped SANITY
+    # pre-flight (20 requests from the FREE pool tail 3839..) ABORTS on
+    # any error (the link must be healthy before loss is applied).  The
+    # measured cells REPORT their per-cell error rate WITHOUT aborting
+    # (loss-driven errors are the signal, not a campaign failure).  The
+    # summary carries the key deliverable: per-cell SPHP-from-C hit rate
+    # with a Wilson 95% CI (imported from stats.py, not reimplemented).
     "three-node-stress": {
-        "pool_line_start": 2041,
+        "pool_line_start": 2921,
         "label": "CM-5 3-node per-leg loss/RTT stress matrix",
         # Queries enter at the Node C gateway (user-facing tier; design §2.2).
         "gateway_ip": "10.8.0.3",
@@ -354,12 +358,14 @@ V2_RUN_SPECS: Dict[str, Dict[str, Any]] = {
             (80, 15, 2.0, 2.0),
         ],
         "variants": ["baseline", "sphp"],
-        "n": 20, "warmups": 5, "repeats": 3,
-        # The (0,0) unshaped sanity gate: a small 0-error pre-flight sample
-        # from the UNUSED pool tail (never touches the measured 2041..3390
-        # range; the master pool has 5,000 lines).  Any error aborts.
-        "sanity_n": 10, "sanity_warmups": 0, "sanity_repeats": 1,
-        "sanity_pool_start": 3391,
+        "n": 15, "warmups": 2, "repeats": 1,
+        # The (0,0) unshaped sanity gate: a 20-request 0-error pre-flight
+        # sample from the FREE pool tail (3839.., the design §5.1 spare —
+        # the same free-tail pattern the loss-sweep sanity pre-flight uses;
+        # never touches the measured 2921..3838 band; the master pool has
+        # 5,000 lines).  Any error aborts before loss is applied.
+        "sanity_n": 20, "sanity_warmups": 0, "sanity_repeats": 1,
+        "sanity_pool_start": 3839,
     },
 }
 
@@ -2545,10 +2551,10 @@ def run_campaign_v3node(
 
 
 # ---------------------------------------------------------------------------
-# v2: three-node-stress run (CM-5 per-leg loss/RTT stress matrix, amended
-# design §3.2/§4.3).  Distinct from the plain `three-node` matrix: each
-# (B, C, lossB, lossC) cell is shaped with float per-leg loss, and the
-# summary carries the SPHP-from-C hit rate with a Wilson 95% CI.
+# v2: three-node-stress run (CM-5 per-leg loss/RTT stress matrix, final
+# design §3.4, finalized in b239833).  Distinct from the plain `three-node`
+# matrix: each (B, C, lossB, lossC) cell is shaped with float per-leg loss,
+# and the summary carries the SPHP-from-C hit rate with a Wilson 95% CI.
 # ---------------------------------------------------------------------------
 def _loss_gate_from_output(gate_out: str) -> Optional[str]:
     """Parse the sibling-commit ``validate.sh`` loss-readback gate outcome
@@ -2573,9 +2579,9 @@ def build_stress_arm_list(spec: Dict[str, Any]) -> List[Tuple[int, int, float, f
     """Return the ordered three-node-stress arm list:
     ``(rtt_b, rtt_c, loss_b, loss_c, variant)``.
 
-    Order is cell-major (the spec's 12 (B, C, lossB, lossC) cells), then the
-    two placement arms (baseline -> sphp).  12 cells x 2 arms = 24 arms.
-    The C leg is held at 15 ms (the user-facing sparse leg, design §3.2);
+    Order is cell-major (the spec's 27 (B, C, lossB, lossC) cells), then the
+    two placement arms (baseline -> sphp).  27 cells x 2 arms = 54 arms.
+    The C leg is held at 15 ms (the user-facing sparse leg, design §3.4);
     the B leg carries the swept RTT; each loss value is a float percent
     (0.5/1/2) applied to its leg independently (B / C / both).
     """
@@ -2771,6 +2777,8 @@ def print_plan_v3node_stress(
     n_measured = n_arms * n_measured_per_arm
     n_warmups = n_arms * n_warmups_per_arm
     n_total = n_arms * n_total_per_arm
+    n_sanity = spec["sanity_n"] * spec["sanity_repeats"]
+    n_total_all = n_total + n_sanity
     sets = [set(a["warmups"]) | set(a["measured"]) for a in arm_plan]
     disjoint = all(not (sets[i] & sets[j])
                    for i in range(len(sets))
@@ -2799,8 +2807,15 @@ def print_plan_v3node_stress(
     print(f"  per arm      : W={args.warmups} warmups + N={args.query_sample} "
           f"x R={args.repeats} = {n_total_per_arm} requests "
           f"({n_measured_per_arm} measured + {n_warmups_per_arm} warmups)")
-    print(f"  TOTAL        : {n_total} requests "
-          f"({n_measured} measured + {n_warmups} warmups)")
+    print(f"  sanity       : (0,0) unshaped pre-flight ({n_sanity} requests "
+          f"from the free pool tail {spec['sanity_pool_start']}..; 0-error "
+          f"gate — any error ABORTS before loss is applied)")
+    print(f"  error gate   : shaped cells REPORT per-cell error rate WITHOUT "
+          f"aborting (loss-driven errors are the signal, not a campaign "
+          f"failure)")
+    print(f"  TOTAL        : {n_total} band requests "
+          f"({n_measured} measured + {n_warmups} warmups) + {n_sanity} sanity "
+          f"= {n_total_all} total")
     print(f"  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm "
           f"(no cache flush exists; §5.2)")
     print(f"  fidelity gate: pre- AND post- each cell, PER LEG: "
@@ -2808,13 +2823,6 @@ def print_plan_v3node_stress(
           f"<loss_c> (11-ping median, ±30% added-RTT window per leg, PLUS "
           f"the sibling-commit fractional-loss readback); FAIL aborts the "
           f"campaign")
-    print(f"  sanity       : a (0,0) unshaped pre-flight sample (N="
-          f"{spec['sanity_n']}) from unused pool tail "
-          f"{spec['sanity_pool_start']}..; 0-error gate — any error ABORTS "
-          f"(link must be healthy before loss is applied)")
-    print(f"  error gate   : shaped cells REPORT per-cell error rate WITHOUT "
-          f"aborting (loss-driven errors are the signal, not a campaign "
-          f"failure; design §6.4 ≤1% is a warning level only here)")
     print(f"  key deliverable: per-cell SPHP-from-C hit rate with a Wilson "
           f"95% CI (imported from experiments/analysis/stats.py::wilson_ci, "
           f"not reimplemented) in the summary")
@@ -2861,11 +2869,12 @@ def run_campaign_v3node_stress(
     line_start: int,
     line_end: int,
 ) -> None:
-    """Execute the CM-5 three-node-stress matrix (amended design §3.2/§4.3).
+    """Execute the CM-5 three-node-stress matrix (final design §3.4/§4.3,
+    finalized in b239833).
 
-    Pre-flight: a (0,0) unshaped sanity sample (small N from the unused pool
-    tail) with a 0-error gate — any error aborts (the link must be healthy
-    before loss is applied).  Then, per (B, C, lossB, lossC) cell: a
+    Pre-flight: a (0,0) unshaped sanity sample (20 requests from the free
+    pool tail) with a 0-error gate — any error aborts (the link must be
+    healthy before loss is applied).  Then, per (B, C, lossB, lossC) cell: a
     per-leg pre-cell fidelity gate (``validate.sh --link-b <rtt> <loss>`` +
     ``--link-c <rtt> <loss>``, each with the sibling-commit fractional-loss
     readback — a FAIL aborts), then ``apply.sh --link-b <rtt_b> <loss_b>
@@ -2990,10 +2999,9 @@ def run_campaign_v3node_stress(
         sanity_pool_start = spec["sanity_pool_start"]
         sanity_n = spec["sanity_n"]
         sanity_reps = spec["sanity_repeats"]
-        # The sanity sample is drawn from the unused pool tail (a small
-        # disjoint block); use the first arm's warmup slot is NOT used
-        # here — we read directly from the pool file's unused tail so it
-        # never touches the measured 2041..2700 range.
+        # The sanity sample is drawn from the free pool tail (a small
+        # disjoint block, same pattern as the loss-sweep sanity pre-flight)
+        # — it never touches the measured 2921..3838 band.
         sanity_queries = all_queries[sanity_pool_start - 1:
                                      sanity_pool_start - 1 + sanity_n]
         sanity_ok = 0
@@ -3855,12 +3863,10 @@ def main() -> None:
         return
 
     if is_v2(args) and args.run == "three-node-stress":
-        # CM-5 3-node per-leg loss/RTT stress matrix (amended design
-        # §3.2/§4.3).  NOTE: this run type is at its STALE pre-b239833
-        # band (2041..3390); the CM-5 re-key to the FINAL §5.1 band
-        # 2921..3838 is a separate follow-up.  The loss-sweep now owns
-        # 2041..2700, so the cross-run disjointness assert (which would
-        # flag the pending stress re-key) is deferred to that follow-up.
+        # CM-5 3-node per-leg loss/RTT stress matrix (final design §3.4,
+        # finalized in b239833): 27 (B, C, lossB, lossC) cells x 2 arms =
+        # 54 arms, N=15 / W=2 / R=1 -> 54 x 17 = 918 lines -> pool band
+        # 2921..3838 (zero slack); (0,0) sanity from free tail 3839..
         spec = V2_RUN_SPECS["three-node-stress"]
         arms = build_stress_arm_list(spec)
         n_arms = len(arms)
