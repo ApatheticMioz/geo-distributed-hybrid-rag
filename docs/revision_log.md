@@ -42,9 +42,9 @@ testbed-disclosure section needs to disclose.
 
 | # | misfit (short) | Verdict |
 |---|---|---|
-| RP-1 | SPHP miss penalty is a per-state *constant*; realized penalty is RTT-rising | **proposed** |
-| RP-2 | SPHP hit path omits a **cold-only** KV-prefix credit (state-dependent) | **proposed** |
-| RP-3 | WAN term is analytic `rtt/2 + serialization`; measured RTT slope differs from 0.5 | **proposed** |
+| RP-1 | SPHP miss penalty is a per-state *constant*; realized penalty is RTT-rising | **deferred** (see RB validation below) |
+| RP-2 | SPHP hit path omits a **cold-only** KV-prefix credit (state-dependent) | **adopted (analysis-level)** (see RB validation below) |
+| RP-3 | WAN term is analytic `rtt/2 + serialization`; measured RTT slope differs from 0.5 | **rejected** (see RB validation below) |
 
 ---
 
@@ -174,6 +174,90 @@ testbed-disclosure section needs to disclose.
 
 ---
 
-*Verdict column is `proposed` for all three entries. Adoption (and any
+---
+
+## RB validation (2026-10-14)
+
+Like-for-like A/B of all three proposals, run 2026-10-14:
+`experiments/analysis/revision_board_eval_20261014.py` (deterministic, no
+stochastic steps; seed 42 recorded for protocol consistency) with results in
+`experiments/analysis/results/revision_board_eval_20261014.{json,md}`. Protocol:
+the paper's C3 validation protocol — leave-one-RTT-tier-out, regime
+(tier-mean) level, BW = 100 Mbps, top-k = 10 — with *identical* data and
+*identical* baseline-term fit recipe in both arms of every A/B, on both the
+old (`campaign_20260918T130756Z`) and the new (`v2_confirm_2node_20261013`)
+surfaces. The current arm reproduces the stored re-baseline LOTO values
+bit-for-bit, so the like-for-like comparison is exact.
+
+**Verdict rules (as encoded in the script):** win on a data set = targeted
+LOTO regime MAPE strictly lower in every targeted regime (RP-1: SPHP
+cold+warm; RP-2: SPHP cold only — warm `C_s = 0` by construction; RP-3: P2
+cold+warm with SPHP as guard) + all guard regimes degrade ≤ 0.25 pp + the
+targeted residual pattern removed. Adopted = wins on **both** data sets
+(`adopted (analysis-level)`); rejected = wins on neither; deferred = wins on
+exactly one, with the stated condition a future data set must meet.
+
+**Per-surface LOTO regime MAPE (R²) — current vs proposed:**
+
+| surface | proposal | regime | current | proposed | Δ pp |
+|---|---|---|---|---|---|
+| 09-18 | RP-1 | cold P2-SPHP | 10.55 (−62.16) | 3.88 (−8.30) | −6.67 |
+| 09-18 | RP-1 | warm P2-SPHP | 5.81 (−0.20) | 4.72 (0.35) | −1.09 |
+| 09-18 | RP-2 | cold P2-SPHP | 10.55 (−62.16) | **1.72** (−1.64) | **−8.83** |
+| 09-18 | RP-2 | warm P2-SPHP (guard) | 5.81 | 5.81 | 0.00 |
+| 09-18 | RP-3 | cold P2 | 1.28 | 1.60 | +0.32 |
+| 09-18 | RP-3 | warm P2 | 2.76 | 1.89 | −0.87 |
+| 10-13 | RP-1 | cold P2-SPHP | 7.83 (−5.58) | 3.34 (−0.32) | −4.49 |
+| 10-13 | RP-1 | warm P2-SPHP | 4.37 (0.19) | 5.98 (−0.21) | **+1.61 (degrades)** |
+| 10-13 | RP-2 | cold P2-SPHP | 7.83 (−5.58) | **6.42** (−2.88) | **−1.41** |
+| 10-13 | RP-2 | warm P2-SPHP (guard) | 4.37 | 4.37 | 0.00 |
+| 10-13 | RP-3 | cold P2 | 2.15 | 2.72 | +0.57 |
+| 10-13 | RP-3 | warm P2 | 4.13 | 2.59 | −1.54 |
+
+(RP-1/RP-2 P2 guards were 0.00 pp on every surface; for RP-3 the SPHP cold
+guard met the 0.25 pp bound on both surfaces but the 09-18 *warm* SPHP guard
+degraded 5.81 → 6.55 (+0.74 pp) — a second independent reason the win check
+fails. Full per-tier tables: results MD/JSON.)
+
+- **RP-2 — adopted (analysis-level).** Wins on both surfaces: cold SPHP
+  LOTO **10.55 → 1.72** (09-18) and **7.83 → 6.42** (10-13); every guard
+  regime 0.00 pp (warm unchanged by construction). Speedup-gap check: cold
+  measured-vs-modeled gap 9.37 → 1.71 pp (09-18) and 5.43 → 2.01 pp (10-13);
+  warm gap unchanged to ≤ 1e-9 pp. On the 10-13 surface the adopted form
+  shifts the SPHP advantage from 18.6–19.7% to 21.8–23.1% (cold) and the
+  **argmin policy's pooled error from 9.72% to 5.11% (−4.61 pp) with zero
+  tier flips** (P2-SPHP stays the argmin at all four RTT tiers, cold and
+  warm; warm error 5.57% → 5.57%, Δ 0.0 pp, no flips).
+- **RP-1 — deferred.** Wins on 09-18 (SPHP cold 10.55 → 3.88, warm 5.81 →
+  4.72; miss-branch MAPE 75.8% → 3.8% cold, 14.8% → 13.3% warm; P2 guards
+  0.00) but **fails on 10-13**: the 10-13 warm realized miss penalty is
+  *flat* in RTT (fit R² = 0.088; per-tier {0: 263.3, 15: 327.9, 40: 288.8,
+  80: 304.3} ms), so a linear-in-RTT form *degrades* the warm regime
+  (4.37 → 5.98) and leaves the warm miss-branch pattern unremoved (21.9% →
+  25.8%). Deferral condition: a future data set must show a **strongly
+  rising WARM realized miss penalty (fit R² ≳ 0.6, as the 09-18 fit at
+  R² = 0.64 does)** *and* an improvement in the warm miss-branch MAPE and
+  its RTT-residual slope **while holding the cold gain** — re-running this
+  identical A/B and winning on that surface per the rules above.
+- **RP-3 — rejected.** Wins on neither surface: it **degrades cold P2 LOTO on
+  both** (1.28 → 1.60 on 09-18; 2.15 → 2.72 on 10-13) while the per-record
+  RTT-residual pattern it targets does not improve in cold (slope 0.0632 →
+  0.0673 pp/ms on 09-18; 0.0506 → 0.0771 on 10-13). The fitted WAN slope is
+  not supported by the P2 data: measured cold P2 tier-mean RTT slopes are
+  −0.93 (09-18) and −0.13 (10-13) vs the analytic 0.5 — the retrieval
+  barrier, not the network, dominates cold, so a free cold WAN slope
+  overfits. Warm shows only marginal movement. Rejected on both surfaces.
+
+**Explicit note:** this validation is *analysis-level only*. **The
+production cost model and the paper are unchanged by it** — "adopted
+(analysis-level)" approves the RP-2 form for the analysis surface
+(`analysis/cost_model.py` fit/evaluation code); the **adoption-port of RP-2
+into the production model (and any re-generation of paper figures / the C3
+numbers) is a separate, explicit subsequent slice.**
+
+---
+
+*Verdict column now reflects the RB validation (2026-10-14): RP-1 deferred,
+RP-2 adopted (analysis-level), RP-3 rejected. Adoption-port (and any
 re-generation of paper figures / the C3 numbers) is a subsequent, separate
 decision and is out of scope for this slice.*
