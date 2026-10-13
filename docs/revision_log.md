@@ -43,7 +43,7 @@ testbed-disclosure section needs to disclose.
 | # | misfit (short) | Verdict |
 |---|---|---|
 | RP-1 | SPHP miss penalty is a per-state *constant*; realized penalty is RTT-rising | **deferred** (see RB validation below) |
-| RP-2 | SPHP hit path omits a **cold-only** KV-prefix credit (state-dependent) | **adopted (analysis-level)** (see RB validation below) |
+| RP-2 | SPHP hit path omits a **cold-only** KV-prefix credit (state-dependent) | **adopted (production)** — ported into `analysis/cost_model.py` (see production-port re-validation below) |
 | RP-3 | WAN term is analytic `rtt/2 + serialization`; measured RTT slope differs from 0.5 | **rejected** (see RB validation below) |
 
 ---
@@ -248,19 +248,84 @@ fails. Full per-tier tables: results MD/JSON.)
   barrier, not the network, dominates cold, so a free cold WAN slope
   overfits. Warm shows only marginal movement. Rejected on both surfaces.
 
-**Explicit note:** this validation is *analysis-level only*. **The
-production cost model and the paper are unchanged by it** — "adopted
-(analysis-level)" approves the RP-2 form for the analysis surface
-(`analysis/cost_model.py` fit/evaluation code); the **adoption-port of RP-2
-into the production model (and any re-generation of paper figures / the C3
-numbers) is a separate, explicit subsequent slice.**
+**Explicit note (as of that slice):** that validation is *analysis-level only*
+— at the time it was written the production cost model and the paper were
+unchanged; it approved the RP-2 form for the analysis surface
+(`analysis/cost_model.py` fit/evaluation code). The adoption-port of RP-2 into
+the production model is recorded in the next section.
 
 ---
 
-*Verdict column now reflects the RB validation (2026-10-14): RP-1 deferred,
-RP-2 adopted (analysis-level), RP-3 rejected. Adoption-port (and any
-re-generation of paper figures / the C3 numbers) is a subsequent, separate
-decision and is out of scope for this slice.*
+## RP-2 production-port re-validation (2026-10-14)
+
+**Verdict: adopted (production).** The adopted cold-only SPHP hit credit has
+been ported into the production analytical cost model
+(`analysis/cost_model.py`: `PlacementCostModel` + `fit_placement_model`), and
+re-validated like-for-like against the analysis-level numbers above.
+
+**What changed in the production model (RP-2 adopted form):**
+- `PlacementCostModel` gains a per-state `sphp_hit_credit_ms` term, subtracted
+  from the SPHP **hit** branch only:
+  `TTFT_hit = max(t_fused_arrival, t_prefill_finish) − C_s`.  The **miss**
+  branch and the **P2** topology are untouched, so the credit cannot flip the
+  argmin in P2's favour and the P2 guard is preserved.
+- `fit_placement_model(..., use_sphp_hit_credit=...)` is the explicit switch:
+  the **default `False`** reproduces the legacy constant form bit-for-bit
+  (`C_s = 0.0` for every state — the paper can still reproduce both forms);
+  `True` fits the adopted form.
+- The credit is fitted **per state** with the same deterministic grid
+  (0 … 2000 ms, 0.5 ms step) and the same measured-vs-modeled tier-speedup
+  recipe as the RB harness: **`C_c > 0` for cold, `C_w = 0.0` for warm** by
+  construction (the KV prefix is already resident in warm — nothing extra to
+  save).  Defaults from the RB fits: **`C_c = 324 ms` (09-18 surface) /
+  64 ms (10-13 surface)**, `C_w = 0`.
+
+**Like-for-like re-validation** — `analysis/rp2_production_port_20261014.py`
+(deterministic), results in
+`analysis/results/rp2_production_port_20261014.{json,md}`.  For both surfaces
+it scores the ported production model (the actual `predict_ttft_p2_sphp`) by
+the paper's C3 protocol (LOTO regime MAPE, BW=100, top-k=10) and by the
+argmin-placement policy on the new surface, and cross-checks **three
+independent ways**: (i) the production model, (ii) the RB harness's own
+`loto_evaluate` reimplementation, and (iii) the *stored* RB output
+(`revision_board_eval_20261014.json`, the authoritative analysis-level
+numbers).  **All 42 checks pass, bit-for-bit** (Δ = 0.00 pp everywhere).
+
+| surface | state | LOTO MAPE% (legacy) | LOTO MAPE% (adopted) | Δ pp | C_s (ms) |
+|---|---|---|---|---|---|
+| 09-18 | cold P2-SPHP | 10.55 | **1.72** | **−8.83** | 324.0 |
+| 09-18 | warm P2-SPHP (guard) | 5.81 | 5.81 | 0.00 | 0.0 |
+| 10-13 | cold P2-SPHP | 7.83 | **6.42** | **−1.41** | 64.0 |
+| 10-13 | warm P2-SPHP (guard) | 4.37 | 4.37 | 0.00 | 0.0 |
+
+P2 (guard) LOTO MAPE is unchanged in every state/surface (1.28/2.76 on
+09-18; 2.15/4.13 on 10-13) — the credit never touches the P2 topology.
+
+**argmin placement policy (10-13 surface, hydration 5.0 ms class default, the
+published-policy reconstruction constant):** the adopted form lowers the
+pooled predicted-vs-realized error of the argmin-selected variant from
+**9.72% → 5.11% (−4.61 pp) in cold with zero argmin flips** (P2-SPHP remains
+the argmin at all four RTT tiers); warm is untouched (**5.57% → 5.57%**,
+Δ 0.0 pp, no flips).  This matches the analysis-level RB result exactly.
+
+**Commit.** The port is landed in this slice's commit
+`feat(costmodel): adopt RP-2 cold-state hit credit in production model (RB
+2026-10-14)` (files: `analysis/cost_model.py`,
+`analysis/rp2_production_port_20261014.py`, `analysis/test_rp2_hit_credit.py`).
+Because a commit cannot record its own hash inside itself, this row is written
+by that same commit; its short SHA is resolvable from `git log` by the commit
+subject above. **Not pushed.** The paper (§VI SPHP equation, the C3 claim,
+Fig. 6 / Fig. 8, and the "conservative lower bound on the cold-start benefit"
+disclosure) is re-generated in a *separate* follow-on slice, per the RB
+scope note; this slice changes the production model and its validation only.
+
+---
+
+*Verdict column now reflects the RB validation (2026-10-14) **and** the
+production-port re-validation (2026-10-14): RP-1 deferred, **RP-2 adopted
+(production)** (ported into `analysis/cost_model.py` with an explicit
+legacy/adopted switch; the paper's C3 numbers / figures are regenerated in a
+follow-on slice), RP-3 rejected.*
 ---
 
 ## Plan-vs-design reconciliation (2026-10-14, consolidated)

@@ -120,6 +120,7 @@ class PlacementCostModel:
         query_bytes: int = 64,
         sphp_hit_rate: float = 0.60,
         t_sphp_miss_penalty_ms: float = 5.0,
+        sphp_hit_credit_ms: float = 0.0,
     ):
         self.t_sparse_base_ms = t_sparse_base_ms
         self.t_dense_base_ms = t_dense_base_ms
@@ -132,6 +133,16 @@ class PlacementCostModel:
         self.query_bytes = query_bytes
         self.sphp_hit_rate = sphp_hit_rate
         self.t_sphp_miss_penalty_ms = t_sphp_miss_penalty_ms
+        # RP-2 (docs/revision_log.md, adopted 2026-10-14): the SPHP hit path
+        # reuses the provisional KV prefix, so a COLD hit saves re-prefill.
+        # This is that state-dependent hit credit C_s, subtracted from the
+        # hit-branch TTFT only (never the miss branch).  It is 0.0 for the
+        # warm state by construction (the prefix is already resident, so
+        # there is nothing extra to save) and for the legacy constant form
+        # (the pre-RP-2 closed form).  It is set by fit_placement_model()
+        # when use_sphp_hit_credit=True (fitted per state, C_c>0 cold); the
+        # constructor default 0.0 preserves the old form bit-for-bit.
+        self.sphp_hit_credit_ms = sphp_hit_credit_ms
 
     def wan_delay_ms(self, payload_bytes: int, rtt_ms: float, bw_mbps: float) -> float:
         """One-way WAN transfer latency = RTT/2 + serialization delay."""
@@ -176,6 +187,14 @@ class PlacementCostModel:
         5. On hit (measured probability sphp_hit_rate) the prefill performed
            during the barrier is saved; on miss the wasted provisional prefill
            (measured mean t_sphp_miss_penalty_ms) is paid on top of P2.
+
+        RP-2 state-dependent hit credit (docs/revision_log.md, adopted
+        2026-10-14): a COLD hit reuses the provisional KV prefix, so the
+        first token lands earlier by sphp_hit_credit_ms (C_c, fitted per
+        state in fit_placement_model; 0.0 for the legacy form).  Applied to
+        the HIT branch only -- the miss branch is untouched, and for the
+        warm state sphp_hit_credit_ms = 0.0 by construction, so the warm
+        prediction and the legacy constant form are reproduced bit-for-bit.
         """
         hint_payload = self.query_bytes + (5 * self.doc_id_bytes)
         fused_payload = self.query_bytes + (top_k * self.doc_id_bytes)
@@ -188,8 +207,10 @@ class PlacementCostModel:
         t_prefill_finish = t_prefill_start + self.t_prefill_base_ms
         t_fused_arrival = self.t_dense_base_ms + self.t_fusion_base_ms + wan_fused
 
-        # Hit case: TTFT is max of fused-context reconciliation vs prefill finish
-        ttft_hit = max(t_fused_arrival, t_prefill_finish)
+        # Hit case: TTFT is max of fused-context reconciliation vs prefill
+        # finish, minus the state-dependent KV-prefix hit credit (0.0 for the
+        # legacy form and for the warm state, so both are bit-identical).
+        ttft_hit = max(t_fused_arrival, t_prefill_finish) - self.sphp_hit_credit_ms
 
         # Miss case: SPHP falls back to standard P2 plus the measured
         # wasted-provisional-prefill penalty.
@@ -312,21 +333,183 @@ def _sphp_stats(sphp_recs: List[dict]) -> Dict[str, object]:
     }
 
 
+# Deterministic grid for the cold-only RP-2 KV-prefix hit credit C_c
+# (0 .. 2000 ms in 0.5 ms steps) -- identical to the RB evaluation harness.
+CC_GRID_MS = [0.0 + 0.5 * i for i in range(4001)]
+
+
+def fit_sphp_hit_credit(
+    base_recs: List[dict],
+    sphp_recs: List[dict],
+    p: Dict[str, float],
+    grid: Optional[List[float]] = None,
+) -> float:
+    """
+    Fit the RP-2 state-dependent SPHP hit credit C_s for one cache state.
+
+    C_s is the extra time a HIT saves by reusing the provisional KV prefix
+    (re-prefill avoided), subtracted from the hit-branch TTFT:
+        TTFT_hit = max(t_fused_arrival, t_prefill_finish) - C_s.
+
+    Deterministic grid search (0 .. 2000 ms, 0.5 ms step) minimizing the mean
+    tier-level gap between the MEASURED SPHP speedup (SPHP tier mean vs P2
+    tier mean) and the MODELED SPHP speedup, using per-tier measured hit
+    rates -- the identical recipe and grid the RB evaluation harness
+    (revision_board_eval_20261014.py) uses, so like-for-like re-validation
+    reproduces its numbers bit-for-bit.  The warm state is fitted on a
+    degenerate grid of [0.0], i.e. C_w = 0 by construction: the prefix is
+    already resident in warm, so there is nothing extra to save.
+    """
+    grid = CC_GRID_MS if grid is None else list(grid)
+    if len(grid) <= 1:
+        return float(grid[0]) if grid else 0.0
+    if not sphp_recs:
+        return 0.0
+
+    tiers = _tiers(sphp_recs)
+
+    def tier_mean(recs: List[dict], rtt: float) -> float:
+        xs = [r["ttft_ms"] for r in recs if float(r["rtt_ms"]) == rtt]
+        return _mean(xs) if xs else float("nan")
+
+    def wan(payload: int, rtt: float) -> float:
+        return 0.5 * rtt + (payload * 8.0) / (100.0 * 1e6) * 1000.0  # BW=100 Mbps
+
+    hint = p["query_bytes"] + 5 * p["doc_id_bytes"]
+    fused = p["query_bytes"] + 10 * p["doc_id_bytes"]
+    hydra = p["t_hydrate_per_doc_ms"] * min(10, 5)
+
+    def p2_pred(rtt: float) -> float:
+        return (max(p["t_sparse_base_ms"], p["t_dense_base_ms"])
+                + p["t_fusion_base_ms"] + wan(fused, rtt)
+                + hydra + p["t_prefill_base_ms"])
+
+    # The per-tier measured-vs-modeled speedup gap, evaluated over an
+    # explicit set of tiers (the full state set for a full fit; the 3
+    # training tiers for a leave-one-tier-out fold).
+    def gap(cc: float, tier_set: List[float]) -> List[float]:
+        out = []
+        for t in tier_set:
+            s_t = [r for r in sphp_recs if float(r["rtt_ms"]) == t]
+            b_t = [r for r in base_recs if float(r["rtt_ms"]) == t]
+            if not s_t or not b_t:
+                out.append(0.0)
+                continue
+            hr_t = _mean([1.0 if r.get("sphp_hit") else 0.0 for r in s_t])
+            ttft_hit = max(
+                p["t_dense_base_ms"] + p["t_fusion_base_ms"] + wan(fused, t),
+                p["t_sparse_base_ms"] + wan(hint, t) + hydra
+                + p["t_prefill_base_ms"],
+            ) - cc
+            ttft_miss = p2_pred(t) + p["t_sphp_miss_penalty_ms"]
+            sm = hr_t * ttft_hit + (1.0 - hr_t) * ttft_miss
+            measured_t = 100.0 * (1.0 - tier_mean(s_t, t) / tier_mean(b_t, t))
+            out.append(100.0 * (1.0 - sm / tier_mean(b_t, t)) - measured_t)
+        return out
+
+    def mean_abs_gap(cc: float) -> float:
+        return _mean([abs(g) for g in gap(cc, tiers)])
+
+    best_cc, best_err = grid[0], float("inf")
+    for cc in grid:
+        e = mean_abs_gap(cc)
+        if e < best_err - 1e-12:
+            best_err, best_cc = e, cc
+    return float(best_cc)
+
+
+def fit_sphp_hit_credit_on_tiers(
+    base_recs: List[dict],
+    sphp_recs: List[dict],
+    p: Dict[str, float],
+    tier_set: List[float],
+    grid: Optional[List[float]] = None,
+) -> float:
+    """
+    Fit C_s over an EXPLICIT tier subset (a leave-one-tier-out fold) rather
+    than over the state's full tier set.  Same deterministic recipe and grid
+    as fit_sphp_hit_credit, but the error is scored only on `tier_set` (the
+    training tiers), so a LOTO fold's C_c is estimated on training data only
+    -- exactly the RB harness's per-fold estimate (the only per-fold variant
+    estimate, since per-tier miss counts are too small to re-fit per fold).
+    """
+    grid = CC_GRID_MS if grid is None else list(grid)
+    if len(grid) <= 1:
+        return float(grid[0]) if grid else 0.0
+    if not tier_set:
+        return 0.0
+
+    def tier_mean(recs: List[dict], rtt: float) -> float:
+        xs = [r["ttft_ms"] for r in recs if float(r["rtt_ms"]) == rtt]
+        return _mean(xs) if xs else float("nan")
+
+    def wan(payload: int, rtt: float) -> float:
+        return 0.5 * rtt + (payload * 8.0) / (100.0 * 1e6) * 1000.0
+
+    hint = p["query_bytes"] + 5 * p["doc_id_bytes"]
+    fused = p["query_bytes"] + 10 * p["doc_id_bytes"]
+    hydra = p["t_hydrate_per_doc_ms"] * min(10, 5)
+
+    def p2_pred(rtt: float) -> float:
+        return (max(p["t_sparse_base_ms"], p["t_dense_base_ms"])
+                + p["t_fusion_base_ms"] + wan(fused, rtt)
+                + hydra + p["t_prefill_base_ms"])
+
+    def mean_abs_gap(cc: float) -> float:
+        errs = []
+        for t in tier_set:
+            s_t = [r for r in sphp_recs if float(r["rtt_ms"]) == t]
+            b_t = [r for r in base_recs if float(r["rtt_ms"]) == t]
+            if not s_t or not b_t:
+                continue
+            hr_t = _mean([1.0 if r.get("sphp_hit") else 0.0 for r in s_t])
+            ttft_hit = max(
+                p["t_dense_base_ms"] + p["t_fusion_base_ms"] + wan(fused, t),
+                p["t_sparse_base_ms"] + wan(hint, t) + hydra
+                + p["t_prefill_base_ms"],
+            ) - cc
+            ttft_miss = p2_pred(t) + p["t_sphp_miss_penalty_ms"]
+            sm = hr_t * ttft_hit + (1.0 - hr_t) * ttft_miss
+            measured_t = 100.0 * (1.0 - tier_mean(s_t, t) / tier_mean(b_t, t))
+            errs.append(abs(100.0 * (1.0 - sm / tier_mean(b_t, t)) - measured_t))
+        return _mean(errs) if errs else float("inf")
+
+    best_cc, best_err = grid[0], float("inf")
+    for cc in grid:
+        e = mean_abs_gap(cc)
+        if e < best_err - 1e-12:
+            best_err, best_cc = e, cc
+    return float(best_cc)
+
+
 def fit_placement_model(
     p2_recs: List[dict],
     sphp_recs: List[dict],
     tps_source: Optional[List[dict]] = None,
+    use_sphp_hit_credit: bool = False,
+    credit_grid: Optional[List[float]] = None,
 ) -> PlacementCostModel:
     """Fit a PlacementCostModel from one cache state's records.
 
     p2_recs:   baseline-variant records of this state (component means).
     sphp_recs: sphp-variant records of this state (measured hit rate, miss penalty).
     tps_source: decode-rate source (defaults to warm records if available).
+    use_sphp_hit_credit: RP-2 switch (docs/revision_log.md, adopted 2026-10-14).
+        False (DEFAULT) -> the legacy constant hit form, bit-for-bit:
+            sphp_hit_credit_ms = 0.0 for every state, so both this fitter's
+            output and PlacementCostModel's predict_ttft_p2_sphp() reproduce
+            the pre-RP-2 closed form exactly (the paper's stored numbers).
+        True -> the adopted state-dependent form: the COLD state gets the
+            fitted C_c (KV-prefix hit credit, see fit_sphp_hit_credit) and
+            the WARM state gets C_w = 0.0 by construction (the prefix is
+            already resident in warm; the grid is degenerate to [0.0]).
+        The credit is applied to the SPHP *hit* branch only; the P2 topology
+        and the SPHP miss branch are untouched by it.
     """
     params = _fit_p2_params(p2_recs)
     tps, _, _ = _tps_of(tps_source if tps_source is not None else p2_recs)
     sphp = _sphp_stats(sphp_recs)
-    return PlacementCostModel(
+    model = PlacementCostModel(
         t_sparse_base_ms=params["t_sparse_base_ms"],
         t_dense_base_ms=params["t_dense_base_ms"],
         t_fusion_base_ms=params["t_fusion_base_ms"],
@@ -335,6 +518,27 @@ def fit_placement_model(
         sphp_hit_rate=float(sphp["measured_hit_rate"]),
         t_sphp_miss_penalty_ms=float(sphp["miss_penalty_ms"]),
     )
+    if use_sphp_hit_credit:
+        # RP-2 adopted form: fit the state-dependent KV-prefix hit credit C_s
+        # on this state's records.  The caller passes a degenerate grid of
+        # [0.0] for the warm state (C_w = 0 by construction); for cold this
+        # returns the grid-searched C_c.
+        cc = fit_sphp_hit_credit(
+            p2_recs, sphp_recs,
+            {
+                "t_sparse_base_ms": model.t_sparse_base_ms,
+                "t_dense_base_ms": model.t_dense_base_ms,
+                "t_fusion_base_ms": model.t_fusion_base_ms,
+                "t_hydrate_per_doc_ms": model.t_hydrate_per_doc_ms,
+                "t_prefill_base_ms": model.t_prefill_base_ms,
+                "t_sphp_miss_penalty_ms": model.t_sphp_miss_penalty_ms,
+                "query_bytes": model.query_bytes,
+                "doc_id_bytes": model.doc_id_bytes,
+            },
+            grid=credit_grid,
+        )
+        model.sphp_hit_credit_ms = float(cc)
+    return model
 
 
 def _tiers(recs: List[dict]) -> List[float]:
@@ -374,6 +578,80 @@ def regime_loto_validation(
     pairs = [(t["predicted_mean_ms"], t["observed_mean_ms"]) for t in per_tier]
     return {
         "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
+        "n_tiers": len(tiers),
+        "per_tier": per_tier,
+        "regime_mape_pct": round(_mape(pairs), 2),
+        "regime_r2": round(_r2(pairs), 4),
+    }
+
+
+def regime_loto_validation_sphp_credit(
+    state_recs: List[dict],
+    sphp_state_recs: List[dict],
+    use_sphp_hit_credit: bool = False,
+    state: str = "cold",
+) -> Dict[str, object]:
+    """
+    Leave-one-tier-out regime validation of the (adopted) SPHP form, using the
+    ACTUAL production PlacementCostModel -- the re-validation entry point for
+    RP-2 ported into the production model.
+
+    For each RTT tier held out: the P2 base terms and SPHP hit rate / miss
+    penalty are fit on the OTHER (training) tiers exactly as the production
+    fitter does, and the RP-2 hit credit is fit on those same training tiers
+    (fit_sphp_hit_credit_on_tiers).  The held-out tier's SPHP mean is then
+    predicted with the production predict_ttft_p2_sphp() and compared with the
+    observed tier mean.
+
+    use_sphp_hit_credit=False -> credit 0.0 in every fold, i.e. bit-identical
+    to regime_loto_validation(..., "P2-SPHP") (the legacy constant form).
+    use_sphp_hit_credit=True  -> the adopted form: C_c grid-searched on the
+    training tiers for the cold state, C_w = 0.0 for the warm state
+    (degenerate grid [0.0]).  This reproduces the RB harness's per-fold
+    RP-2 C estimate, so like-for-like re-validation matches it bit-for-bit.
+    """
+    tiers = _tiers(state_recs)
+    per_tier = []
+    for held in tiers:
+        tr_base = [r for r in state_recs if float(r["rtt_ms"]) != held]
+        tr_sphp = [r for r in sphp_state_recs if float(r["rtt_ms"]) != held]
+        model = fit_placement_model(
+            tr_base, tr_sphp, tps_source=tr_base,
+            use_sphp_hit_credit=False,
+        )
+        if use_sphp_hit_credit:
+            tr_tiers = [t for t in tiers if t != held]
+            if state == "cold":
+                model.sphp_hit_credit_ms = fit_sphp_hit_credit_on_tiers(
+                    tr_base, tr_sphp,
+                    {
+                        "t_sparse_base_ms": model.t_sparse_base_ms,
+                        "t_dense_base_ms": model.t_dense_base_ms,
+                        "t_fusion_base_ms": model.t_fusion_base_ms,
+                        "t_hydrate_per_doc_ms": model.t_hydrate_per_doc_ms,
+                        "t_prefill_base_ms": model.t_prefill_base_ms,
+                        "t_sphp_miss_penalty_ms": model.t_sphp_miss_penalty_ms,
+                        "query_bytes": model.query_bytes,
+                        "doc_id_bytes": model.doc_id_bytes,
+                    },
+                    tr_tiers,
+                )
+            else:
+                model.sphp_hit_credit_ms = 0.0  # C_w = 0 by construction
+        pred = model.predict_ttft_p2_sphp(rtt_ms=held)
+        obs = _mean([r["ttft_ms"] for r in sphp_state_recs
+                     if float(r["rtt_ms"]) == held])
+        per_tier.append({
+            "rtt_ms": held,
+            "fitted_credit_ms": round(model.sphp_hit_credit_ms, 2),
+            "predicted_mean_ms": round(pred, 1),
+            "observed_mean_ms": round(obs, 1),
+            "ape_pct": round(abs(pred - obs) / max(obs, 1.0) * 100.0, 2),
+        })
+    pairs = [(t["predicted_mean_ms"], t["observed_mean_ms"]) for t in per_tier]
+    return {
+        "protocol": ("leave-one-tier-out on RTT tiers; regime (tier-mean) level; "
+                     "per-fold RP-2 hit credit fit on training tiers"),
         "n_tiers": len(tiers),
         "per_tier": per_tier,
         "regime_mape_pct": round(_mape(pairs), 2),
