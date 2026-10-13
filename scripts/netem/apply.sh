@@ -68,7 +68,7 @@ usage() {
   echo "" >&2
   echo "Arguments:" >&2
   echo "  RTT_MS   Non-negative integer full round-trip delay (halved per direction)" >&2
-  echo "  LOSS_PCT Integer 0..100 packet loss percentage (halved per direction)" >&2
+  echo "  LOSS_PCT Loss 0..100, at most one decimal place (e.g. 0.5, 1, 2); halved per direction" >&2
   echo "  RATE     Optional token-bucket rate (e.g. 10mbit, 100mbit, 1gbit)" >&2
   exit 1
 }
@@ -79,8 +79,8 @@ validate_tier() {
     echo "FATAL: Invalid RTT_MS '$rtt'. Must be a non-negative integer." >&2
     exit 1
   fi
-  if [[ ! "$loss" =~ ^[0-9]+$ ]] || [ "$loss" -gt 100 ]; then
-    echo "FATAL: Invalid LOSS_PCT '$loss'. Must be an integer between 0 and 100." >&2
+  if [[ ! "$loss" =~ ^[0-9]+([.][0-9])?$ ]] || awk -v x="$loss" 'BEGIN { exit !(x > 100) }'; then
+    echo "FATAL: Invalid LOSS_PCT '$loss'. Must be between 0 and 100 with at most one decimal place." >&2
     exit 1
   fi
   if [ -n "$rate" ] && [[ ! "$rate" =~ ^[0-9]+(kbit|mbit|gbit)$ ]]; then
@@ -175,15 +175,27 @@ tc class add dev "$IFB" parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit
 tc filter add dev "$IFB" protocol ip parent 1: prio 1 u32 match ip src "$PEER_B_IP" flowid 1:10
 tc filter add dev "$IFB" protocol ip parent 1: prio 1 u32 match ip src "$PEER_C_IP" flowid 1:20
 
+# --- Helper: Compute per-direction loss ---------------------------------------
+# loss/2 with two-decimal precision via awk so fractional design values stay
+# shapable: 0.5 -> 0.25, 1 -> 0.5, 2 -> 1, 1.5 -> 0.75 (integer-safe; a
+# 1-decimal format would round 0.25 to 0.2, breaking the 0.05pp readback
+# tolerance). (The old integer $(( loss/2 )) truncated 1 -> 0 and 0.5 was
+# rejected outright, leaving only 0% and 2% usable.)
+half_loss_pct() {
+  local loss="$1"
+  awk -v x="$loss" 'BEGIN { h = x / 2; if (h == 0) print "0"; else if (h == int(h)) printf "%d", h; else printf "%.2f", h }'
+}
+
 # --- Helper: Apply Netem Leaf --------------------------------------------------
 apply_leaf() {
   local dev="$1" parent="$2" handle="$3" rtt="$4" loss="$5" rate="$6"
   local half_delay=$(( rtt / 2 ))
-  local half_loss=$(( loss / 2 ))
+  local half_loss
+  half_loss="$(half_loss_pct "$loss")"
   local args=()
 
   [ "$half_delay" -gt 0 ] && args+=(delay "${half_delay}ms")
-  [ "$half_loss" -gt 0 ] && args+=(loss "${half_loss}%")
+  awk -v h="$half_loss" 'BEGIN { exit !(h > 0) }' && args+=(loss "${half_loss}%")
   [ -n "$rate" ] && args+=(rate "$rate")
 
   if [ ${#args[@]} -gt 0 ]; then

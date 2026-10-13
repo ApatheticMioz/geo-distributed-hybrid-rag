@@ -5,15 +5,18 @@
 # Semantics:
 #   1. Clear all qdiscs.
 #   2. Measure baseline median RTT over $PING_COUNT pings.
-#   3. Apply shaping via apply.sh for the target link.
+#   3. Apply shaping via apply.sh for the target link (with LOSS_PCT if given).
 #   4. Measure shaped median RTT over $PING_COUNT pings.
 #   5. Enforce gate: |shaped - baseline - RTT_MS| <= 30% of RTT_MS.
-#   6. Trap cleanup clears all netem state on exit.
+#   6. If LOSS_PCT is given, additionally verify the netem LOSS readback:
+#      `tc qdisc show` must report exactly loss/2 per direction (egress + ifb
+#      ingress) within a 0.05pp tolerance.
+#   7. Trap cleanup clears all netem state on exit.
 #
 # Syntax:
-#   validate.sh --link-b <RTT_MS>
-#   validate.sh --link-c <RTT_MS>
-#   validate.sh --link-b <RTT_B> --link-c <RTT_C>
+#   validate.sh --link-b <RTT_MS> [LOSS_PCT]
+#   validate.sh --link-c <RTT_MS> [LOSS_PCT]
+#   validate.sh --link-b <RTT_B> [LOSS_B] --link-c <RTT_C> [LOSS_C]
 # =============================================================================
 set -euo pipefail
 
@@ -24,6 +27,7 @@ fi
 
 command -v tc >/dev/null 2>&1 || { echo "FATAL: 'tc' not found." >&2; exit 1; }
 command -v ping >/dev/null 2>&1 || { echo "FATAL: 'ping' not found." >&2; exit 1; }
+command -v ip >/dev/null 2>&1 || { echo "FATAL: 'ip' not found." >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 11 samples keeps the median odd-valued (no interpolation in median()) and
@@ -33,14 +37,16 @@ PING_COUNT=11
 
 usage() {
   echo "Usage:" >&2
-  echo "  $0 --link-b <RTT_MS>" >&2
-  echo "  $0 --link-c <RTT_MS>" >&2
-  echo "  $0 --link-b <RTT_B> --link-c <RTT_C>" >&2
+  echo "  $0 --link-b <RTT_MS> [LOSS_PCT]" >&2
+  echo "  $0 --link-c <RTT_MS> [LOSS_PCT]" >&2
+  echo "  $0 --link-b <RTT_B> [LOSS_B] --link-c <RTT_C> [LOSS_C]" >&2
   exit 1
 }
 
 RTT_B=""
+LOSS_B=""
 RTT_C=""
+LOSS_C=""
 
 [ $# -gt 0 ] || usage
 
@@ -50,11 +56,19 @@ while [ $# -gt 0 ]; do
       [ $# -ge 2 ] || usage
       RTT_B="$2"
       shift 2
+      if [ $# -gt 0 ] && [[ ! "$1" =~ ^-- ]]; then
+        LOSS_B="$1"
+        shift 1
+      fi
       ;;
     --link-c)
       [ $# -ge 2 ] || usage
       RTT_C="$2"
       shift 2
+      if [ $# -gt 0 ] && [[ ! "$1" =~ ^-- ]]; then
+        LOSS_C="$1"
+        shift 1
+      fi
       ;;
     *)
       echo "FATAL: Unrecognized argument '$1'. Ambiguous positional arguments are forbidden." >&2
@@ -71,8 +85,18 @@ validate_rtt_value() {
   fi
 }
 
+validate_loss_value() {
+  local val="$1" label="$2"
+  if [[ ! "$val" =~ ^[0-9]+([.][0-9])?$ ]] || awk -v x="$val" 'BEGIN { exit !(x > 100) }'; then
+    echo "FATAL: Loss for $label must be between 0 and 100 with at most one decimal place, got '$val'." >&2
+    exit 1
+  fi
+}
+
 [ -n "$RTT_B" ] && validate_rtt_value "$RTT_B" "Link B"
+[ -n "$LOSS_B" ] && validate_loss_value "$LOSS_B" "Link B"
 [ -n "$RTT_C" ] && validate_rtt_value "$RTT_C" "Link C"
+[ -n "$LOSS_C" ] && validate_loss_value "$LOSS_C" "Link C"
 
 # Cleanup on exit
 cleanup() {
@@ -107,11 +131,77 @@ ping_samples() {
   done
 }
 
+# Extract the netem loss percentage from a qdisc-show output line, or empty if
+# the qdisc has no `loss` param. Handles netem's rendered forms, e.g.
+# "delay 7.5ms loss 0.5%" -> "0.5".
+parse_netem_loss() {
+  local line="$1"
+  echo "$line" | grep -oE 'loss [0-9]+(\.[0-9]+)?%' | head -n1 | awk '{print $2}' | tr -d '%' || true
+}
+
+# Verify the applied netem loss readback matches the target loss (halved per
+# direction): parse `tc qdisc show` for the iface's netem leaf (egress) and the
+# ifb leaf (ingress); each must equal loss/2 within 0.05pp. Runs while shaping
+# is active (before the trap cleanup fires).
+validate_loss_readback() {
+  local iface="$1" ifb="$2" peer_src="$3" loss="$4"
+
+  local expected
+  expected="$(awk -v x="$loss" 'BEGIN { h = x / 2; if (h == 0) print "0"; else if (h == int(h)) printf "%d", h; else printf "%.2f", h }')"
+
+  local egress_line ifb_line
+  egress_line="$(tc qdisc show dev "$iface" | grep 'netem' | grep 'flowid\|parent' | head -n1)"
+  ifb_line="$(tc qdisc show dev "$ifb" 2>/dev/null | grep "netem" | grep "$peer_src" | head -n1)"
+  # Fallback: ifb leaf is untagged by peer in qdisc-show; take its single netem leaf.
+  [ -n "$ifb_line" ] || ifb_line="$(tc qdisc show dev "$ifb" 2>/dev/null | grep 'netem' | head -n1)"
+
+  if [ -z "$egress_line" ]; then
+    echo "FATAL: No netem qdisc found on egress ($iface) — cannot read back loss." >&2
+    return 1
+  fi
+  if [ -z "$ifb_line" ]; then
+    echo "FATAL: No netem qdisc found on ingress ($ifb) — cannot read back loss." >&2
+    return 1
+  fi
+
+  local egress_loss ifb_loss
+  egress_loss="$(parse_netem_loss "$egress_line")"
+  ifb_loss="$(parse_netem_loss "$ifb_line")"
+
+  if [ -z "$egress_loss" ]; then
+    if awk -v x="$expected" 'BEGIN { exit !(x > 0) }'; then
+      echo "FATAL: Egress netem qdisc has no 'loss' parameter but target loss is ${loss}%: ${egress_line}" >&2
+      return 1
+    fi
+    egress_loss="0"
+  fi
+  if [ -z "$ifb_loss" ]; then
+    if awk -v x="$expected" 'BEGIN { exit !(x > 0) }'; then
+      echo "FATAL: Ingress (ifb) netem qdisc has no 'loss' parameter but target loss is ${loss}%: ${ifb_line}" >&2
+      return 1
+    fi
+    ifb_loss="0"
+  fi
+
+  echo "Loss readback       : egress=${egress_loss}%  ingress(ifb)=${ifb_loss}%  (expected ${expected}%/dir for ${loss}% total)"
+
+  local e_ok i_ok
+  e_ok="$(awk -v g="$egress_loss" -v e="$expected" 'BEGIN { d = g - e; if (d < 0) d = -d; print (d <= 0.05) ? 1 : 0 }')"
+  i_ok="$(awk -v g="$ifb_loss" -v e="$expected" 'BEGIN { d = g - e; if (d < 0) d = -d; print (d <= 0.05) ? 1 : 0 }')"
+
+  if [ "$e_ok" -eq 1 ] && [ "$i_ok" -eq 1 ]; then
+    echo "Loss gate: PASS (|observed - ${expected}%| <= 0.05pp per direction)"
+  else
+    echo "Loss gate: FAIL (expected ${expected}%/dir; observed egress=${egress_loss}%, ingress=${ifb_loss}%; tolerance 0.05pp)" >&2
+    return 1
+  fi
+}
+
 validate_target_link() {
-  local label="$1" ip="$2" target_rtt="$3"
+  local label="$1" ip="$2" target_rtt="$3" target_loss="${4:-0}"
 
   echo "========================================================================"
-  echo " VALIDATION: Link ${label} (${ip}) — Target Added RTT: ${target_rtt} ms"
+  echo " VALIDATION: Link ${label} (${ip}) — Target Added RTT: ${target_rtt} ms, Loss: ${target_loss}%"
   echo "========================================================================"
 
   bash "$SCRIPT_DIR/clear.sh" >/dev/null
@@ -131,9 +221,9 @@ validate_target_link() {
 
   # 2. Apply Shaping
   if [ "$label" = "B" ]; then
-    bash "$SCRIPT_DIR/apply.sh" --link-b "$target_rtt" 0 >/dev/null
+    bash "$SCRIPT_DIR/apply.sh" --link-b "$target_rtt" "$target_loss" >/dev/null
   else
-    bash "$SCRIPT_DIR/apply.sh" --link-c "$target_rtt" 0 >/dev/null
+    bash "$SCRIPT_DIR/apply.sh" --link-c "$target_rtt" "$target_loss" >/dev/null
   fi
 
   # 3. Shaped Measurement
@@ -164,9 +254,26 @@ validate_target_link() {
     echo "Status: FAIL (Observed RTT ${diff} ms is outside ±30% acceptance window)"
     return 1
   fi
+
+  # 5. Enforce Loss Readback Gate (only if loss was requested)
+  if [ "$target_loss" != "0" ]; then
+    local iface ifb peer_src
+    if [ -n "${NETEM_IFACE:-}" ]; then
+      iface="$NETEM_IFACE"
+    else
+      iface="$(ip -4 -o addr show to 10.8.0.1/24 2>/dev/null | awk '{print $2}' | head -n1)"
+    fi
+    ifb="ifb0"
+    if [ "$label" = "B" ]; then
+      peer_src="10.8.0.2"
+    else
+      peer_src="10.8.0.3"
+    fi
+    validate_loss_readback "$iface" "$ifb" "$peer_src" "$target_loss"
+  fi
 }
 
-[ -n "$RTT_B" ] && validate_target_link "B" "10.8.0.2" "$RTT_B"
-[ -n "$RTT_C" ] && validate_target_link "C" "10.8.0.3" "$RTT_C"
+[ -n "$RTT_B" ] && validate_target_link "B" "10.8.0.2" "$RTT_B" "$LOSS_B"
+[ -n "$RTT_C" ] && validate_target_link "C" "10.8.0.3" "$RTT_C" "$LOSS_C"
 
 echo "ALL VALIDATIONS PASSED."
