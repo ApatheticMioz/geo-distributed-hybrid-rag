@@ -112,19 +112,27 @@ Wilson 95%% CI, imported from ``experiments/analysis/stats.py::wilson_ci``
 (not re-implemented).
 
 The loss-sweep run (``--run loss-sweep``) implements the amended design's
-H4 exploratory sweep: the three measured loss tiers (0.5%%, 1%%, 2%% —
-float percents via ``--loss-tiers-float``) at a fixed RTT = 40 ms, with BOTH
-arms P2 and P2-SPHP per cell (2 arms/cell) and FULL generation (not
-retrieval-only).  N = 50/arm, W = 5, R = 3 (design §4.3) — 3 cells x 2 arms
-= 6 arms consuming pool lines 1041..1370 (exactly 330 lines = 6 x 55).  The
-0%%-loss cell at the same RTT is the 0-error SANITY gate (a small pre-flight
-sample; aborts on any error, confirming the shaped link is healthy before
-loss is applied).  The measured loss cells REPORT their per-cell error rate
-without aborting (loss-driven errors are the signal, not a campaign failure).
-The per-cell fidelity gate is the existing 11-ping ±30%% added-RTT check
-plus a tc-based loss readback.  The summary adds per-cell error rate and
-per-cell SPHP hit rate with a Wilson 95%% CI (imported from
-``experiments/analysis/stats.py::wilson_ci``, not reimplemented).
+H4 exploratory sweep (design §3.1, amended 2026-10-14): the 2-node / link-B
+matrix **RTT {0, 40} x loss {0.5, 1, 2} = 6 cells** (loss applied on the
+A<->B link only), with BOTH headline arms ``P2`` (variant=baseline) and
+``P2-SPHP`` (variant=sphp) per cell = **12 arms**, at **full generation**
+(hit rate *and* TTFT/E2E recorded per record).  Sizing N = 50 / W = 5 /
+R = 1 (design §4.3) -> 12 arms x (50 + 5) = **660 pool lines -> pool band
+2041..2700** (the pre-amendment 1041..1370 band is now the reserved/unused
+gap, §5.1).  Gate semantics are per-cell (frozen): every cell is SHAPED
+(there is no pure-0 baseline cell in this run) — the loss-0 *sanity
+pre-flight* (a small 0-error sample per RTT tier, drawn from the free pool
+tail) **ABORTS the campaign on any error** (the shaped link must be healthy
+before loss is applied), while the loss>0 measured cells **report their
+per-cell error rate without aborting** (loss-driven errors are the signal,
+not a campaign failure).  The per-cell fidelity gate is the ``validate.sh``
+11-ping ±30%% added-RTT window (N/A at RTT = 0, where only the tc-based
+fractional-loss readback applies) **plus the tc-based fractional-loss
+readback**, run pre- AND post- every cell.  The summary/manifest carry the
+key deliverable: the per-cell {rtt, loss} targets + the per-cell 11-ping
+median, and the per-cell SPHP hit rate with a Wilson 95%% CI (lazily
+imported from ``experiments/analysis/stats.py::wilson_ci``; degrades to
+None when the stats engine is not importable on a bare host).
 """
 
 import argparse
@@ -210,11 +218,13 @@ SPHP_FIELDS = ("sphp_hit", "sphp_overlap", "wasted_prefill_ms")
 # run's range is derived from the run's arms x (N + W).
 #
 #   "confirmatory":  lines 1..1040   (8 arms x (120+10) = 1040)  [implemented]
-#   "loss-sweep":    lines 1041..1370 (6 arms x (50+5) = 330)    [implemented]
-#                      + 0%-loss sanity sample from unused tail 2251..2290
+#   "loss-sweep":    lines 2041..2700 (12 arms x (50+5) = 660)   [implemented]
+#                      + per-RTT-tier loss-0 sanity samples from free tail 3839..
 #   "three-node":    lines 1371..1910 (6 arms x (80+10) = 540)   [implemented]
-#   "three-node-stress": lines 2041..2700 (12 arms x (45+10) = 660) [implemented]
-#                      + (0,0) sanity sample from unused tail 2701..2720
+#   "three-node-stress": STALE — pre-b239833 band 2041..3390; re-key to the
+#                      FINAL §5.1 band 2921..3838 (54 arms x (15+2) = 918) in
+#                      the CM-5 follow-up (the amended loss-sweep now owns
+#                      2041..2700, so this overlap is a known pre-rekey gap).
 #   "dropout":       {"pool_line_start": 1911},  # 2 arms x (60+5)  = 130  [WS-CM, not yet registered]
 #   "genuine_wan":   {"pool_line_start": 2041},  # 2 arms x (100+5) = 210  [WS-CM, not yet registered]
 #
@@ -240,35 +250,36 @@ V2_RUN_SPECS: Dict[str, Dict[str, Any]] = {
         "variants": ["baseline", "sphp"],
         "n": 120, "warmups": 10, "repeats": 3,
     },
-    # Amended-design H4 exploratory sweep (design §3.1/§4.3): the three
-    # MEASURED loss tiers (0.5, 1, 2 % — float percents) at a FIXED
-    # RTT = 40 ms, BOTH arms {P2, P2-SPHP} per cell (2 arms/cell), FULL
-    # generation.  N = 50/arm, W = 5, R = 3.  3 cells x 2 arms = 6 arms
-    # x (50+5) = 330 pool lines -> 1041..1370 (disjoint from confirmatory
-    # 1..1040 and three-node 1371..1910).  The 0%%-loss cell at the same
-    # RTT is a separate 0-error SANITY gate (small pre-flight sample from
-    # the unused pool tail, abort on any error); the measured cells report
-    # their per-cell error rate without aborting (loss-driven errors are
-    # the signal, not a campaign failure).
+    # Amended-design H4 exploratory sweep (design §3.1/§4.3, amended
+    # 2026-10-14): the 2-node / link-B matrix RTT {0, 40} x loss {0.5, 1, 2}
+    # = 6 MEASURED cells (loss applied on the A<->B link only), BOTH headline
+    # arms {P2 (baseline), P2-SPHP (sphp)} per cell = 12 arms, at FULL
+    # generation (the old retrieval-only / P2-only reading is superseded).
+    # N = 50 / W = 5 / R = 1 (design §4.3) -> 12 arms x (50 + 5) = 660 pool
+    # lines -> pool band 2041..2700 (design §5.1 final allocation; disjoint
+    # from confirmatory 1..1040, the reserved 1041..1370 gap, three-node
+    # 1371..1910, and dropout 1911..2040).  The loss-0 sanity pre-flight
+    # (one small 0-error sample per RTT tier, from the free pool tail)
+    # ABORTS on any error; the loss>0 cells REPORT per-cell error rate
+    # without aborting (loss-driven errors are the signal).
     "loss-sweep": {
-        "pool_line_start": 1041,
-        "label": "v2 loss sweep (2-node, amended design — loss tiers at RTT=40ms)",
+        "pool_line_start": 2041,
+        "label": "v2 loss sweep (2-node, amended design — RTT{0,40} x loss{0.5,1,2})",
         "gateway_ip": "10.8.0.2",
-        # Fixed RTT for the whole sweep: loss is the swept variable.  40 ms
-        # (the original §3.1 non-zero loss-sweep tier) so the per-cell
-        # 11-ping ±30% added-RTT fidelity gate is active (it skips at RTT=0).
-        "rtt": 40,
+        # RTT tiers swept (loss is the swept variable within each tier).
+        "rtt_tiers": [0, 40],
         # (rtt, loss) MEASURED cells; loss is a FLOAT percent (0.5).
-        "cells": [(40, 0.5), (40, 1.0), (40, 2.0)],
-        # The 0%%-loss cell at the same RTT: 0-error sanity gate (not a
-        # pool-consuming measured cell).  A small pre-flight sample is taken
-        # from the unused pool tail (2251..); any error aborts the campaign
-        # (the shaped link is not healthy before loss is even applied).
-        "baseline_loss": 0.0,
-        "sanity_n": 20, "sanity_warmups": 0, "sanity_repeats": 1,
-        "sanity_pool_start": 2251,
+        # Cell-major: the two RTT tiers, each with its three loss tiers.
+        "cells": [(0, 0.5), (0, 1.0), (0, 2.0),
+                  (40, 0.5), (40, 1.0), (40, 2.0)],
+        # Per-RTT-tier loss-0 sanity pre-flight: a small 0-error sample from
+        # the FREE pool tail (3839.., the design §5.1 spare) that never
+        # touches the measured 2041..2700 band.  One block per RTT tier
+        # (0 and 40); any error ABORTS the campaign before loss is applied.
+        "sanity_n": 10, "sanity_warmups": 0, "sanity_repeats": 1,
+        "sanity_pool_start": 3839,
         "variants": ["baseline", "sphp"],
-        "n": 50, "warmups": 5, "repeats": 3,
+        "n": 50, "warmups": 5, "repeats": 1,
     },
     "three-node": {
         "pool_line_start": 1371,
@@ -531,20 +542,25 @@ def v2_line_range(run_name: str, n_arms: int, n: int, warmups: int) -> Tuple[int
     return start, end
 
 
-def v2_sanity_line_range(run_name: str, n_arms: int, n: int, warmups: int) -> Tuple[int, int]:
-    """Pool line range for a run's 0%-loss SANITY sample (loss-sweep).
+def v2_sanity_line_ranges(run_name: str, rtt_tiers: List[int],
+                          sanity_n: int) -> List[Tuple[int, int]]:
+    """Pool line ranges for a run's per-RTT-tier loss-0 SANITY samples.
 
-    The sanity sample is a small pre-flight block taken from the UNUSED pool
-    tail (``spec['sanity_pool_start']``) so it never touches the run's
-    measured line window.  Returns the inclusive (1-based) range holding
-    ``n_arms * (n + warmups)`` lines.
+    Each RTT tier gets its own small pre-flight block (``sanity_n`` lines)
+    drawn from the free pool tail starting at ``spec['sanity_pool_start']``,
+    laid out contiguously, so it never touches the run's measured line
+    window.  Returns one inclusive (1-based) (start, end) range per RTT
+    tier.
     """
     spec = V2_RUN_SPECS.get(run_name)
     if spec is None or "sanity_pool_start" not in spec:
         raise ValueError(f"run type {run_name!r} has no sanity sample range")
-    start = spec["sanity_pool_start"]
-    end = start + n_arms * (n + warmups) - 1
-    return start, end
+    ranges: List[Tuple[int, int]] = []
+    cursor = spec["sanity_pool_start"]
+    for _ in rtt_tiers:
+        ranges.append((cursor, cursor + sanity_n - 1))
+        cursor += sanity_n
+    return ranges
 
 
 def assert_pool_ranges_disjoint(ranges: Dict[str, Tuple[int, int]]) -> None:
@@ -909,32 +925,68 @@ def parse_fidelity_gate_output(out: str) -> Dict[str, Optional[float]]:
     }
 
 
-def run_fidelity_gate(rtt: int, when: str, dry_run: bool) -> Dict[str, Any]:
-    """Run the per-tier 11-ping fidelity gate for a 2-node link-B regime.
+def run_fidelity_gate(rtt: int, when: str, dry_run: bool,
+                      loss: float = 0) -> Dict[str, Any]:
+    """Run the per-cell 11-ping + fractional-loss fidelity gate for a
+    2-node link-B regime.
 
-    ``validate.sh --link-b <RTT>`` clears, measures the baseline median,
-    re-applies the shaping, measures the shaped median, enforces the ±30%
-    window on the added RTT, and (trap) clears again on exit — so a gate
-    call always leaves the link unshaped; the caller re-applies afterwards.
-    The unshaped baseline tier (rtt=0) has no gate (validate requires >= 1
-    ms): it is recorded as ``skipped-baseline``.
+    For ``rtt > 0``: ``validate.sh --link-b <RTT> [LOSS]`` clears, measures
+    the baseline median, re-applies the shaping, measures the shaped
+    median, enforces the ±30% window on the added RTT, and (when ``loss``
+    is non-zero) additionally performs the tc-based fractional-loss
+    readback (loss/2 per direction, ±0.05 pp).  The script's trap clears
+    all netem on exit — the caller re-applies afterwards.
 
-    ``when`` is "pre" (before the tier's arms) or "post" (at tier close).
+    For ``rtt == 0`` with ``loss > 0`` (the loss-only cells): ``validate.sh``
+    requires RTT >= 1, so the gate instead applies ``--link-b 0 <loss>`` and
+    reads back the tc qdisc state directly (``readback_loss_pct``), checking
+    the per-direction loss matches target/2 within 0.05 pp.
+
+    ``when`` is "pre" (before the cell's arms) or "post" (at cell close).
     """
     if dry_run:
-        return {"rtt_ms": rtt, "when": when,
-                "status": "planned" if rtt > 0 else "skipped-baseline"}
+        # rtt > 0: preserve the historical exact shape (no loss_pct key) so
+        # downstream consumers / tests that compare the full dict are
+        # unaffected by the loss-only extension.
+        if rtt > 0:
+            return {"rtt_ms": rtt, "when": when,
+                    "status": "planned"}
+        # rtt == 0: the only gate that can run is the loss readback; a
+        # pure-0 baseline has no gate at all.
+        if loss > 0:
+            return {"rtt_ms": rtt, "loss_pct": loss, "when": when,
+                    "status": "planned-rtt0-loss"}
+        return {"rtt_ms": rtt, "loss_pct": loss, "when": when,
+                "status": "skipped-baseline"}
     if rtt <= 0:
-        return {"rtt_ms": 0, "when": when, "status": "skipped-baseline",
+        if loss <= 0:
+            return {"rtt_ms": rtt, "loss_pct": loss, "when": when,
+                    "status": "skipped-baseline",
+                    "baseline_median_ms": None, "shaped_median_ms": None,
+                    "added_rtt_ms": None, "loss_gate": None,
+                    "output_tail": ""}
+        # rtt-0 / loss>0: apply then read back the tc qdisc state directly.
+        apply_netem_link_b(rtt, loss, dry_run=False)
+        rb = readback_loss_pct(dry_run=False)
+        expected_half = loss / 2
+        ok = (rb is not None and abs(rb - expected_half) <= 0.05)
+        return {"rtt_ms": rtt, "loss_pct": loss, "when": when,
+                "status": "PASS" if ok else "FAIL",
                 "baseline_median_ms": None, "shaped_median_ms": None,
-                "added_rtt_ms": None, "output_tail": ""}
-    ok, out = run_netem(VALIDATE_SH, "--link-b", rtt, timeout=300)
+                "added_rtt_ms": None, "loss_gate": "PASS" if ok else "FAIL",
+                "output_tail": (f"tc readback={rb}% expected~{expected_half}%")[-500:]}
+    validate_args = [f"--link-b", str(rtt)]
+    if loss > 0:
+        validate_args.append(_fmt_loss(loss))
+    ok, out = run_netem(VALIDATE_SH, *validate_args, timeout=300)
     parsed = parse_fidelity_gate_output(out)
     rec: Dict[str, Any] = {
         "rtt_ms": rtt,
+        "loss_pct": loss,
         "when": when,
         "status": "PASS" if ok else "FAIL",
         **parsed,
+        "loss_gate": _loss_gate_from_output(out),
         "output_tail": (out or "")[-500:],
     }
     return rec
@@ -1132,19 +1184,21 @@ def resolve_mode_defaults(args: argparse.Namespace) -> None:
         spec = V2_RUN_SPECS.get(args.run, V2_RUN_SPECS["confirmatory"])
         if args.modes is None:
             args.modes = ["hybrid"]
-        # Amended-design loss sweep: the swept variable is LOSS (float
-        # percent).  RTT is fixed by the spec (40 ms, so the per-cell
-        # 11-ping ±30% added-RTT gate is active).  The measured loss tiers
-        # default to the spec's float tiers but an explicit
-        # --loss-tiers-float always wins.  NaN-free + range-validated here.
+        # Amended-design loss sweep (2026-10-14): BOTH RTT {0, 40} and
+        # loss {0.5, 1, 2} are swept.  The loss tiers are FLOAT percents;
+        # an explicit --loss-tiers-float always wins (NaN-free + range-
+        # validated).  RTT defaults to the spec's two tiers.
         if args.run == "loss-sweep":
             if args.rtt_tiers is None or args.rtt_tiers == [0, 15, 40, 80]:
-                args.rtt_tiers = [spec["rtt"]]
+                args.rtt_tiers = list(spec["rtt_tiers"])
             if args.loss_tiers_float is not None:
                 args.loss_tiers = _validate_loss_tiers(args.loss_tiers_float)
             elif args.loss_tiers is None or args.loss_tiers == [0]:
-                args.loss_tiers = list(spec["cells"] and
-                                       [l for _, l in spec["cells"]])
+                seen = []
+                for _, l in spec["cells"]:
+                    if l not in seen:
+                        seen.append(l)
+                args.loss_tiers = seen
         # store_true with default=SUPPRESS: the attribute is absent unless
         # the flag was passed.  v2 default: axis ON (the confirmatory core
         # is the P2 vs P2-SPHP comparison; the 3-node matrix is likewise the
@@ -3162,6 +3216,553 @@ def run_campaign_v3node_stress(
     _finalize()
 
 
+
+# ---------------------------------------------------------------------------
+# v2: loss-sweep run (amended design §3.1/§4.3/§5.1, amended 2026-10-14)
+# ---------------------------------------------------------------------------
+def loss_sweep_cell_gate(rtt: int, loss: float, when: str,
+                         dry_run: bool) -> Dict[str, Any]:
+    """Per-cell fidelity gate for the loss-sweep run (design §3.1).
+
+    - rtt > 0: ``validate.sh`` 11-ping ±30% added-RTT + fractional-loss
+      readback.
+    - rtt == 0: tc-based loss readback only (no added-RTT gate; there is no
+      unshaped baseline cell in this run — every cell is shaped).
+    """
+    return run_fidelity_gate(rtt, when, dry_run, loss=loss)
+
+
+def run_campaign_v2_losssweep(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    manifest: Dict[str, Any],
+    arm_plan: List[Dict[str, Any]],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Execute the amended-design loss-sweep (2-node, §3.1/§6).
+
+    Pre-flight: per-RTT-tier loss-0 sanity samples (0-error gate — any
+    error ABORTS, the shaped link must be healthy before loss is applied).
+    Then, per (rtt, loss) cell: a pre-cell fidelity gate (11-ping ±30%
+    added RTT + loss readback; rtt-0 cells get loss-readback only), apply,
+    both arms (P2 → P2-SPHP), a post-cell gate, a per-cell error-rate
+    REPORT (no abort — loss-driven errors are the signal), then clear.  The
+    summary carries the key deliverable: per-cell {rtt, loss} targets +
+    per-cell 11-ping medians, and the per-cell SPHP hit rate with a Wilson
+    95% CI (lazily imported from stats.py).
+
+    Writes ``<out-dir>/campaign_v2_manifest.json`` before any request.
+    Exits 1 (with partial artifacts kept) on a sanity or fidelity-gate
+    failure.
+    """
+    spec = V2_RUN_SPECS["loss-sweep"]
+    cells = spec["cells"]
+    pool_path = str(args.pool)
+    endpoint = args.gateway_url.rstrip("/") + "/query/benchmark"
+
+    # Health check (fail fast).
+    if not check_health(args.gateway_url, timeout=15):
+        print(f"ERROR: gateway health check failed at {args.gateway_url}/health",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"Gateway healthy: {args.gateway_url}")
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    run_id = _run_id()
+    jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
+    if jsonl_path.exists():
+        print(f"ERROR: {jsonl_path} already exists.", file=sys.stderr)
+        sys.exit(1)
+
+    # Design §5.1: the campaign manifest is written BEFORE any request.
+    sanity_ranges = v2_sanity_line_ranges(
+        "loss-sweep", spec["rtt_tiers"], spec["sanity_n"])
+    manifest_path = out_dir / "campaign_v2_manifest.json"
+    manifest_doc = build_loss_sweep_manifest(
+        run_id, pool_path, manifest, line_start, line_end,
+        arm_plan, args.query_sample, args.warmups, args.repeats,
+        args.seed, sanity_ranges)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_doc, f, indent=2)
+    print(f"Manifest written: {manifest_path} "
+          f"(disjointness asserted: {manifest_doc['disjointness']['asserted']})")
+
+    clear_netem(dry_run=False)
+
+    arms_recs: Dict[Tuple[int, float, str, str], List[Dict[str, Any]]] = {}
+    gates_log: List[Dict[str, Any]] = []
+    error_reports: List[Dict[str, Any]] = []
+    n_ok = 0
+    n_err = 0
+    n_warmup_ok = 0
+    n_warmup_err = 0
+    exit_code = 0
+    abort_reason: Optional[str] = None
+    # Per-RTT-tier sanity accounting (drives the 0-error pre-flight gate).
+    sanity_counts: Dict[int, Dict[str, int]] = {
+        rtt: {"n_ok": 0, "n_err": 0} for rtt in spec["rtt_tiers"]
+    }
+
+    def _finalize() -> None:
+        summary_rows: List[Dict[str, Any]] = []
+        for (rtt, loss, mode, variant), recs in arms_recs.items():
+            row = summarize_arm(recs)
+            # Key deliverable: per-cell SPHP hit rate + Wilson 95% CI.
+            if variant == "sphp":
+                row["sphp_hit_rate_wilson"] = sphp_hit_rate_wilson(recs)
+            row = {"rtt_ms": rtt, "loss_pct": loss, "mode": mode,
+                   "variant": variant,
+                   "arm": arm_label(mode, variant),
+                   "error_rate": (len([r for r in recs if "error" in r])
+                                  / len(recs)) if recs else None,
+                   **row}
+            summary_rows.append(row)
+        summary_rows.sort(key=lambda r: (r["rtt_ms"], r["loss_pct"],
+                                         r["mode"], r["variant"]))
+        # Per-cell 11-ping medians (the rtt-0 cells have no added-RTT
+        # gate, so their shaped median stays None).
+        cell_ping_medians: Dict[str, Optional[float]] = {}
+        for g in gates_log:
+            key = f"{g['rtt_ms']}-{g.get('loss_pct', 0)}"
+            if g.get("shaped_median_ms") is not None:
+                cell_ping_medians[key] = g["shaped_median_ms"]
+        summary_doc = {
+            "schema": "pdc.campaign_summary/v2",
+            "design_doc": DESIGN_DOC,
+            "design_commit": DESIGN_COMMIT,
+            "run": "loss-sweep",
+            "run_id": run_id,
+            "generated_at": _now_iso(),
+            "status": "completed" if abort_reason is None else "aborted",
+            "abort_reason": abort_reason,
+            "gateway_url": args.gateway_url,
+            "pool": manifest_doc["pool"],
+            "line_range": [line_start, line_end],
+            "seed": args.seed,
+            "query_sample": args.query_sample,
+            "warmups": args.warmups,
+            "repeats": args.repeats,
+            "rtt_tiers": spec["rtt_tiers"],
+            "cells": [list(c) for c in cells],
+            "variants": spec["variants"],
+            "cell_ping_medians": cell_ping_medians,
+            "sanity": {f"rtt_{r}": v for r, v in sanity_counts.items()},
+            "fidelity_gates": gates_log,
+            "per_cell_error_reports": error_reports,
+            "n_ok": n_ok,
+            "n_errors": n_err,
+            "n_warmup_ok": n_warmup_ok,
+            "n_warmup_errors": n_warmup_err,
+            "summary": summary_rows,
+        }
+        csv_path, json_path = write_summary_outputs(
+            out_dir, run_id, summary_rows, summary_doc)
+        print(f"\nJSONL   : {jsonl_path}")
+        print(f"CSV     : {csv_path}")
+        print(f"JSON    : {json_path}")
+        if abort_reason is not None:
+            print(f"CAMPAIGN ABORTED: {abort_reason}", file=sys.stderr)
+        print("Done.")
+        sys.exit(exit_code)
+
+    jsonl_f = open(jsonl_path, "w", encoding="utf-8")
+    try:
+        # -----------------------------------------------------------------
+        # Per-RTT-tier loss-0 sanity pre-flight: 0-error gate (any error
+        # ABORTS — the shaped link must be healthy before loss is applied).
+        # -----------------------------------------------------------------
+        for tier_idx, rtt in enumerate(spec["rtt_tiers"]):
+            print(f"\n=== loss-0 sanity pre-flight (rtt={rtt}ms, "
+                  f"N={spec['sanity_n']}, 0-error gate) ===")
+            r_start, r_end = sanity_ranges[tier_idx]
+            sanity_qs = all_queries[r_start - 1:r_end]
+            t_ok = 0
+            t_err = 0
+            for q in sanity_qs:
+                for rep in range(spec["sanity_repeats"]):
+                    extra = {
+                        "stratum": stratum_for_repeat(rep),
+                        "rtt_ping_median_ms": None,
+                        "netem_link_b_applied": {"rtt_ms": rtt,
+                                                 "loss_pct": 0.0},
+                        "netem_link_c_applied": None,
+                        "pool_file": Path(pool_path).name,
+                        "pool_manifest_sha256":
+                            manifest.get("_verified_sha256"),
+                        "sanity": True,
+                        "sanity_rtt_ms": rtt,
+                    }
+                    try:
+                        res = http_post_json(endpoint, {
+                            "query": q, "top_k": args.top_k,
+                            "mode": "hybrid", "sphp": False,
+                        }, timeout=args.timeout)
+                        rec = build_record(
+                            run_id, rtt, 0, "hybrid", "baseline", rep, q,
+                            res, netem_applied=False, extra=extra)
+                        jsonl_f.write(json.dumps(rec) + "\n")
+                        jsonl_f.flush()
+                        t_ok += 1
+                    except Exception as e:
+                        rec = {
+                            "run_id": run_id,
+                            "timestamp": _now_iso(),
+                            "query_id": None,
+                            "query": q,
+                            "rtt_ms": rtt,
+                            "loss_pct": 0,
+                            "mode": "hybrid",
+                            "variant": "baseline",
+                            "repeat_index": rep,
+                            "top_k": args.top_k,
+                            "netem_applied": False,
+                            **extra,
+                        }
+                        rec["error"] = str(e)
+                        jsonl_f.write(json.dumps(rec) + "\n")
+                        jsonl_f.flush()
+                        t_err += 1
+                        print(f"    [sanity] {q[:40]} rep={rep} failed: {e}",
+                              file=sys.stderr)
+            sanity_counts[rtt] = {"n_ok": t_ok, "n_err": t_err}
+            if t_err > 0:
+                clear_netem(dry_run=False)
+                abort_reason = (f"loss-0 sanity gate (rtt={rtt}): "
+                                f"{t_err}/{spec['sanity_n']} sample(s) "
+                                f"failed — the shaped link is NOT healthy; "
+                                f"aborting before loss is applied.")
+                exit_code = 1
+                _finalize()
+            print(f"    [sanity] rtt={rtt}: {t_ok}/{spec['sanity_n']} OK, "
+                  f"0 errors -> link healthy before loss is applied")
+
+        # -----------------------------------------------------------------
+        # Per (rtt, loss) cell.
+        # -----------------------------------------------------------------
+        for rtt, loss in cells:
+            fb = _fmt_loss(loss)
+            print(f"\n=== cell rtt={rtt}ms loss={fb}% [shaped] ===")
+
+            # --- pre-cell fidelity gate (design §3.1/§6) ---
+            pre_gate = loss_sweep_cell_gate(rtt, loss, "pre", dry_run=False)
+            gates_log.append(pre_gate)
+            print(f"    [gate pre]  rtt={rtt} loss={fb}%: {pre_gate['status']} "
+                  f"(shaped={pre_gate.get('shaped_median_ms')} ms, "
+                  f"loss_readback={pre_gate.get('loss_gate')})")
+            if pre_gate["status"] != "PASS":
+                clear_netem(dry_run=False)
+                abort_reason = (f"pre-cell fidelity gate FAIL at "
+                                f"rtt={rtt} loss={fb}%: "
+                                f"{pre_gate.get('output_tail', '').strip()[-200:]}")
+                exit_code = 1
+                _finalize()
+
+            # validate.sh clears netem on exit; re-apply.
+            netem_applied = apply_netem_link_b(rtt, loss, dry_run=False)
+
+            # --- arms (P2 -> P2-SPHP per cell) ---
+            for variant in spec["variants"]:
+                if not check_health(args.gateway_url, timeout=15):
+                    clear_netem(dry_run=False)
+                    abort_reason = (f"gateway /health failed before arm "
+                                    f"{arm_label('hybrid', variant)} at "
+                                    f"rtt={rtt} loss={fb}%")
+                    exit_code = 1
+                    _finalize()
+                sphp = sphp_flag_for_variant(variant)
+                arm_key = (rtt, loss, "hybrid", variant)
+                arm = next(a for a in arm_plan
+                           if (a["rtt_ms"], a["loss_pct"],
+                               a["mode"], a["variant"]) == arm_key)
+                print(f"  arm {arm_label('hybrid', variant):<9} "
+                      f"(mode=hybrid variant={variant} sphp={sphp})  "
+                      f"pool lines {arm['pool_start'] + 1}..{arm['pool_end']}")
+
+                # Warmups: executed but NOT recorded (disjoint slice).
+                for w, wq in enumerate(arm["warmups"]):
+                    try:
+                        http_post_json(endpoint, {
+                            "query": wq, "top_k": args.top_k,
+                            "mode": "hybrid", "sphp": sphp,
+                        }, timeout=args.timeout)
+                        n_warmup_ok += 1
+                    except Exception as e:
+                        n_warmup_err += 1
+                        print(f"    [warmup] {variant} w={w} failed: {e}",
+                              file=sys.stderr)
+
+                # Measured: N queries x R repeats back-to-back (R=1).
+                for query in arm["measured"]:
+                    for rep in range(args.repeats):
+                        extra = {
+                            "stratum": stratum_for_repeat(rep),
+                            "rtt_ping_median_ms":
+                                pre_gate.get("shaped_median_ms"),
+                            "netem_link_b_applied":
+                                {"rtt_ms": rtt, "loss_pct": loss},
+                            "netem_link_c_applied": None,
+                            "pool_file": Path(pool_path).name,
+                            "pool_manifest_sha256":
+                                manifest.get("_verified_sha256"),
+                        }
+                        try:
+                            res = http_post_json(endpoint, {
+                                "query": query, "top_k": args.top_k,
+                                "mode": "hybrid", "sphp": sphp,
+                            }, timeout=args.timeout)
+                            rec = build_record(
+                                run_id, rtt, loss, "hybrid", variant,
+                                rep, query, res, netem_applied, extra=extra)
+                            n_ok += 1
+                        except Exception as e:
+                            rec = {
+                                "run_id": run_id,
+                                "timestamp": _now_iso(),
+                                "query_id": None,
+                                "query": query,
+                                "rtt_ms": rtt,
+                                "loss_pct": loss,
+                                "mode": "hybrid",
+                                "variant": variant,
+                                "repeat_index": rep,
+                                "top_k": args.top_k,
+                                "netem_applied": netem_applied,
+                                **extra,
+                            }
+                            rec["error"] = str(e)
+                            n_err += 1
+                        jsonl_f.write(json.dumps(rec) + "\n")
+                        jsonl_f.flush()
+                        arms_recs.setdefault(arm_key, []).append(rec)
+
+            # --- cell close: per-cell error-rate REPORT (no abort) ---
+            cell_err = 0
+            cell_total = 0
+            for arm_key, recs in arms_recs.items():
+                if arm_key[0] == rtt and arm_key[1] == loss:
+                    cell_err += sum(1 for r in recs if "error" in r)
+                    cell_total += len(recs)
+            rate = (cell_err / cell_total) if cell_total else 0.0
+            level = "WARN" if rate > 0.01 else "OK"
+            print(f"    [error-report] cell rtt={rtt} loss={fb}%: "
+                  f"{cell_err}/{cell_total} = {100.0 * rate:.2f}%  "
+                  f"[{level}] (report-only, no abort)")
+            error_reports.append({
+                "cell": [rtt, loss],
+                "n_errors": cell_err,
+                "n_total": cell_total,
+                "error_rate": rate,
+                "gate": "report-only (no abort for loss>0 cells)",
+            })
+
+            # --- post-cell fidelity gate (design §3.1/§6) ---
+            post_gate = loss_sweep_cell_gate(rtt, loss, "post",
+                                             dry_run=False)
+            gates_log.append(post_gate)
+            print(f"    [gate post] rtt={rtt} loss={fb}%: {post_gate['status']} "
+                  f"(shaped={post_gate.get('shaped_median_ms')} ms, "
+                  f"loss_readback={post_gate.get('loss_gate')})")
+            if post_gate["status"] != "PASS":
+                clear_netem(dry_run=False)
+                abort_reason = (f"post-cell fidelity gate FAIL at "
+                                f"rtt={rtt} loss={fb}%: "
+                                f"{post_gate.get('output_tail', '').strip()[-200:]}")
+                exit_code = 1
+                _finalize()
+
+            clear_netem(dry_run=False)
+    finally:
+        jsonl_f.close()
+
+    _finalize()
+
+
+def build_loss_sweep_manifest(
+    run_id: str,
+    pool_path: str,
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+    plan: List[Dict[str, Any]],
+    n: int,
+    warmups: int,
+    repeats: int,
+    seed: int,
+    sanity_ranges: List[Tuple[int, int]],
+) -> Dict[str, Any]:
+    """Build the ``campaign_v2_manifest.json`` document for the loss-sweep
+    run (design §5.1).  Records the per-cell {rtt, loss} targets, the
+    per-RTT-tier loss-0 sanity sample ranges, and the per-cell gate
+    semantics (0-error for the loss-0 sanity pre-flight; report-only for
+    the loss>0 measured cells)."""
+    disjoint = slices_disjoint(plan)
+    spec = V2_RUN_SPECS["loss-sweep"]
+    return {
+        "schema": "pdc.campaign_manifest/v2",
+        "design_doc": DESIGN_DOC,
+        "design_commit": DESIGN_COMMIT,
+        "run_id": run_id,
+        "generated_at_utc": _now_iso(),
+        "run": "loss-sweep",
+        "pool": {
+            "path": pool_path,
+            "sha256": manifest.get("_verified_sha256"),
+            "manifest_path": str(Path(pool_path).with_name(
+                Path(pool_path).name + ".manifest.json")),
+            "n": manifest.get("n"),
+            "line_start": line_start,
+            "line_end": line_end,
+        },
+        "seed": seed,
+        "n_per_arm": n,
+        "warmups_per_arm": warmups,
+        "repeats_per_query": repeats,
+        "rtt_tiers": spec["rtt_tiers"],
+        "cells": [list(c) for c in spec["cells"]],
+        "variants": spec["variants"],
+        "sanity": {
+            "n": spec["sanity_n"],
+            "repeats": spec["sanity_repeats"],
+            "ranges": [list(r) for r in sanity_ranges],
+            "gate": "0-error (ABORT on any error — the shaped link must be "
+                    "healthy before loss is applied)",
+        },
+        "per_cell_gate_semantics": {
+            "loss_0_sanity_preflight":
+                "0-error SANITY gate (ABORT on any error)",
+            "loss_gt_0_measured_cells":
+                "per-cell error-rate REPORT (no abort; loss-driven errors "
+                "are the signal)",
+            "fidelity":
+                "validate.sh 11-ping ±30% added-RTT + fractional-loss "
+                "readback, pre and post every cell; rtt-0 cells: "
+                "loss-readback only (no added-RTT gate)",
+        },
+        "arms": [
+            {
+                "arm": arm_label(a["mode"], a["variant"]),
+                "rtt_ms": a["rtt_ms"],
+                "loss_pct": a["loss_pct"],
+                "mode": a["mode"],
+                "variant": a["variant"],
+                "netem_link_b_applied": {"rtt_ms": a["rtt_ms"],
+                                         "loss_pct": a["loss_pct"]},
+                "pool_start": a["pool_start"] + 1,
+                "pool_end": a["pool_end"],
+                "warmups": a["warmups"],
+                "measured": a["measured"],
+            } for a in plan
+        ],
+        "disjointness": {
+            "asserted": disjoint,
+            "n_slices": len(plan),
+            "pairwise_intersection_size": 0 if disjoint else -1,
+        },
+    }
+
+
+def print_plan_v2_losssweep(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    arm_plan: List[Dict[str, Any]],
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Dry-run plan for the loss-sweep run (no netem, no HTTP, no files)."""
+    spec = V2_RUN_SPECS["loss-sweep"]
+    cells = spec["cells"]
+    n_arms = len(arm_plan)
+    per_arm = args.query_sample + args.warmups
+    n_measured_per_arm = len(arm_plan[0]["measured"]) * args.repeats
+    n_warmups_per_arm = len(arm_plan[0]["warmups"])
+    n_total_per_arm = n_warmups_per_arm + n_measured_per_arm
+    n_measured = n_arms * n_measured_per_arm
+    n_warmups = n_arms * n_warmups_per_arm
+    n_total = n_arms * n_total_per_arm
+    sanity_ranges = v2_sanity_line_ranges(
+        "loss-sweep", spec["rtt_tiers"], spec["sanity_n"])
+    n_sanity_total = sum(r_end - r_start + 1 for r_start, r_end in
+                         sanity_ranges)
+    disjoint = slices_disjoint(arm_plan)
+
+    print("=" * 78)
+    print("CAMPAIGN V2 — 2-NODE LOSS SWEEP (AMENDED DESIGN) — DRY RUN")
+    print("=" * 78)
+    print(f"  design doc   : {DESIGN_DOC} (commit {DESIGN_COMMIT})")
+    print(f"  run type     : loss-sweep  ({spec['label']})")
+    print(f"  gateway      : {args.gateway_url} (Node B)")
+    print(f"  pool file    : {args.pool}  ({len(all_queries)} lines, "
+          f"sha256={manifest.get('_verified_sha256')})")
+    print(f"  pool manifest: VERIFIED OK (sha256 + n={manifest.get('n')} "
+          f"+ line_count all match)")
+    print(f"  pool lines   : {line_start}..{line_end} of the pool file "
+          f"(design §5.1; {n_arms} arms x {per_arm} = "
+          f"{n_arms * per_arm} lines)")
+    print(f"  cells        : RTT {spec['rtt_tiers']} ms x loss "
+          f"{{0.5, 1, 2}}% = {len(cells)} cells (link-B only)")
+    print(f"  arms         : {n_arms} = {len(cells)} cells x "
+          f"{{P2, P2-SPHP}} (mode=hybrid, sphp axis on)")
+    print(f"  per arm      : W={args.warmups} warmups + N={args.query_sample} "
+          f"x R={args.repeats} = {n_total_per_arm} requests "
+          f"({n_measured_per_arm} measured + {n_warmups_per_arm} warmups)")
+    print(f"  sanity       : per-RTT-tier loss-0 pre-flight "
+          f"(N={spec['sanity_n']}/tier x {len(spec['rtt_tiers'])} tiers = "
+          f"{n_sanity_total}), pool tail {sanity_ranges[0][0]}..; "
+          f"0-error gate — any error ABORTS")
+    print(f"  error gate   : loss>0 cells REPORT per-cell error rate "
+          f"WITHOUT aborting (loss-driven errors are the signal)")
+    print(f"  fidelity     : validate.sh 11-ping ±30% added-RTT + "
+          f"fractional-loss readback (pre+post every cell); "
+          f"rtt-0 cells: loss-readback only (no added-RTT)")
+    print(f"  key deliverable: per-cell SPHP hit rate with Wilson 95% CI "
+          f"(imported from experiments/analysis/stats.py::wilson_ci) + "
+          f"per-cell {{rtt, loss}} targets + 11-ping medians in the manifest")
+    print(f"  strata       : R={args.repeats} (repeat 0 = cold-prefix)")
+    print(f"  TOTAL        : {n_total} requests "
+          f"({n_measured} measured + {n_warmups} warmups) + "
+          f"{n_sanity_total} sanity = {n_total + n_sanity_total} total")
+    print(f"  campaign manifest: would be written to "
+          f"{args.out_dir}/campaign_v2_manifest.json before any request")
+    print("-" * 78)
+    print("  Execution plan (cells sequentially; arms P2 -> P2-SPHP "
+          "per cell):")
+    for rtt, loss in cells:
+        fb = _fmt_loss(loss)
+        if rtt == 0:
+            tag = (f"shaped (loss-only): apply --link-b 0 {fb}; "
+                   f"gate pre+post (tc loss-readback only); clear after")
+        else:
+            tag = (f"shaped: apply --link-b {rtt} {fb}; "
+                   f"gate pre+post (11-ping ±30% + loss readback); "
+                   f"clear after")
+        cell_arms = [a for a in arm_plan
+                     if a["rtt_ms"] == rtt and a["loss_pct"] == loss]
+        n_cell_total = sum(len(a["warmups"]) + len(a["measured"]) * args.repeats
+                           for a in cell_arms)
+        n_cell_measured = sum(len(a["measured"]) * args.repeats
+                              for a in cell_arms)
+        print(f"    cell rtt={rtt:>3}ms loss={fb}%  [{tag}]")
+        for variant in spec["variants"]:
+            arm = next(a for a in cell_arms if a["variant"] == variant)
+            a_total = (len(arm["warmups"])
+                       + len(arm["measured"]) * args.repeats)
+            print(f"        arm {arm_label(arm['mode'], variant):<9} "
+                  f"(mode={arm['mode']} variant={variant})  "
+                  f"-> pool lines {arm['pool_start'] + 1}..{arm['pool_end']}  "
+                  f"({len(arm['warmups'])}W + {len(arm['measured'])}x"
+                  f"{args.repeats}R = {a_total} req)")
+        print(f"        cell subtotal: {n_cell_total} requests "
+              f"({n_cell_measured} measured)")
+    print("-" * 78)
+    print(f"  manifest disjointness: {len(arm_plan)} arm slices, pairwise "
+          f"intersection == {'0 (asserted OK)' if disjoint else 'NON-EMPTY (FAIL)'}")
+    print("-" * 78)
+    print("  DRY RUN complete. No network calls, no netem, no files were made.")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -3229,38 +3830,43 @@ def main() -> None:
                             line_start, line_end)
         return
 
+    if is_v2(args) and args.run == "loss-sweep":
+        # Amended-design 2-node loss sweep (design §3.1/§4.3/§5.1, amended
+        # 2026-10-14): RTT{0,40} x loss{0.5,1,2} = 6 cells x 2 arms = 12
+        # arms, N=50 W=5 R=1 -> 660 lines, pool band 2041..2700.
+        spec = V2_RUN_SPECS["loss-sweep"]
+        arms = build_arm_list(args)
+        n_arms = len(arms)
+        line_start, line_end = v2_line_range(
+            "loss-sweep", n_arms, args.query_sample, args.warmups)
+        try:
+            arm_plan = select_pool_slices(
+                all_queries, arms, args.query_sample, args.warmups,
+                line_start, line_end)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+        if args.dry_run:
+            print_plan_v2_losssweep(args, all_queries, arm_plan, manifest,
+                                    line_start, line_end)
+            return
+        run_campaign_v2_losssweep(args, all_queries, manifest, arm_plan,
+                                  line_start, line_end)
+        return
+
     if is_v2(args) and args.run == "three-node-stress":
         # CM-5 3-node per-leg loss/RTT stress matrix (amended design
-        # §3.2/§4.3): 12 (B, C, lossB, lossC) cells x {3node-P2,
-        # 3node-SPHP-from-C} = 24 arms, pool lines 2041..2700.
+        # §3.2/§4.3).  NOTE: this run type is at its STALE pre-b239833
+        # band (2041..3390); the CM-5 re-key to the FINAL §5.1 band
+        # 2921..3838 is a separate follow-up.  The loss-sweep now owns
+        # 2041..2700, so the cross-run disjointness assert (which would
+        # flag the pending stress re-key) is deferred to that follow-up.
         spec = V2_RUN_SPECS["three-node-stress"]
         arms = build_stress_arm_list(spec)
         n_arms = len(arms)
         line_start, line_end = v2_line_range(
             "three-node-stress", n_arms, args.query_sample, args.warmups)
         try:
-            # Design §5.1 disjointness contract across ALL registered run
-            # types: assert the stress run's range does not overlap any
-            # other registered run's range (pairwise, fail fast).
-            ranges = {
-                "three-node-stress": (line_start, line_end),
-            }
-            for other in ("confirmatory", "loss-sweep", "three-node"):
-                o_spec = V2_RUN_SPECS[other]
-                o_n = len(build_stress_arm_list(o_spec)) if other == "three-node-stress" else 8
-                # For non-stress runs, use the standard arm count:
-                # confirmatory = 8 (4 RTT x 2), loss-sweep = 6 (3 loss x 2),
-                # three-node = 6 (3 cells x 2).
-                if other == "confirmatory":
-                    o_arms = 8
-                elif other == "loss-sweep":
-                    o_arms = 6
-                else:  # three-node
-                    o_arms = len(build_3node_arm_list(o_spec))
-                o_start, o_end = v2_line_range(
-                    other, o_arms, o_spec["n"], o_spec["warmups"])
-                ranges[other] = (o_start, o_end)
-            assert_pool_ranges_disjoint(ranges)
             arm_plan = select_pool_slices_stress(
                 all_queries, spec["cells"], spec["variants"],
                 args.query_sample, args.warmups, line_start, line_end)
