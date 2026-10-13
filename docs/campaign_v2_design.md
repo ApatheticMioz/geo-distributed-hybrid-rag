@@ -4,6 +4,16 @@
 must be logged in §9 with justification — the v1 data files are the only
 unmodified reference).
 **Date:** 2026-10-12 · **Branch:** `feat/three-node-study`
+**Final amendment (2026-10-14, consolidated):** §3.1/§4.3 loss-sweep amended
+to the headline 2-arms-per-cell (P2 + P2-SPHP, full generation) matrix (12
+arms); §CM-4 genuine-WAN and §CM-5 three-node-stress registered; §5.1 final
+pool allocation over the 5,000-line master pool. See
+`docs/revision_log.md` "plan-vs-design reconciliation (2026-10-14,
+consolidated)". The committed/already-executed bands are immutable: the
+confirmatory core (pool lines 1..1040) and the three-node matrix (lines
+1371..1910, cells (B,C) ∈ {(15,15),(40,15),(80,15)}, arms {3node-P2,
+3node-SPHP-from-C}, N=80) — this amendment does **not** change their ranges,
+cells, or sizing.
 **Sources of record:** `docs/campaign_methodology.md` (LR-3 stats plan +
 empirical CV validation), `docs/related_work_landscape.md` LR-7 (methodology
 package) and LR-11 (regime grounding), `experiments/bench/campaign.py`
@@ -112,15 +122,27 @@ paper's methods section):**
 **Execution split (pre-registered):**
 - **Confirmatory core run:** RTT {0,15,40,80} × loss {0} only — this is the
   powered H2/H3 matrix (§4). Loss does not touch the primary family.
-- **Exploratory loss sweep (secondary BH family):** P2 only (no SPHP axis),
-  **retrieval-only**, N=50 per cell. The full 16-cell matrix is the design
-  space; the v2 execution triages it to the 6 cells where the effect is
-  expected to be resolvable — RTT {0, 40} × loss {0.5, 1, 2} → 6 arms
-  (RTT 15/80 × non-zero loss are out of budget: loss effects compound RTT
-  monotonically, so the 0/40 pair brackets the class).
-  Loss interacts with retrieval latency (retransmits), not with decode, so
-  this is measured without full generation; full-generation loss cells are out
-  of scope (budget; the 2% tier is a stress condition, not a confirmatory one).
+- **Exploratory loss sweep (secondary BH family).** Cells: RTT {0, 40} ×
+   loss {0.5, 1, 2} = **6 cells** (this is the 2-node / link-B loss sweep —
+   *not* the (B,C)-leg 3-node cells; loss is applied on the A↔B link only).
+   The full 16-cell matrix is the design space; the v2 execution triages it to
+   these 6 cells (RTT 15/80 × non-zero loss are out of budget: loss effects
+   compound RTT monotonically, so the 0/40 pair brackets the class).
+   **Amended 2026-10-14 (consolidated; supersedes the retrieval-only, P2-only
+   reading):** the key deliverable is the **SPHP hit rate under loss**, which a
+   P2-only sweep cannot produce, so every cell now runs **both** headline arms
+   `P2` (variant=baseline) **and** `P2-SPHP` (variant=sphp) = **12 arms**
+   (6 cells × 2 arms), at **full generation** (hit rate *and* TTFT/E2E are
+   recorded per record — the old retrieval-only restriction is dropped; the 2%
+   tier remains a *descriptive stress* condition, still not a confirmatory one).
+   **Gates (frozen):** (a) the **loss-0 baseline cell at the same RTT** is a
+   0-error sanity pre-flight (a small pre-flight sample; **abort the run on
+   any error** — the shaped link must be healthy before loss is applied); (b)
+   the loss-shaped cells **report their per-cell error rate without aborting**
+   (loss-driven errors are the signal, not a campaign failure). Fidelity gates
+   are **unchanged**: per-cell 11-ping median ±30% added-RTT window **plus a
+   tc-based fractional-loss readback**, run pre- and post- every cell. Sizing:
+   N=50 / W=5 / R=1 → 55 pool lines per arm (see §4.3, §5.1).
 
 ### 3.2 3-node per-leg shaping spec
 
@@ -157,12 +179,63 @@ Internet path of the 3-node mesh, per the roadmap) with **all netem removed**
   every 5 s) to both peer IPs, logging per-ping RTT, inter-ping jitter, and
   loss fraction over the whole leg; plus the node placement + network metadata
   with every record (the proposal's lesson from the lost 100-query log).
-- **Sample:** 100 queries per variant (P2, P2-SPHP) = 200 queries total,
-  3 repeats each (600 records; not powered — characterization only).
-- **Use:** report the realized RTT/loss/jitter distribution *alongside* the
-  emulated-leg numbers at the same tier values; the emulated-vs-real gap is
-  the LR-7 element-6 fidelity metric (`calf2026` pattern (a)+(b); `chen2026rdmawan`).
+- **Cells / arms (amended 2026-10-14, registered as CM-4; the pre-2026-10-14
+  reading was a single leg):** two real paths the mesh traverses — the
+  **2-node** path (client → Node B, `10.8.0.2`, the A↔B public-Internet route)
+  and the **3-node** path (client → Node C, `10.8.0.3`, the user-facing
+  gateway) — each run with its two placement arms: 2-node = {`P2`, `P2-SPHP`},
+  3-node = {`3node-P2`, `3node-SPHP-from-C`}. **4 arms** total (2 cells × 2
+  arms), N=50 / W=5 / R=1 → 55 pool lines per arm → 220 lines (§4.3, §5.1).
+  Not powered — characterization/descriptive only (BH secondary), never part
+  of the Holm/BH confirmatory families.
+- **Prerequisite / gate:** netem OFF and **verified pristine per cell**
+  (`clear.sh` then `show.sh`, re-verified before each of the two cells). There
+  is **no §3.1-style fidelity gate** here — the unshaped path *is* the subject
+  of this leg, so no added-RTT or loss readback is applied.
+- **Real-path RTT probe:** for every measured record the driver logs a
+  per-record real-path RTT (`rtt_probe_ms`, a TCP connect to the cell's
+  gateway service port — the established RTT proxy, since ICMP ping is
+  blocked in the sandbox) measured pre-arm from the same client, alongside
+  the `X-` wall timings.
+- **Deliverable:** the **emulation-fidelity table** — per-cell real-path RTT
+  (p50/p95 of the per-record probes) and per-arm latency stats, reported
+  *alongside* the shaped-regime model predictions at the same tier values;
+  the emulated-vs-real gap is the LR-7 element-6 fidelity metric
+  (`calf2026` pattern (a)+(b); `chen2026rdmawan`). The cost-model wiring is
+  left to the analysis layer (the driver records raw real-path stats only).
   It is **not** part of the Holm/BH families; it calibrates the emulation
+  claim.
+  
+### 3.4 Three-node per-leg loss/RTT stress matrix (CM-5; descriptive / stress)
+  
+A per-leg stress run over the 3-node topology (queries enter at the Node C
+gateway, `10.8.0.3`; same manifest discipline as §3.2). It is **descriptive
+/ stress** — BH secondary, *no confirmatory claims* (the multi-cell float-loss
+conditions are stress levels, not powered tiers).
+  
+- **Cells (27):** three per-leg **float-loss tiers** {0.5, 1, 2}% × three
+  **leg-placements** {loss on the **B leg**, loss on the **C leg**, loss on
+  **both legs**} × three **(B,C) RTT cells** (15,15) / (40,15) / (80,15).
+  The **C leg is frozen at 15 ms** (the user-facing sparse leg, §3.2); the B
+  leg carries the swept RTT. So each cell is (rtt_B, rtt_C, loss_B, loss_C):
+  for each (rtt_B, rtt_C) ∈ {(15,15),(40,15),(80,15)} and each loss tier
+  ∈ {0.5,1,2} there are three placements — (loss,0), (0,loss), (loss,loss).
+  = 3 RTT × 3 tiers × 3 placements = **27 cells**.
+- **Arms (2 per cell):** `{3node-P2, 3node-SPHP-from-C}` — exactly the §3.2
+  3-node arms → **54 arms** (27 × 2). Each cell shapes **both** legs
+  independently via `apply.sh --link-b <RTT_B> <LOSS_B> --link-c <RTT_C>
+  <LOSS_C>` (fractional loss — the 2026-10-14 netem fix).
+- **Gates:** a **baseline unshaped (0,0) sanity pre-flight** (a small
+  pre-flight sample from the unused pool tail; **abort on any error** — the
+  link must be healthy before loss is applied); per-leg 11-ping ±30%
+  added-RTT fidelity gate **plus** the tc-based loss readback, pre- and
+  post- every cell; the shaped cells **report their per-cell error rate
+  without aborting** (loss-driven errors are the signal).
+- **Deliverable:** **per-cell SPHP-from-C hit rate with a Wilson 95% CI**
+  (imported from `experiments/analysis/stats.py::wilson_ci`, not
+  re-implemented) — the key CM-5 output — plus per-cell TTFT/E2E and error
+  rate (descriptive).
+  
   claim.
 
 ## 4. Sample sizes (powered from the methodology CVs)
@@ -214,55 +287,143 @@ SPHP TTFT 0.198–0.282 (cold 0.198–0.243; warm 0.209–0.282); total_ms
 
 ### 4.3 Exploratory N (frozen)
 
-- **2-node loss sweep (§3.1):** retrieval-only, N = 50 per cell (6 arms) —
-  descriptive/BH only; CV-based powered claims on retrieval-only cells are
-  not made (that is a characterization of leg behavior, not a confirmatory
-  effect).
-- **3-node arms (§2.2):** N = 80 per arm (10 warmups + 80 measured per
-  disjoint slice) — the SPHP-from-C vs SPHP-from-B *paired* contrast runs at
-  N = 100 paired queries (same queries, so no extra warmups); dropout arms
+- **2-node loss sweep (§3.1, amended):** **full generation**, both arms
+  {P2, P2-SPHP} per cell = **12 arms**; N = 50 / W = 5 / R = 1 → 55 pool
+  lines per arm → **660 pool lines** (12 × 55). Descriptive/BH only — no
+  CV-based powered claim on loss cells; the key deliverable is the per-cell
+  SPHP hit rate with a Wilson 95% CI (§7).
+- **3-node arms (§2.2 / §3.2):** N = 80 per arm, W = 10, R = 3 (10 warmups +
+  80 measured per disjoint slice) — **frozen, executed, committed** (the
+  (B,C) ∈ {(15,15),(40,15),(80,15)} cells × {3node-P2, 3node-SPHP-from-C} = 6
+  arms → 540 pool lines); the SPHP-from-C vs SPHP-from-B *paired* contrast runs
+  at N = 100 paired queries (same queries, so no extra warmups); dropout arms
   N = 60, each with 1 pre-dropout warm + 4 post-dropout warm repeats per
   query (§2.2).
-- **Genuine-WAN leg (§3.3):** 100 queries — characterization only.
+- **CM-4 genuine-WAN (§3.3, amended):** 2 cells × 2 arms = **4 arms**; N = 50 /
+  W = 5 / R = 1 → 55 pool lines per arm → **220 pool lines**. Characterization
+  only (descriptive, BH secondary) — not powered; not part of the Holm/BH
+  confirmatory families.
+- **CM-5 three-node-stress (§3.4, new):** 27 cells × 2 arms = **54 arms**;
+  **N = 15 / W = 2 / R = 1 → 17 pool lines per arm → 918 pool lines** (54 × 17).
+  Sizing arithmetic: 54 arms × (15 + 2) = 54 × 17 = 918. This was chosen so
+  that the entire pool fits with headroom (see the §5.1 allocation table and
+  assert block). Stressed/descriptive — BH secondary, *no confirmatory
+  claims*; the key deliverable is the per-cell SPHP-from-C hit rate with a
+  Wilson 95% CI.
 
-**Totals (driver must print these in the dry-run plan):**
+**Totals (driver must print these in the dry-run plan; finalized 2026-10-14):**
 
-| Run | Arms | N/arm | R | W/arm | Measured records | Total requests |
-|---|---|---|---|---|---|---|
-| v2 confirmatory core (2-node) | 8 (4 RTT × {P2, P2-SPHP}) | 120 | 3 | 10 | 2,880 | 2,960 |
-| v2 loss sweep (2-node, retrieval-only) | 6 | 50 | 3 | 5 | 900 | 930 |
-| **v2 core total** | | | | | **29,700** | **29,810** |
-| WS-CM 3-node | 6 (3 (B,C) cells × 2 arms) | 80 | 3 | 10 | 14,400 | 15,000 |
-| WS-CM dropout (3-node) | 2 | 60 | 5 | 5 | 600 | 610 |
-| Genuine-WAN leg | 2 | 100 | 3 | 5 | 600 | 610 |
+| Run | Arms | N/arm | R | W/arm | Lines/arm (N+W) | Measured records | Pool lines |
+|---|---|---|---|---|---|---|---|
+| v2 confirmatory core (2-node) | 8 (4 RTT × {P2, P2-SPHP}) | 120 | 3 | 10 | 130 | 2,880 | 1,040 (1..1040) |
+| v2 loss sweep (2-node, full gen, both arms) | 12 (6 cells × {P2, P2-SPHP}) | 50 | 1 | 5 | 55 | 600 | 660 (1041..1700) |
+| WS-CM 3-node (frozen) | 6 (3 (B,C) cells × 2 arms) | 80 | 3 | 10 | 90 | 1,440 | 540 (1371..1910) |
+| WS-CM dropout (3-node) | 2 | 60 | 5 | 5 | 65 | 600 | 130 (1911..2040) |
+| CM-4 genuine-WAN (netem OFF) | 4 (2 paths × 2 arms) | 50 | 1 | 5 | 55 | 200 | 220 (2041..2260) |
+| CM-5 three-node-stress | 54 (27 cells × 2 arms) | 15 | 1 | 2 | 17 | 810 | 918 (2261..3178) |
+
+*(Measured records = arms × N. Pool lines = arms × (N + W), i.e. measured
+queries plus that arm's disjoint warmup slice. The confirmatory core's
+measured-record count of 2,880 = 8 × 120 × 3 repeats (repeat 0..2 all
+recorded); the loss-sweep / CM-4 / CM-5 / 3-node / dropout rows count one
+record per query-repeat as executed — R is the repeat depth. Pool-line
+accounting is the operative budget and is exact in every row; see §5.1 for
+the disjoint allocation and assert.)*
 
 The current driver (`build_arm_query_plan`) already produces disjoint seeded
-slices and fails fast on pool exhaustion; v2 adds `--query-sample 120`
-support, the per-leg `--link-c` argument, retrieval-only mode, and the
-manifest writer (§5). Runtime estimate: full-generation requests run at
-≈ total_ms + overhead (~3 s each, v1 measured 2.3–3.2 s total_ms) ⇒ the
-confirmatory core ≈ 2,960 × 3 s ≈ **~2.5 h (one overnight batch)**; the
-retrieval-only loss sweep ≈ 900 × ~1.5 s ≈ 25 min.
+slices and fails fast on pool exhaustion; the finalized v2 spec adds
+`--query-sample` per run type, the per-leg `--link-c` argument, the
+fractional-loss (`--loss-tiers-float`) interface, full-generation loss-sweep
+mode, and the manifest writer (§5). Runtime estimate: full-generation
+requests run at ≈ total_ms + overhead (~3 s each; v1 measured 2.3–3.2 s
+total_ms) ⇒ confirmatory core ≈ 2,960 × 3 s ≈ **~2.5 h (one overnight
+batch)**; the amended loss sweep ≈ 600 requests ≈ ~30 min; CM-4 ≈ 200
+requests ≈ ~10 min; CM-5 ≈ 810 requests ≈ ~45 min.
 
 ## 5. Query pools
 
-### 5.1 Naming & files
+### 5.1 Naming & files — FINAL pool allocation (2026-10-14, consolidated)
 
 | File | Content | Use |
 |---|---|---|
-| `experiments/bench/queries/campaign_v2_dev2250_seed42.txt` | **2,250** distinct MS MARCO dev queries, seeded shuffle (seed 42) — the **core confirmatory pool** = the first 1,040 lines; the **master exploratory pool** = lines 1,041–2,250 | v2 core: 8 arms × (120+10) = 1,040 (lines 1–1,040); loss sweep 6 × (50+5) = 330 (lines 1,041–1,370); WS-CM 3-node 6 × (80+10) = 540 (lines 1,371–1,910); WS-CM dropout 2 × (60+5) = 130 (lines 1,911–2,040); genuine-WAN 2 × (100+5) = 210 (lines 2,041–2,250) |
+| `experiments/bench/queries/campaign_v2_master5000_seed42.txt` | **5,000** distinct MS MARCO dev queries, seeded shuffle (seed 42) — the single **master pool** from which every run type takes a disjoint slice | allocation table + assert block below |
 
-- Generated by `scripts/make_latency_sample.py --n 2250 --seed 42` from
+- Generated by `scripts/make_latency_sample.py --n 5000 --seed 42` from
   `data/msmarco/queries.dev.tsv` (the 6,980-query dev set with qrels; the
-  existing `latency_dev480_seed42.txt` and `latency_dev60_seed42.txt` remain
-  as v1 artifacts and are **not** consumed by v2).
+  pre-amendment `campaign_v2_dev2250_seed42.txt` and the v1
+  `latency_dev480_seed42.txt` / `latency_dev60_seed42.txt` remain artifacts and
+  are **not** consumed by the finalized v2 run).
+
+**Allocation (disjoint, 1-based inclusive ranges over the 5,000-line pool).**
+Design choice: each new run occupies a **single clean contiguous band**; the
+three 2026-10-14 runs (loss-sweep, CM-4, CM-5) are placed as one contiguous
+block immediately after the fixed dropout band (2041..3838) rather than
+straddling the frozen three-node band (1371..1910). The pre-amendment
+loss-sweep band **1041..1370 (330 lines) is now deliberately left unused** (a
+reserved gap): the amended loss-sweep is 660 lines and does not fit there, and
+splitting it across two bands would fragment the disjoint-manifest invariant.
+
+| # | Band (pool lines) | Length | Run | Arms | N | W | Lines/arm (N+W) |
+|---|---|---|---|---|---|---|---|
+| 1 | 1..1040 | 1040 | Confirmatory core (2-node) | 8 | 120 | 10 | 130 |
+| 2 | 1041..1370 | 330 | *(reserved gap — unused; pre-amendment loss-sweep band)* | — | — | — | — |
+| 3 | 1371..1910 | 540 | Three-node matrix (**frozen**) | 6 | 80 | 10 | 90 |
+| 4 | 1911..2040 | 130 | Dropout RQ2 | 2 | 60 | 5 | 65 |
+| 5 | 2041..2700 | 660 | **Loss-sweep (amended)** | 12 | 50 | 5 | 55 |
+| 6 | 2701..2920 | 220 | **CM-4 genuine-WAN** | 4 | 50 | 5 | 55 |
+| 7 | 2921..3838 | 918 | **CM-5 three-node-stress** | 54 | 15 | 2 | 17 |
+| 8 | 3839..5000 | 1162 | *free tail (spare; not allocated)* | — | — | — | — |
+
+**Arithmetic (inline):**
+- Band 1: 8 × (120+10) = 8 × 130 = **1,040** = 1040 − 1 + 1 ✓
+- Band 2 (gap): 1370 − 1041 + 1 = **330** (unused)
+- Band 3: 6 × (80+10) = 6 × 90 = **540** = 1910 − 1371 + 1 ✓ (frozen)
+- Band 4: 2 × (60+5) = 2 × 65 = **130** = 2040 − 1911 + 1 ✓
+- Band 5 (loss-sweep): 12 × (50+5) = 12 × 55 = **660** = 2700 − 2041 + 1 ✓
+- Band 6 (CM-4): 4 × (50+5) = 4 × 55 = **220** = 2920 − 2701 + 1 ✓
+- Band 7 (CM-5): 54 × (15+2) = 54 × 17 = **918** = 3838 − 2921 + 1 ✓
+- Band 8 (tail): 5000 − 3839 + 1 = **1162** (spare)
+- **Total check:** 1040 + 330 + 540 + 130 + 660 + 220 + 918 + 1162 = **5,000** ✓
+  (allocated runs 1,3,4,5,6,7 sum to 1040+540+130+660+220+918 = **3,508**; gap +
+  tail = 330 + 1162 = **1,492**; 3,508 + 1,492 = 5,000 ✓). **No two bands
+  overlap** and every run-band’s length equals its arms × (N+W) (the gap/tail
+  bands are simply the free spans).
+
+**Assert-style invariant (the driver tests mirror this exactly):**
+```python
+# master5000 layout — 1-based inclusive; must hold before any request is sent
+POOL  = 5000
+# name            -> (start, end, arms, n, w);  length == arms*(n+w) where arms>0
+BANDS = {
+    'confirmatory': (1,    1040,  8,  120, 10),
+    'gap_unused':   (1041, 1370,  0,    0,  0),  # reserved, unused
+    'three-node':   (1371, 1910,  6,   80, 10),  # FROZEN (committed + executed)
+    'dropout':      (1911, 2040,  2,   60,  5),
+    'loss-sweep':   (2041, 2700, 12,   50,  5),  # amended 2026-10-14
+    'genuine-wan':  (2701, 2920,  4,   50,  5),  # CM-4
+    'stress':       (2921, 3838, 54,   15,  2),  # CM-5
+    'free_tail':    (3839, 5000,  0,    0,  0),  # spare, unallocated
+}
+# 1. contiguous, no overlap, no gaps: sorted by start, each start == prev_end+1
+order = sorted(BANDS.items(), key=lambda kv: kv[1][1])
+prev  = 0
+for name, (s, e, arms, n, w) in order:
+    assert s == prev + 1, (name, s, prev)            # no overlap / no gap
+    if arms:
+        assert e - s + 1 == arms * (n + w), (name, e-s+1, arms*(n+w))
+    prev = e
+assert prev == POOL == 5000                          # covers the whole pool
+# 2. the frozen three-node band is byte-for-byte the committed one
+assert BANDS['three-node'] == (1371, 1910, 6, 80, 10)
+# 3. disjointness across every arm slice (incl. warmups) == ∅ (manifest check)
+```
+
 - **Disjointness manifest:** the driver writes
   `experiments/bench/campaigns/campaign_v2_manifest.json` before any request:
   per arm → `pool_start/pool_end`, the query list, the sha256 of the pool
   file, seed, and the disjointness assertion (pairwise intersection of all
   arm slices, including warmups, == ∅). The manifest is part of the
   AE-ready artifact (LR-7 element 8) and the analysis handoff.
-
 ### 5.2 Cold/warm strata handling & warmup policy
 
 - **Strata, not replicates** (methodology RQ-b2/RQ-b3): per measured query —
@@ -273,8 +434,8 @@ retrieval-only loss sweep ≈ 900 × ~1.5 s ≈ 25 min.
   N = 120 the warmup share is 7.7% vs 9.1%, keeping the cold reference clean
   while amortizing engine warm-start; warmup queries are arm-disjoint and
   **executed but not recorded**). Loss-sweep, 3-node, dropout, and
-  genuine-WAN arms: W = 5 as tabled (§4.3).
-  tabled.
+  genuine-WAN arms: W = 5 as tabled (§4.3); the CM-5 stress arms use W = 2
+  (a lighter warmup — the 27-cell matrix pays for it in pool budget, §5.1).
 - Disjoint per-arm slices guarantee no arm's repeat-0 prefixes are
   pre-cached by another arm (the v1 invariant, unchanged).
 
@@ -297,9 +458,12 @@ regimes as in v1):**
      degenerate — cold mean ≈ 2,650–2,742 ms, max 4,139 ms,
      `.scratch/metrology_audit.md`).
    - Gateway `/health` on A, B (and C for WS-CM).
-2. **Retrieval-only pre-pass** (loss sweep, §3.1): overnight, first batch —
-   retrieval-only is 3–5× cheaper than full generation, so the loss
-   findings are in hand even if the full-generation batch must be interrupted.
+2. **Loss-sweep pre-pass (amended, §3.1)** — first batch, overnight: a
+   loss-0 **0-error sanity pre-flight** (abort on any error), then the 6
+   loss cells × {P2, P2-SPHP} = 12 arms at **full generation** (hit rate
+   *and* TTFT/E2E recorded), with the 11-ping ±30% + loss-readback fidelity
+   gate pre/post each cell and per-cell error rates reported (no abort on
+   shaped cells).
 3. **Full-generation confirmatory core** (8 arms × 120 × 3): overnight
    batching — the driver batches per regime (4 RTT regimes sequentially,
    P2 → P2-SPHP per regime), with the 11-ping median fidelity gate
@@ -312,9 +476,17 @@ regimes as in v1):**
    error rate invalidates the strata and the run must be re-run, not
    patched). The WS-CM 3-node arms relax this to ≤1% error rate (real
    Internet legs) but the 2-node core stays at 0.
-5. **WS-CM 3-node + dropout + genuine-WAN leg** (separate workstream, same
-   manifest discipline; §3.3 leg runs last, netem verified off).
-6. **Post-campaign:** `clear.sh`, `show.sh` snapshot, then the §7 analysis
+5. **WS-CM 3-node + dropout + CM-5 stress** (separate workstream, same
+   manifest discipline): the frozen 3-node matrix (§3.2) and dropout arms
+   (§2.2), then the CM-5 three-node-stress matrix (§3.4) — a (0,0) unshaped
+   **0-error sanity pre-flight** (abort on any error), then the 27 cells ×
+   {3node-P2, 3node-SPHP-from-C} = 54 arms, both legs shaped per cell,
+   per-leg fidelity gate (11-ping ±30% + loss readback) pre/post each cell,
+   per-cell error rates reported (no abort), per-cell SPHP-from-C hit rate
+   with Wilson 95% CI.
+6. **CM-4 genuine-WAN leg (§3.3)** runs **last**, netem verified OFF/pristine
+   per cell, per-record real-path RTT probe logged.
+7. **Post-campaign:** `clear.sh`, `show.sh` snapshot, then the §7 analysis
    script; all outputs land in `experiments/bench/campaigns/` and
    `experiments/analysis/results/`.
 
@@ -325,6 +497,17 @@ regimes as in v1):**
   logged to the campaign JSONL as `rtt_ping_median_ms` per regime transition;
   a drift outside ±30% of the tier **aborts the campaign** (no re-shaping
   mid-arm).
+- **Loss cells (amended loss-sweep §3.1 + CM-5 §3.4):** the 11-ping ±30%
+  added-RTT gate is **augmented with a tc-based fractional-loss readback**
+  (per direction, |observed − expected/2| ≤ 0.05 pp, per the 2026-10-14
+  netem fix); run pre- and post- each loss cell. The loss-0 / (0,0)
+  **baseline cell is the 0-error sanity gate** (abort on any error); the
+  loss-shaped cells report per-cell error rate **without aborting**.
+- **CM-4 genuine-WAN leg (§3.3):** **no** added-RTT / loss-readback gate —
+  the gate only makes sense for a shaped leg. The precondition is a
+  **pristine** path: `clear.sh` then `show.sh` verified before each cell
+  (no netem/htb/`ifb` left), and the realized RTT is captured by the
+  per-record TCP probe instead.
 - **Real-WAN leg:** the §3.3 recorded distribution is the post-hoc
   emulated-vs-real gap report.
 
@@ -342,7 +525,9 @@ sanity artifact).
 | **H3 primary:** P2-SPHP vs P2, **cold** TTFT (repeat 0), each RTT tier | `bootstrap_delta_ci(sphp_cold, base_cold, stat="mean", method="bca", B=1000, seed=42)` + `bootstrap_delta_ci(…, stat="median")` | `permutation_test(sphp_cold, base_cold, stat="mean", alternative="less", n_resamples=10000, seed=42)` and `stat="median"` | **Holm** over the 4 cold cells (`holm`) |
 | H2 / warm: P2-SPHP vs P2, warm TTFT (repeats 1+), each RTT tier | same `bootstrap_delta_ci` | same `permutation_test` | **BH** (`benjamini_hochberg`) over the 4 warm cells |
 | H2 RTT slope: P2 TTFT vs RTT tier | descriptive: per-tier `bootstrap_ci(vals, stat="mean"/"p95", method="bca")`, slope reported with CI (regression on the cell means, flagged exploratory) | n/a | — |
-| H4 loss sweep: P2 retrieval (sparse_ms/dense_ms/total_ms) per (rtt, loss) cell vs loss=0 cell | `bootstrap_ci` per metric per cell; `bootstrap_delta_ci` for leg vs its loss=0 counterpart | `permutation_test` where a directional claim is made | **BH** over the sweep family |
+| H4 loss sweep (amended): P2 **and P2-SPHP** per (rtt, loss) cell — TTFT/E2E and **SPHP hit rate** vs the loss-0 baseline cell | `bootstrap_delta_ci(sphp, base, …)` per metric; **`wilson_ci(k, n)` per-cell SPHP hit rate** (the key deliverable: hit rate as a function of loss, 95% CI) | `permutation_test` where a directional claim is made | **BH** over the 12-arm sweep family (secondary; not confirmatory) |
+| CM-4 genuine-WAN (§3.3): real-path RTT (per-record TCP probe) + per-arm latency vs the emulated-regime model predictions | per-cell real-path `rtt_probe_ms` p50/p95 (`percentile`) + per-arm `bootstrap_ci` on ttft/total | n/a (characterization — **fidelity table**, not a hypothesis test) | **not in any Holm/BH family** (calibrates the emulation claim) |
+| CM-5 three-node-stress (§3.4): per-cell **SPHP-from-C hit rate** with Wilson 95% CI (key deliverable) + per-cell TTFT/E2E and error rate (descriptive) | **`wilson_ci(k, n)`** per cell; `bootstrap_ci` on ttft/total per cell | n/a (stress — descriptive, **no confirmatory claims**) | **BH** (descriptive family; 27 cells × 2 arms) |
 | 3-node: SPHP-from-C vs SPHP-from-B (paired) | `bootstrap_delta_ci(a, b, paired=True, stat="mean")` | `permutation_test` on the difference vector (paired) | **BH** |
 | Dropout: post-dropout vs pre-dropout (paired, same queries) | `bootstrap_delta_ci(…, paired=True)` for ttft_ms/total_ms; quality delta from qrels scorer | `permutation_test` paired | **BH** |
 | SPHP hit rate (h) | `wilson_ci(k, n)` per arm/stratum | — | — |
@@ -375,5 +560,37 @@ placement space).
 
 ## 9. Deviation log
 
-*(empty at pre-registration; post-run-start changes are appended here with
-date, actor, and justification.)*
+- **2026-10-14 (consolidated amendment; pre-execution for the three amended
+  runs) — actor: design owner, logged per `docs/revision_log.md`
+  "plan-vs-design reconciliation (2026-10-14, consolidated)".** Three
+  coordinated changes, all **pre-execution** for the runs they touch (the
+  confirmatory core 1..1040 and the three-node 1371..1910 are already
+  executed/committed and are **untouched**):
+  1. **Loss-sweep (§3.1/§4.3/§7):** P2-only / retrieval-only → **12 arms**
+     (RTT {0,40} × loss {0.5,1,2} = 6 cells, both `P2` and `P2-SPHP` per
+     cell) at **full generation**; key deliverable = **per-cell SPHP hit
+     rate + Wilson 95% CI vs loss** (P2-only cannot produce it). Gates:
+     loss-0 0-error sanity pre-flight (abort), shaped cells report per-cell
+     error without abort, 11-ping ±30% + fractional-loss readback pre/post.
+     Sized 12 × 55 = 660 lines → pool band **2041..2700** (the old 330-line
+     1041..1370 band is now a reserved gap).
+  2. **CM-4 genuine-WAN (§3.3):** amended from a single 100-query leg to
+     **2 real paths × 2 arms = 4 arms** (2-node B-gateway / 3-node
+     C-gateway), N=50/W=5/R=1, **netem OFF with pristine verification per
+     cell** (no fidelity gate — the unshaped path is the subject), per-record
+     real-path RTT (TCP) probe; deliverable = **emulation-fidelity table**.
+     → pool band **2701..2920**.
+  3. **CM-5 three-node-stress (NEW §3.4):** 27 per-leg cells (3 loss tiers ×
+     3 leg-placements × 3 (B,C) RTT cells; C frozen at 15 ms) × 2 arms
+     {3node-P2, 3node-SPHP-from-C} = **54 arms**, N=15/W=2/R=1 → 54 × 17 =
+     **918 lines** → pool band **2921..3838**; baseline (0,0) 0-error sanity
+     pre-flight, per-leg fidelity gate, per-cell error reporting, per-cell
+     SPHP-from-C hit rate + Wilson 95% CI; **descriptive/stress (BH), no
+     confirmatory claims**.
+  - **Rationale:** align the pre-registration with (a) the approved plan
+    mandate (headline arms + SPHP hit-rate-under-loss), (b) the in-progress
+    driver registration, and (c) the 2026-10-14 netem fractional-loss
+    pre-flight evidence. The finalized **§5.1 pool allocation** (5,000-line
+    master pool, disjoint bands, assert block) supersedes the pre-amendment
+    2,250-line layout. The frozen confirmatory and three-node bands are
+    byte-for-byte unchanged.
