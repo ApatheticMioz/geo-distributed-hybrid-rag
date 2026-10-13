@@ -1142,3 +1142,130 @@ def test_losssweep_gate_semantics_runner(tmp_path, monkeypatch):
     assert len(sphp_rows) == 6
     for r in sphp_rows:
         assert r["sphp_hit_rate_wilson"]["ci_95"] is not None
+
+
+# ---------------------------------------------------------------------------
+# v2: CM-5 three-node-stress run (final design b239833 §3.4 / §5.1)
+# ---------------------------------------------------------------------------
+def _stress_cells_from_design():
+    """Reconstruct the design §3.4 cell set independently: 3 (B,C) RTT cells
+    x 3 loss tiers {0.5,1,2} x 3 leg-placements {B, C, both}, C frozen at 15.
+    For each (rtt_b, rtt_c) and loss tier the three placements are
+    (loss,0) / (0,loss) / (loss,loss)."""
+    expected = []
+    for rtt_b in (15, 40, 80):
+        for tier in (0.5, 1.0, 2.0):
+            expected += [(rtt_b, 15, tier, 0.0),
+                          (rtt_b, 15, 0.0, tier),
+                          (rtt_b, 15, tier, tier)]
+    return expected
+
+
+def test_stress_spec_frozen():
+    spec = campaign.V2_RUN_SPECS["three-node-stress"]
+    # 54 arms (27 cells x 2 variants) x (N=15 + W=2) = 918 pool lines.
+    arms = campaign.build_stress_arm_list(spec)
+    assert len(arms) == 54
+    ls, le = campaign.v2_line_range("three-node-stress", len(arms),
+                                    spec["n"], spec["warmups"])
+    assert ls == 2921
+    assert le == 3838
+    # Band arithmetic: 54 arms x (15+2) = 54 x 17 = 918, and the band is
+    # 2921..3838 inclusive = 918 lines -> ZERO slack (fits exactly).
+    assert (le - ls + 1) == 918
+    assert len(arms) * (spec["n"] + spec["warmups"]) == 918
+    # design §3.4 / §4.3 sizing: N=15, W=2, R=1 per arm.
+    assert spec["n"] == 15
+    assert spec["warmups"] == 2
+    assert spec["repeats"] == 1
+    # The two 3-node arms (design §3.4 -> §3.2): P2 + SPHP-from-C.
+    assert spec["variants"] == ["baseline", "sphp"]
+    # The (0,0) unshaped sanity pre-flight: 20 requests from the FREE tail
+    # 3839.. (the same free-tail pattern the loss-sweep uses), never the band.
+    assert spec["sanity_n"] == 20
+    assert spec["sanity_pool_start"] == 3839
+    assert spec["sanity_pool_start"] >= 3839  # strictly in the free tail
+
+
+def test_stress_cells_match_design():
+    # The 27 (B, C, lossB, lossC) cells must match design §3.4 exactly:
+    # 3 (B,C) RTT cells x 3 loss tiers {0.5,1,2} x 3 leg-placements (B/C/both),
+    # C frozen at 15, order cell-major (RTT, then tier, then placement).
+    spec = campaign.V2_RUN_SPECS["three-node-stress"]
+    assert len(spec["cells"]) == 27
+    assert spec["cells"] == _stress_cells_from_design()
+    # C leg frozen at 15 ms across every cell (user-facing sparse leg).
+    assert all(rtt_c == 15 for _, rtt_c, _, _ in spec["cells"])
+    # B leg carries the swept RTT; every loss value is a float percent.
+    assert all(rtt_b in (15, 40, 80) for rtt_b, _, _, _ in spec["cells"])
+
+
+def test_stress_arm_expansion():
+    spec = campaign.V2_RUN_SPECS["three-node-stress"]
+    arms = campaign.build_stress_arm_list(spec)
+    # Cell-major, variant-second: first cell (15,15,0.5,0.0) -> baseline then
+    # sphp; last cell (80,15,2.0,2.0) -> sphp is the 54th arm.
+    assert arms[0] == (15, 15, 0.5, 0.0, "baseline")
+    assert arms[1] == (15, 15, 0.5, 0.0, "sphp")
+    assert arms[-1] == (80, 15, 2.0, 2.0, "sphp")
+    # Both arms present for every cell, in baseline -> sphp order.
+    for cell in spec["cells"]:
+        pair = [a for a in arms if a[:4] == cell]
+        assert [a[4] for a in pair] == ["baseline", "sphp"]
+
+
+def test_stress_select_pool_slices(tmp_path):
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    all_queries = campaign.load_queries(str(pool))
+    spec = campaign.V2_RUN_SPECS["three-node-stress"]
+    n_arms = len(campaign.build_stress_arm_list(spec))
+    ls, le = campaign.v2_line_range("three-node-stress", n_arms,
+                                    spec["n"], spec["warmups"])
+    plan = campaign.select_pool_slices_stress(
+        all_queries, spec["cells"], spec["variants"],
+        spec["n"], spec["warmups"], ls, le)
+    assert len(plan) == 54
+    assert plan[0]["pool_start"] == 2920   # 0-based index for line 2921
+    assert plan[0]["pool_end"] == 2937     # 17-line arm block (2W + 15)
+    assert plan[-1]["pool_end"] == 3838    # last line of the band
+    # Every arm block is exactly 17 lines (W=2 + N=15).
+    for a in plan:
+        assert len(a["warmups"]) == 2
+        assert len(a["measured"]) == 15
+        assert a["pool_end"] - a["pool_start"] == 17
+    # Pairwise disjoint over all 54 arm slices (warmups + measured).
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert not (sets[i] & sets[j])
+
+
+def test_stress_band_disjoint():
+    # design §5.1 final allocation: the CM-5 band 2921..3838 must be
+    # pairwise disjoint from every other registered/frozen pool line-range,
+    # INCLUDING the amended loss-sweep band 2041..2700 (the bug this re-key
+    # fixes) and the free tail 3839.. used by the sanity pre-flight.
+    spec = campaign.V2_RUN_SPECS["three-node-stress"]
+    n_arms = len(campaign.build_stress_arm_list(spec))
+    ls, le = campaign.v2_line_range("three-node-stress", n_arms,
+                                    spec["n"], spec["warmups"])
+    stress = (ls, le)
+    assert stress == (2921, 3838)
+    ranges = {
+        "confirmatory": (1, 1040),
+        "reserved_gap": (1041, 1370),   # pre-amendment loss-sweep band (unused)
+        "three-node": (1371, 1910),     # WS-CM 3-node (frozen)
+        "dropout": (1911, 2040),
+        "loss-sweep": (2041, 2700),     # amended (the overlap being fixed)
+        "genuine-wan": (2701, 2920),    # CM-4
+        "three-node-stress": (2921, 3838),
+        "free_tail": (3839, 5000),      # sanity pre-flight source
+    }
+    campaign.assert_pool_ranges_disjoint(ranges)
+    # The sanity block (20 from the free tail) stays clear of the band.
+    sanity = (spec["sanity_pool_start"],
+              spec["sanity_pool_start"] + spec["sanity_n"] - 1)
+    assert sanity == (3839, 3858)
+    assert sanity[0] > le  # strictly after the band's end
+    # ...and stays within the free tail.
+    assert sanity[1] <= 5000

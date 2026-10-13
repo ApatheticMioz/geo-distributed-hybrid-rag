@@ -1,0 +1,136 @@
+# Dry-run evidence for three-node-stress re-key (working tree on top of 10ed1e7; final run specs per b239833 §3.4 CM-5 stress / §5.1 final pool allocation — band 2921..3838, 54 arms, N=15/W=2/R=1, sanity from free tail 3839..)
+# Generated: 2026-10-13T10:41:24Z via: python3 experiments/bench/campaign.py --run three-node-stress --dry-run
+
+==============================================================================
+CAMPAIGN V2 — CM-5 3-NODE PER-LEG LOSS/RTT STRESS MATRIX — DRY RUN
+==============================================================================
+  design doc   : docs/campaign_v2_design.md (commit 1f911ef)
+  run type     : three-node-stress  (CM-5 3-node per-leg loss/RTT stress matrix)
+  gateway      : http://10.8.0.3:8000 (Node C — user-facing tier)
+  pool file    : experiments/bench/queries/campaign_v2_master5000_seed42.txt  (5000 lines, sha256=9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa)
+  pool manifest: VERIFIED OK (sha256 + n=5000 + line_count all match)
+  pool lines   : 2921..3838 of the pool file (design §5.1 allocation; 54 arms x 17 = 918 lines)
+  cells        : 27 (B, C, lossB, lossC) per-leg float loss cells (loss 0.5/1/2%: B leg / C leg / both) x 3-node RTT cells (B,C) in {(15,15),(40,15),(80,15)}; C held at 15 ms (user-facing sparse leg)
+  arms         : 54 = 27 cells x {3node-P2, 3node-SPHP-from-C} (mode=hybrid, sphp axis on)
+  per arm      : W=2 warmups + N=15 x R=1 = 17 requests (15 measured + 2 warmups)
+  sanity       : (0,0) unshaped pre-flight (20 requests from the free pool tail 3839..; 0-error gate — any error ABORTS before loss is applied)
+  error gate   : shaped cells REPORT per-cell error rate WITHOUT aborting (loss-driven errors are the signal, not a campaign failure)
+  TOTAL        : 918 band requests (810 measured + 108 warmups) + 20 sanity = 938 total
+  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm (no cache flush exists; §5.2)
+  fidelity gate: pre- AND post- each cell, PER LEG: validate.sh --link-b <rtt_b> <loss_b> and --link-c <rtt_c> <loss_c> (11-ping median, ±30% added-RTT window per leg, PLUS the sibling-commit fractional-loss readback); FAIL aborts the campaign
+  key deliverable: per-cell SPHP-from-C hit rate with a Wilson 95% CI (imported from experiments/analysis/stats.py::wilson_ci, not reimplemented) in the summary
+  campaign manifest: would be written to experiments/bench/campaigns/campaign_v2_manifest.json before any request
+------------------------------------------------------------------------------
+  Execution plan (cells sequentially; arms 3node-P2 -> 3node-SPHP-from-C per cell):
+    cell (B=15ms/0.5%, C=15ms/0%)  [shaped: apply --link-b 15 0.5 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 2921..2937  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 2938..2954  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/0%, C=15ms/0.5%)  [shaped: apply --link-b 15 0 --link-c 15 0.5; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 2955..2971  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 2972..2988  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/0.5%, C=15ms/0.5%)  [shaped: apply --link-b 15 0.5 --link-c 15 0.5; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 2989..3005  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3006..3022  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/1%, C=15ms/0%)  [shaped: apply --link-b 15 1 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3023..3039  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3040..3056  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/0%, C=15ms/1%)  [shaped: apply --link-b 15 0 --link-c 15 1; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3057..3073  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3074..3090  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/1%, C=15ms/1%)  [shaped: apply --link-b 15 1 --link-c 15 1; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3091..3107  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3108..3124  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/2%, C=15ms/0%)  [shaped: apply --link-b 15 2 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3125..3141  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3142..3158  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/0%, C=15ms/2%)  [shaped: apply --link-b 15 0 --link-c 15 2; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3159..3175  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3176..3192  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=15ms/2%, C=15ms/2%)  [shaped: apply --link-b 15 2 --link-c 15 2; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3193..3209  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3210..3226  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/0.5%, C=15ms/0%)  [shaped: apply --link-b 40 0.5 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3227..3243  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3244..3260  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/0%, C=15ms/0.5%)  [shaped: apply --link-b 40 0 --link-c 15 0.5; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3261..3277  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3278..3294  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/0.5%, C=15ms/0.5%)  [shaped: apply --link-b 40 0.5 --link-c 15 0.5; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3295..3311  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3312..3328  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/1%, C=15ms/0%)  [shaped: apply --link-b 40 1 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3329..3345  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3346..3362  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/0%, C=15ms/1%)  [shaped: apply --link-b 40 0 --link-c 15 1; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3363..3379  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3380..3396  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/1%, C=15ms/1%)  [shaped: apply --link-b 40 1 --link-c 15 1; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3397..3413  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3414..3430  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/2%, C=15ms/0%)  [shaped: apply --link-b 40 2 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3431..3447  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3448..3464  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/0%, C=15ms/2%)  [shaped: apply --link-b 40 0 --link-c 15 2; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3465..3481  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3482..3498  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=40ms/2%, C=15ms/2%)  [shaped: apply --link-b 40 2 --link-c 15 2; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3499..3515  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3516..3532  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/0.5%, C=15ms/0%)  [shaped: apply --link-b 80 0.5 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3533..3549  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3550..3566  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/0%, C=15ms/0.5%)  [shaped: apply --link-b 80 0 --link-c 15 0.5; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3567..3583  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3584..3600  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/0.5%, C=15ms/0.5%)  [shaped: apply --link-b 80 0.5 --link-c 15 0.5; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3601..3617  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3618..3634  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/1%, C=15ms/0%)  [shaped: apply --link-b 80 1 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3635..3651  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3652..3668  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/0%, C=15ms/1%)  [shaped: apply --link-b 80 0 --link-c 15 1; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3669..3685  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3686..3702  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/1%, C=15ms/1%)  [shaped: apply --link-b 80 1 --link-c 15 1; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3703..3719  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3720..3736  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/2%, C=15ms/0%)  [shaped: apply --link-b 80 2 --link-c 15 0; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3737..3753  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3754..3770  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/0%, C=15ms/2%)  [shaped: apply --link-b 80 0 --link-c 15 2; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3771..3787  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3788..3804  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+    cell (B=80ms/2%, C=15ms/2%)  [shaped: apply --link-b 80 2 --link-c 15 2; per-leg gate pre+post (with loss readback); clear after]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 3805..3821  (2W + 15x1R = 17 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 3822..3838  (2W + 15x1R = 17 req)
+        cell subtotal: 34 requests (30 measured)
+------------------------------------------------------------------------------
+  manifest disjointness: 54 arm slices, pairwise intersection == 0 (asserted OK)
+------------------------------------------------------------------------------
+  DRY RUN complete. No network calls, no netem, no files were made.
