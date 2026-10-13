@@ -1,0 +1,52 @@
+# Dry-run evidence for loss-sweep re-key (working tree on top of ca7e822; commit 1f911ef is the design-doc pointer, final run specs per b239833 §3.1/§5.1)
+# Generated: 2026-10-13T10:06:23Z via: python3 experiments/bench/campaign.py --run loss-sweep --dry-run
+
+==============================================================================
+CAMPAIGN V2 — 2-NODE LOSS SWEEP (AMENDED DESIGN) — DRY RUN
+==============================================================================
+  design doc   : docs/campaign_v2_design.md (commit 1f911ef)
+  run type     : loss-sweep  (v2 loss sweep (2-node, amended design — RTT{0,40} x loss{0.5,1,2}))
+  gateway      : http://10.8.0.2:8000 (Node B)
+  pool file    : experiments/bench/queries/campaign_v2_master5000_seed42.txt  (5000 lines, sha256=9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa)
+  pool manifest: VERIFIED OK (sha256 + n=5000 + line_count all match)
+  pool lines   : 2041..2700 of the pool file (design §5.1; 12 arms x 55 = 660 lines)
+  cells        : RTT [0, 40] ms x loss {0.5, 1, 2}% = 6 cells (link-B only)
+  arms         : 12 = 6 cells x {P2, P2-SPHP} (mode=hybrid, sphp axis on)
+  per arm      : W=5 warmups + N=50 x R=1 = 55 requests (50 measured + 5 warmups)
+  sanity       : per-RTT-tier loss-0 pre-flight (N=10/tier x 2 tiers = 20), pool tail 3839..; 0-error gate — any error ABORTS
+  error gate   : loss>0 cells REPORT per-cell error rate WITHOUT aborting (loss-driven errors are the signal)
+  fidelity     : validate.sh 11-ping ±30% added-RTT + fractional-loss readback (pre+post every cell); rtt-0 cells: loss-readback only (no added-RTT)
+  key deliverable: per-cell SPHP hit rate with Wilson 95% CI (imported from experiments/analysis/stats.py::wilson_ci) + per-cell {rtt, loss} targets + 11-ping medians in the manifest
+  strata       : R=1 (repeat 0 = cold-prefix)
+  TOTAL        : 660 requests (600 measured + 60 warmups) + 20 sanity = 680 total
+  campaign manifest: would be written to experiments/bench/campaigns/campaign_v2_manifest.json before any request
+------------------------------------------------------------------------------
+  Execution plan (cells sequentially; arms P2 -> P2-SPHP per cell):
+    cell rtt=  0ms loss=0.5%  [shaped (loss-only): apply --link-b 0 0.5; gate pre+post (tc loss-readback only); clear after]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 2041..2095  (5W + 50x1R = 55 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 2096..2150  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+    cell rtt=  0ms loss=1%  [shaped (loss-only): apply --link-b 0 1; gate pre+post (tc loss-readback only); clear after]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 2151..2205  (5W + 50x1R = 55 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 2206..2260  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+    cell rtt=  0ms loss=2%  [shaped (loss-only): apply --link-b 0 2; gate pre+post (tc loss-readback only); clear after]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 2261..2315  (5W + 50x1R = 55 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 2316..2370  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+    cell rtt= 40ms loss=0.5%  [shaped: apply --link-b 40 0.5; gate pre+post (11-ping ±30% + loss readback); clear after]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 2371..2425  (5W + 50x1R = 55 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 2426..2480  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+    cell rtt= 40ms loss=1%  [shaped: apply --link-b 40 1; gate pre+post (11-ping ±30% + loss readback); clear after]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 2481..2535  (5W + 50x1R = 55 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 2536..2590  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+    cell rtt= 40ms loss=2%  [shaped: apply --link-b 40 2; gate pre+post (11-ping ±30% + loss readback); clear after]
+        arm P2        (mode=hybrid variant=baseline)  -> pool lines 2591..2645  (5W + 50x1R = 55 req)
+        arm P2-SPHP   (mode=hybrid variant=sphp)  -> pool lines 2646..2700  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+------------------------------------------------------------------------------
+  manifest disjointness: 12 arm slices, pairwise intersection == 0 (asserted OK)
+------------------------------------------------------------------------------
+  DRY RUN complete. No network calls, no netem, no files were made.

@@ -885,3 +885,260 @@ def test_v2_explicit_repeats_wins():
     ])
     campaign.resolve_mode_defaults(args)
     assert args.repeats == 5
+
+
+# ---------------------------------------------------------------------------
+# v2: loss-sweep run (amended design b239833 §3.1/§5.1, amended 2026-10-14)
+# ---------------------------------------------------------------------------
+def _losssweep_args(tmp_path, pool_path):
+    """Build resolved CLI args for the loss-sweep run (design §4.3 defaults:
+    N=50 / W=5 / R=1, sphp axis on, float loss tiers)."""
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(pool_path),
+        "--run", "loss-sweep",
+        "--dry-run",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    campaign.resolve_mode_defaults(args)
+    return args
+
+
+def test_losssweep_spec_frozen():
+    spec = campaign.V2_RUN_SPECS["loss-sweep"]
+    # design §5.1 final allocation: pool band 2041..2700 (12 arms x (50+5)
+    # = 660 lines), derived end inclusive.
+    ls, le = campaign.v2_line_range("loss-sweep", 12, 50, 5)
+    assert ls == 2041
+    assert le == 2700
+    # the 6 measured (rtt, loss) cells — float loss percents, cell-major.
+    assert spec["cells"] == [(0, 0.5), (0, 1.0), (0, 2.0),
+                             (40, 0.5), (40, 1.0), (40, 2.0)]
+    # both headline arms (P2 / P2-SPHP), R=1 cold-prefix stratum.
+    assert spec["variants"] == ["baseline", "sphp"]
+    assert spec["n"] == 50
+    assert spec["warmups"] == 5
+    assert spec["repeats"] == 1
+    assert spec["rtt_tiers"] == [0, 40]
+    # the loss-0 sanity pre-flight draws from the free pool tail 3839..
+    assert spec["sanity_pool_start"] == 3839
+
+
+def test_losssweep_arm_expansion(tmp_path):
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    args = _losssweep_args(tmp_path, pool)
+    # float tiers resolve: RTT{0,40} x loss{0.5,1,2} x 1 mode x 2 variants.
+    assert args.rtt_tiers == [0, 40]
+    assert args.loss_tiers == [0.5, 1.0, 2.0]
+    assert args.modes == ["hybrid"]
+    assert args.sphp_axis is True
+    arms = campaign.build_arm_list(args)
+    assert len(arms) == 12  # 6 cells x {baseline, sphp}
+    assert campaign.v2_line_range("loss-sweep", len(arms),
+                                  args.query_sample, args.warmups) == (2041, 2700)
+
+
+def test_losssweep_select_slices(tmp_path):
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    args = _losssweep_args(tmp_path, pool)
+    all_queries = campaign.load_queries(str(pool))
+    arms = campaign.build_arm_list(args)
+    ls, le = campaign.v2_line_range("loss-sweep", len(arms),
+                                    args.query_sample, args.warmups)
+    plan = campaign.select_pool_slices(all_queries, arms,
+                                       args.query_sample, args.warmups,
+                                       ls, le)
+    assert len(plan) == 12
+    assert plan[0]["pool_start"] == 2041 - 1  # 0-based first index
+    assert plan[-1]["pool_end"] == 2700
+    assert campaign.slices_disjoint(plan)
+    # every slice is 55 (W=5 + N=50); warmups never overlap measured.
+    for a in plan:
+        assert len(a["warmups"]) == 5
+        assert len(a["measured"]) == 50
+
+
+def test_losssweep_float_loss_parsing(tmp_path):
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(QUERIES_DIR / "campaign_v2_master5000_seed42.txt"),
+        "--run", "loss-sweep",
+        "--loss-tiers-float", "0.5", "1.0", "2.0",
+        "--dry-run",
+    ])
+    campaign.resolve_mode_defaults(args)
+    # the CLI float tiers are validated (finite, 0..100) and preserved.
+    assert args.loss_tiers == [0.5, 1.0, 2.0]
+    # _validate_loss_tiers accepts fractional percents and rejects non-finite.
+    assert campaign._validate_loss_tiers([0.5, 1.0, 2.0]) == [0.5, 1.0, 2.0]
+    with pytest.raises(ValueError, match="finite"):
+        campaign._validate_loss_tiers([float("nan")])
+    with pytest.raises(ValueError, match="out of range"):
+        campaign._validate_loss_tiers([101.0])
+
+
+def test_losssweep_band_disjoint():
+    # design §5.1: the loss-sweep band 2041..2700 must not overlap any other
+    # registered (or frozen) pool line-range.
+    loss = (2041, 2700)
+    others = {
+        "confirmatory": (1, 1040),
+        "reserved": (1371, 1910),          # three-node (final re-key target)
+        "three-node": (1911, 2040),        # dropout (frozen)
+        "three-node-stress": (2701, 2920), # CM-5 (final re-key target)
+        "tail-A": (2921, 3838),            # CM-5 follow-up band
+        "free-tail": (3839, 5000),         # sanity pre-flight source
+    }
+    campaign.assert_pool_ranges_disjoint({"loss-sweep": loss, **others})
+
+
+def test_losssweep_wilson_wiring(tmp_path, monkeypatch):
+    # The summary path routes the sphp arm's hit-rate through the lazily
+    # imported wilson helper.  Monkeypatch the getter to a deterministic
+    # fake to prove the wiring end-to-end.
+    calls = []
+
+    def fake_wilson(k, n, z=1.96):
+        calls.append((k, n))
+        return (0.10, 0.20)
+
+    monkeypatch.setattr(campaign, "_get_wilson_ci", lambda: fake_wilson)
+
+    recs = [
+        {"sphp_hit": True, "ttft_ms": 1.0, "total_ms": 2.0, "repeat_index": 0},
+        {"sphp_hit": False, "ttft_ms": 1.5, "total_ms": 3.0, "repeat_index": 0},
+        {"sphp_hit": True, "ttft_ms": 0.5, "total_ms": 2.0, "repeat_index": 0},
+    ]
+    out = campaign.sphp_hit_rate_wilson(recs)
+    assert calls == [(2, 3)]
+    assert out["n"] == 3
+    assert out["n_hits"] == 2
+    assert out["rate"] == round(2 / 3, 4)
+    assert out["ci_95"] == [0.10, 0.20]  # not None
+    # a record set with no sphp_hit yields null CI (no division by zero).
+    out_none = campaign.sphp_hit_rate_wilson([{"sphp_hit": None}])
+    assert out_none["ci_95"] is None
+    assert out_none["rate"] is None
+
+
+def test_losssweep_gate_semantics_runner(tmp_path, monkeypatch):
+    """Gate semantics for the loss-sweep runner (design §3.1/§6), driven
+    end-to-end with fake network/netem side effects against the REAL
+    5,000-line master pool (band arithmetic stays genuine; N=2/W=1 shrinks
+    the per-arm slice so the small run fits).
+
+    (a) loss-0 sanity pre-flight error -> ABORT (exit 1, before loss is
+        applied).
+    (b) loss>0 measured-cell error -> per-cell error-rate REPORT, no
+        abort (exit 0) — the loss-driven error is the signal.
+    """
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    manifest = {"_verified_sha256": campaign.sha256_file(str(pool)),
+                "n": 5000}
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(pool),
+        "--run", "loss-sweep",
+        "--loss-tiers-float", "0.5", "1.0", "2.0",
+        "--query-sample", "2",
+        "--warmups", "1",
+        "--repeats", "1",
+        "--gateway-url", "http://gw.test",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    campaign.resolve_mode_defaults(args)
+    all_queries = campaign.load_queries(str(pool))
+    assert len(all_queries) == 5000
+    arms = campaign.build_arm_list(args)
+    assert len(arms) == 12
+
+    # Small per-arm slice: the run needs 12 x (N=2 + W=1) = 36 measured-band
+    # lines + 2 x N_sanity sanity lines.  Keep the sanity ranges real
+    # (3839..) but shrink the measured band to 1..36 via the range helper.
+    monkeypatch.setattr(campaign, "v2_line_range",
+                        lambda run, n_arms, n, w: (1, 1 + n_arms * (n + w) - 1))
+    # The real runner derives ls/le before calling the runner, so patch the
+    # actual call the test makes below identically.
+    ls, le = campaign.v2_line_range("loss-sweep", len(arms),
+                                    args.query_sample, args.warmups)
+    arm_plan = campaign.select_pool_slices(
+        all_queries, arms, args.query_sample, args.warmups, ls, le)
+    # _finalize calls write_summary_outputs; re-implement it to write the
+    # summary JSON doc (skipping the CSV) so we can assert on the per-cell
+    # error report + Wilson wiring in the summary.
+    def write_summary_real(out_dir, run_id, rows, doc):
+        (out_dir / f"summary_{run_id}.json").write_text(
+            json.dumps(doc, indent=2), encoding="utf-8")
+        return (out_dir / f"summary_{run_id}.csv",
+                out_dir / f"summary_{run_id}.json")
+    monkeypatch.setattr(campaign, "write_summary_outputs", write_summary_real)
+
+    def _patch_net(monkeypatch, fail_on_call):
+        """fail_on_call: 1-based POST index that raises; None = never.
+        Sanity pre-flight is calls 1..20 (2 rtt tiers x sanity_n=10); the
+        first measured cell (rtt=0, loss=0.5, P2) starts at call 21."""
+        calls = {"n": 0}
+        def fake_health(url, timeout=15):
+            return True
+        def fake_gate(rtt, loss, when, dry_run):
+            return {"rtt_ms": rtt, "loss_pct": loss, "when": when,
+                    "status": "PASS", "shaped_median_ms": 5.0,
+                    "added_rtt_ms": 5.0, "loss_gate": "PASS",
+                    "output_tail": ""}
+        def fake_apply(rtt, loss, dry_run):
+            return True
+        def fake_clear(dry_run):
+            return None
+        def fake_http(url, payload, timeout):
+            calls["n"] += 1
+            if fail_on_call is not None and calls["n"] == fail_on_call:
+                raise RuntimeError("synthetic loss-driven error")
+            return {"query_id": "1", "top_k": payload.get("top_k"),
+                    "timings": {"ttft_ms": 1.0, "total_ms": 2.0,
+                                "sparse_ms": 0, "dense_ms": 0,
+                                "fusion_ms": 0, "decode_ms": 0,
+                                "simulated_wan_ms": 0},
+                    "token_count": 3, "decode_tps": 4.0,
+                    "sphp_hit": True, "sphp_overlap": 0.5}
+        monkeypatch.setattr(campaign, "check_health", fake_health)
+        monkeypatch.setattr(campaign, "run_fidelity_gate",
+                            lambda rtt, when, dry_run, loss=0:
+                            fake_gate(rtt, loss, when, dry_run))
+        monkeypatch.setattr(campaign, "loss_sweep_cell_gate", fake_gate)
+        monkeypatch.setattr(campaign, "apply_netem_link_b", fake_apply)
+        monkeypatch.setattr(campaign, "clear_netem", fake_clear)
+        monkeypatch.setattr(campaign, "http_post_json", fake_http)
+        return calls
+
+    # (a) sanity pre-flight error -> ABORT before loss is applied (exit 1).
+    _patch_net(monkeypatch, fail_on_call=1)
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2_losssweep(args, all_queries, manifest,
+                                           arm_plan, ls, le)
+    assert ei.value.code == 1
+
+    # (b) measured loss>0-cell error -> REPORT, run completes (exit 0).
+    # POST order: sanity pre-flight = 2 x sanity_n (N=10/tier) = 20 calls;
+    # per cell: arm P2 (W=1 + N=2) then arm P2-SPHP (W=1 + N=2).  The first
+    # MEASURED POST of cell 1 (rtt=0, loss=0.5, P2 baseline) is call 23
+    # (20 sanity + 1 P2 warmup + 1).  Failing it exercises the per-cell
+    # error-report path (n_errors, per_cell_error_reports, exit 0).
+    args.out_dir = str(tmp_path / "out2")
+    calls = _patch_net(monkeypatch, fail_on_call=23)
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2_losssweep(args, all_queries, manifest,
+                                           arm_plan, ls, le)
+    assert ei.value.code == 0  # report-only: no abort for loss>0 cells
+    summary = json.loads(
+        next((tmp_path / "out2").glob("summary_*.json")).read_text())
+    assert summary["status"] == "completed"
+    assert summary["n_errors"] == 1  # the synthetic measured-cell error
+    reports = summary["per_cell_error_reports"]
+    assert any(r["n_errors"] == 1 and "no abort" in r["gate"]
+               for r in reports)
+    # Wilson wiring: every sphp arm row carries a ci_95 (here the real
+    # stats engine; assert it is a 2-float list, i.e. not None).
+    sphp_rows = [r for r in summary["summary"] if r["variant"] == "sphp"]
+    assert len(sphp_rows) == 6
+    for r in sphp_rows:
+        assert r["sphp_hit_rate_wilson"]["ci_95"] is not None
