@@ -18,6 +18,7 @@ And the WS-CM 3-node run (design §2.2/§3.2/§4.3/§5.1):
 """
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -1269,3 +1270,339 @@ def test_stress_band_disjoint():
     assert sanity[0] > le  # strictly after the band's end
     # ...and stays within the free tail.
     assert sanity[1] <= 5000
+
+
+# ---------------------------------------------------------------------------
+# v2: CM-4 genuine-WAN run (final design b239833 §3.3 / §5.1)
+# ---------------------------------------------------------------------------
+def test_gw_spec_frozen():
+    spec = campaign.V2_RUN_SPECS["genuine-wan"]
+    # design §3.3 (amended 2026-10-14) + §4.3: 2 real cross-site paths x
+    # 2 placement arms = 4 arms; N=50 / W=5 / R=1.
+    arms = campaign.build_genuine_wan_arm_list(spec)
+    assert len(arms) == 4
+    ls, le = campaign.v2_line_range("genuine-wan", len(arms),
+                                    spec["n"], spec["warmups"])
+    # design §5.1: pool band 2701..2920; 4 arms x (50+5) = 4 x 55 = 220
+    # lines, and the band is 2920-2701+1 = 220 -> ZERO slack (fits exactly).
+    assert ls == 2701
+    assert le == 2920
+    assert (le - ls + 1) == 220
+    assert len(arms) * (spec["n"] + spec["warmups"]) == 220
+    # 4 x (5W + 50N) arithmetic frozen in the spec test.
+    assert spec["n"] == 50
+    assert spec["warmups"] == 5
+    assert spec["repeats"] == 1
+    # Netem OFF: the unshaped real path is the subject, so there is no
+    # §3.1-style fidelity gate; the pristine precondition replaces it.
+    assert "sanity_n" in spec and spec["sanity_n"] == 20
+    # The 20-request sanity pre-flight draws from the FREE pool tail 3839..
+    # (the same free-tail pattern the loss-sweep / CM-5 use), never the band.
+    assert spec["sanity_pool_start"] == 3839
+    assert spec["sanity_pool_start"] >= 3839  # strictly in the free tail
+
+
+def test_gw_arm_expansion():
+    spec = campaign.V2_RUN_SPECS["genuine-wan"]
+    arms = campaign.build_genuine_wan_arm_list(spec)
+    # Cell-major, arm-order within cell: 2-node {P2, P2-SPHP} then
+    # 3-node {3node-P2, 3node-SPHP-from-C}.
+    assert arms == [
+        ("2-node", "P2", "baseline"),
+        ("2-node", "P2-SPHP", "sphp"),
+        ("3-node", "3node-P2", "baseline"),
+        ("3-node", "3node-SPHP-from-C", "sphp"),
+    ]
+    # Both real paths present; the 3-node cell targets the user-facing
+    # Node C gateway, the 2-node cell the Node B gateway (design §3.3).
+    ips = {c[0]: c[1] for c in spec["cells"]}
+    assert ips == {"2-node": "10.8.0.2", "3-node": "10.8.0.3"}
+
+
+def test_gw_select_pool_slices(tmp_path):
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    all_queries = campaign.load_queries(str(pool))
+    spec = campaign.V2_RUN_SPECS["genuine-wan"]
+    arms = campaign.build_genuine_wan_arm_list(spec)
+    ls, le = campaign.v2_line_range("genuine-wan", len(arms),
+                                    spec["n"], spec["warmups"])
+    plan = campaign.select_pool_slices_genuine_wan(
+        all_queries, arms, spec["n"], spec["warmups"], ls, le)
+    assert len(plan) == 4
+    assert plan[0]["pool_start"] == 2700   # 0-based index for line 2701
+    assert plan[0]["pool_end"] == 2755     # first 55-line block
+    assert plan[-1]["pool_end"] == 2920    # last line of the band
+    # Each arm block is exactly 55 lines (W=5 + N=50); arm carries the
+    # cell's gateway ip and design arm label.
+    for a in plan:
+        assert len(a["warmups"]) == 5
+        assert len(a["measured"]) == 50
+        assert a["pool_end"] - a["pool_start"] == 55
+    assert [a["gateway_ip"] for a in plan] ==         ["10.8.0.2", "10.8.0.2", "10.8.0.3", "10.8.0.3"]
+    # Pairwise disjoint over all 4 arm slices (warmups + measured).
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert not (sets[i] & sets[j])
+
+
+def test_gw_band_disjoint():
+    # design §5.1 final allocation: the CM-4 band 2701..2920 must be
+    # pairwise disjoint from every other registered/frozen pool line-range,
+    # including the loss-sweep band 2041..2700 and the CM-5 band
+    # 2921..3838, plus the free tail 3839.. used by the sanity pre-flight.
+    spec = campaign.V2_RUN_SPECS["genuine-wan"]
+    n_arms = len(campaign.build_genuine_wan_arm_list(spec))
+    ls, le = campaign.v2_line_range("genuine-wan", n_arms,
+                                    spec["n"], spec["warmups"])
+    assert (ls, le) == (2701, 2920)
+    ranges = {
+        "confirmatory": (1, 1040),
+        "reserved_gap": (1041, 1370),   # pre-amendment loss-sweep (unused)
+        "three-node": (1371, 1910),     # WS-CM 3-node (frozen)
+        "dropout": (1911, 2040),
+        "loss-sweep": (2041, 2700),
+        "genuine-wan": (2701, 2920),    # CM-4 (this run)
+        "three-node-stress": (2921, 3838),
+        "free_tail": (3839, 5000),      # sanity pre-flight source
+    }
+    campaign.assert_pool_ranges_disjoint(ranges)
+    # The sanity block (20 from the free tail) stays clear of the band.
+    sanity = (spec["sanity_pool_start"],
+              spec["sanity_pool_start"] + spec["sanity_n"] - 1)
+    assert sanity == (3839, 3858)
+    assert sanity[0] > le  # strictly after the band's end
+    assert sanity[1] <= 5000
+
+
+def test_gw_pristine_dry_run_and_readback(monkeypatch):
+    # dry-run is trivially pristine (no shaping was ever applied).
+    assert campaign.verify_netem_pristine(dry_run=True) ==         (True, "dry-run (no shaping applied)")
+    # Real mode: the tc-qdisc readback (the same tooling the fidelity gate
+    # uses) decides.  A netem leaf remaining -> dirty (not pristine); a
+    # clean qdisc listing -> pristine.
+    monkeypatch.setattr(campaign, "clear_netem", lambda dry_run: None)
+    monkeypatch.setattr(campaign, "_tc_qdisc_state",
+                        lambda: "qdisc noqueue 0: root")
+    assert campaign.verify_netem_pristine(dry_run=False) ==         (True, "no netem/htb qdisc present (pristine)")
+    monkeypatch.setattr(campaign, "_tc_qdisc_state",
+                        lambda: "qdisc netem 10: root delay 40ms loss 2%")
+    ok, detail = campaign.verify_netem_pristine(dry_run=False)
+    assert ok is False
+    assert "netem" in detail
+
+
+def test_gw_pristine_dirty_aborts_before_request(tmp_path, monkeypatch):
+    # The CM-4 runner must verify a pristine readback BEFORE the first
+    # request; a dirty (non-pristine) readback ABORTS (exit != 0) with NO
+    # request ever sent.
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    manifest = {"_verified_sha256": campaign.sha256_file(str(pool)),
+                "n": 5000}
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(pool),
+        "--run", "genuine-wan",
+        "--query-sample", "2",
+        "--warmups", "1",
+        "--gateway-url", "http://gw.test",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    campaign.resolve_mode_defaults(args)
+    all_queries = campaign.load_queries(str(pool))
+    spec = campaign.V2_RUN_SPECS["genuine-wan"]
+    arms = campaign.build_genuine_wan_arm_list(spec)
+    ls, le = campaign.v2_line_range("genuine-wan", len(arms),
+                                    args.query_sample, args.warmups)
+    arm_plan = campaign.select_pool_slices_genuine_wan(
+        all_queries, arms, args.query_sample, args.warmups, ls, le)
+
+    calls = {"http": 0, "health": 0}
+
+    def fake_pristine(dry_run):
+        return False, "synthetic dirty: netem 10: root delay 40ms"
+
+    def fake_health(url, timeout=15):
+        calls["health"] += 1
+        return True
+
+    def fake_http(url, payload, timeout):
+        calls["http"] += 1
+        return {"query_id": "1", "top_k": payload.get("top_k"),
+                "timings": {"ttft_ms": 1.0, "total_ms": 2.0}}
+
+    monkeypatch.setattr(campaign, "verify_netem_pristine", fake_pristine)
+    monkeypatch.setattr(campaign, "check_health", fake_health)
+    monkeypatch.setattr(campaign, "http_post_json", fake_http)
+
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2_genuine_wan(args, all_queries, manifest,
+                                             arm_plan, ls, le)
+    assert ei.value.code == 1
+    # No request (and no health probe) was sent before the abort.
+    assert calls["http"] == 0
+    assert calls["health"] == 0
+
+
+def test_gw_record_carries_rtt_probe(tmp_path, monkeypatch):
+    # Each measured record carries the per-record real-path RTT probe
+    # field (rtt_probe_ms), a TCP-connect probe to the cell's gateway
+    # service port.  Drive the runner with a mocked probe + network and
+    # assert the written records all carry a finite rtt_probe_ms.
+    pool = QUERIES_DIR / "campaign_v2_master5000_seed42.txt"
+    manifest = {"_verified_sha256": campaign.sha256_file(str(pool)),
+                "n": 5000}
+    ap = campaign.build_parser()
+    args = ap.parse_args([
+        "--pool", str(pool),
+        "--run", "genuine-wan",
+        "--query-sample", "2",
+        "--warmups", "1",
+        "--gateway-url", "http://gw.test",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    campaign.resolve_mode_defaults(args)
+    all_queries = campaign.load_queries(str(pool))
+    spec = campaign.V2_RUN_SPECS["genuine-wan"]
+    arms = campaign.build_genuine_wan_arm_list(spec)
+    ls, le = campaign.v2_line_range("genuine-wan", len(arms),
+                                    args.query_sample, args.warmups)
+    arm_plan = campaign.select_pool_slices_genuine_wan(
+        all_queries, arms, args.query_sample, args.warmups, ls, le)
+
+    def fake_pristine(dry_run):
+        return True, "pristine (mocked)"
+
+    def fake_health(url, timeout=15):
+        return True
+
+    def fake_probe(host, port, timeout=3.0):
+        return 42.5  # deterministic real-path RTT probe (ms)
+
+    def fake_http(url, payload, timeout):
+        return {"query_id": "1", "top_k": payload.get("top_k"),
+                "timings": {"ttft_ms": 100.0, "total_ms": 300.0,
+                            "sparse_ms": 0, "dense_ms": 0, "fusion_ms": 0,
+                            "decode_ms": 0, "simulated_wan_ms": 0},
+                "token_count": 3, "decode_tps": 4.0,
+                "sphp_hit": True, "sphp_overlap": 0.5}
+
+    monkeypatch.setattr(campaign, "verify_netem_pristine", fake_pristine)
+    monkeypatch.setattr(campaign, "check_health", fake_health)
+    monkeypatch.setattr(campaign, "rtt_probe_ms", fake_probe)
+    monkeypatch.setattr(campaign, "http_post_json", fake_http)
+    # keep the summary writer but capture the written JSONL.
+    def write_summary_real(out_dir, run_id, rows, doc):
+        (out_dir / f"summary_{run_id}.json").write_text(
+            json.dumps(doc, indent=2), encoding="utf-8")
+        return (out_dir / f"summary_{run_id}.csv",
+                out_dir / f"summary_{run_id}.json")
+    monkeypatch.setattr(campaign, "write_summary_outputs", write_summary_real)
+
+    with pytest.raises(SystemExit) as ei:
+        campaign.run_campaign_v2_genuine_wan(args, all_queries, manifest,
+                                             arm_plan, ls, le)
+    assert ei.value.code == 0
+    jsonls = list((tmp_path / "out").glob("campaign_*.jsonl"))
+    assert len(jsonls) == 1
+    recs, n_trunc = campaign.load_jsonl_records(jsonls[0])
+    assert n_trunc == 0
+    # The 20 sanity records + the measured records all carry rtt_probe_ms.
+    assert all("rtt_probe_ms" in r for r in recs)
+    measured = [r for r in recs if "sanity" not in r]
+    assert measured  # the 4 arms x N=2 = 8 measured records were written
+    for r in measured:
+        assert r["rtt_probe_ms"] == 42.5
+        assert math.isfinite(r["rtt_probe_ms"])
+        assert r["cell"] in ("2-node", "3-node")
+        # netem OFF: no shaping applied to any genuine-WAN record.
+        assert r["netem_applied"] is False
+        assert r["netem_link_b_applied"] is None
+        assert r["netem_link_c_applied"] is None
+
+
+def test_gw_rtt_probe_tcp_connect(monkeypatch):
+    # rtt_probe_ms is a TCP connect round trip (the established RTT proxy,
+    # since ICMP is blocked).  Mock the socket connect to a deterministic
+    # duration and to a failure, and check the ms conversion / NaN.
+    class FakeSock:
+        def __init__(self, *a, **k):
+            pass
+        def __enter__(self):
+            import time as _t
+            _t.sleep(0.001)
+            return self
+        def __exit__(self, *a):
+            return False
+
+    import socket as _socket
+    monkeypatch.setattr(
+        _socket, "create_connection",
+        lambda addr, timeout=3.0: FakeSock())
+    val = campaign.rtt_probe_ms("10.8.0.2", 8000)
+    assert 0.0 <= val < 2000.0  # a real (small) round trip, in ms
+
+    def boom(addr, timeout=3.0):
+        raise OSError("unreachable")
+    monkeypatch.setattr(_socket, "create_connection", boom)
+    assert math.isnan(campaign.rtt_probe_ms("10.8.0.3", 8000))
+
+
+def test_gw_fidelity_table_fixture():
+    # The emulation-fidelity table is a deterministic post-pass over the
+    # measured records: it reports per-arm real-path RTT p50/p95/IQR and
+    # TTFT/E2E p50/p95, optionally alongside cost-model predictions.  On
+    # fixture records it must produce non-empty rows with finite values.
+    import math
+    def mk(cell, arm, n, base_rtt, base_ttft, base_total, n_err=0):
+        recs = []
+        for i in range(n):
+            r = {
+                "cell": cell, "arm": arm,
+                "rtt_probe_ms": base_rtt + i,
+                "ttft_ms": base_ttft + i * 10,
+                "total_ms": base_total + i * 10,
+                "repeat_index": i % 2,
+            }
+            if i < n_err:
+                r["error"] = "boom"
+            recs.append(r)
+        return recs
+    records = (mk("2-node", "P2", 10, 40.0, 200.0, 500.0)
+               + mk("2-node", "P2-SPHP", 10, 40.0, 180.0, 480.0)
+               + mk("3-node", "3node-P2", 10, 80.0, 240.0, 520.0)
+               + mk("3-node", "3node-SPHP-from-C", 10, 80.0, 220.0, 500.0,
+                    n_err=1))
+    table = campaign.build_fidelity_table(records)
+    # One row per (cell, arm); error-bearing records are excluded but the
+    # arm still has enough clean records to produce a row (9 for the
+    # last arm).
+    assert len(table) == 4
+    # Deterministic ordering: 2-node before 3-node, and within a cell the
+    # declared arm order.
+    assert [r["cell"] for r in table] ==         ["2-node", "2-node", "3-node", "3-node"]
+    for r in table:
+        # Non-empty row with finite, sensible statistics.
+        assert r["n"] >= 1
+        for k in ("rtt_probe_p50_ms", "rtt_probe_p95_ms",
+                  "rtt_probe_iqr_ms", "ttft_p50_ms", "ttft_p95_ms",
+                  "total_p50_ms", "total_p95_ms"):
+            assert r[k] is not None, f"missing {k}"
+            assert math.isfinite(r[k]), f"non-finite {k}"
+        # IQR is non-negative.
+        assert r["rtt_probe_iqr_ms"] >= 0.0
+    # With no cost-model predictions supplied the model/gap fields are
+    # absent (the driver records raw stats only — §3.3).
+    assert all("model_ttft_ms" not in r for r in table)
+    # With predictions supplied, the gap (real p50 - model) appears and is
+    # finite.
+    preds = {
+        ("2-node", "P2"): {"ttft_ms": 210.0},
+        ("2-node", "P2-SPHP"): {"ttft_ms": 190.0},
+    }
+    table2 = campaign.build_fidelity_table(records, predictions=preds)
+    by_arm = {r["arm"]: r for r in table2}
+    assert by_arm["P2"]["model_ttft_ms"] == 210.0
+    assert math.isfinite(by_arm["P2"]["ttft_gap_ms"])
+    # Arms with no prediction stay prediction-free.
+    assert "model_ttft_ms" not in by_arm["3node-P2"]

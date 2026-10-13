@@ -88,8 +88,32 @@ The three-node run (``--run three-node``) implements the design's WS-CM
 (design §5.1).  Both the A<->B (``--link-b``) and A<->C (``--link-c``) legs
 are shaped per cell, each with its own pre- and post-cell 11-ping fidelity
 gate.  Queries enter at Node C (the user-facing gateway).  The RQ2 dropout
-and genuine-WAN run types remain WS-CM extension points (see
-``V2_RUN_SPECS``).
+run type remains a WS-CM extension point (see ``V2_RUN_SPECS``).
+
+The genuine-WAN run (``--run genuine-wan``) implements the CM-4
+characterization leg (design §3.3/§4.3/§5.1, finalized in b239833): the
+TWO real cross-site paths the mesh traverses — the 2-node path (client ->
+Node B, ``10.8.0.2``) and the 3-node path (client -> Node C, ``10.8.0.3``,
+the user-facing gateway) — each with its two placement arms
+(2-node = {P2, P2-SPHP}; 3-node = {3node-P2, 3node-SPHP-from-C}) = **4
+arms**, N = 50 / W = 5 / R = 1 -> 4 arms x (50 + 5) = **220 pool lines ->
+band 2701..2920** (fits with ZERO slack, §5.1).  **Netem OFF**: before the
+first request the driver runs ``clear.sh`` then verifies via tc-qdisc
+readback (the same readback tooling the fidelity gate uses) that NO
+netem/htb shaping remains — the unshaped real path IS the subject of this
+leg, so there is no §3.1-style added-RTT/loss fidelity gate; a dirty
+readback ABORTS the run before any request.  A 20-request unshaped sanity
+pre-flight (free pool tail 3839.., 0-error gate — abort on any error)
+confirms the link is healthy.  Each measured record carries a real-path
+RTT probe (``rtt_probe_ms``, a TCP-connect round trip to the cell's
+gateway service port — the established RTT proxy, since ICMP ping is
+blocked in the sandbox).  The deliverable is the **emulation-fidelity
+table** (``build_fidelity_table``): a deterministic post-pass over the
+measured records reporting per-arm real-path RTT p50/p95 and TTFT
+p50/p95, optionally alongside the cost-model predictions for the nearest
+shaped regime (the driver records raw stats only; design §3.3 leaves the
+cost-model wiring to the analysis layer).  Characterization only — BH
+secondary, not in any Holm/BH confirmatory family.
 
 The three-node stress run (``--run three-node-stress``) implements the CM-5
 per-leg loss/RTT stress matrix (design §3.4, finalized in b239833): the 27
@@ -145,6 +169,7 @@ import json
 import math
 import random
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -367,6 +392,56 @@ V2_RUN_SPECS: Dict[str, Dict[str, Any]] = {
         "sanity_n": 20, "sanity_warmups": 0, "sanity_repeats": 1,
         "sanity_pool_start": 3839,
     },
+    # CM-4 genuine-WAN characterization leg (final design §3.3/§4.3/§5.1,
+    # finalized in b239833).  NOT a shaping run: netem is OFF for the whole
+    # leg — the unshaped real cross-site path IS the subject of this
+    # characterization (so there is no §3.1-style added-RTT / loss fidelity
+    # gate here; the driver instead verifies a PRISTINE readback before the
+    # first request and aborts if any shaping remains).  Two real paths the
+    # mesh traverses, each run with its two placement arms (design §3.3,
+    # amended 2026-10-14 — the pre-2026-10-14 reading was a single leg):
+    #   * 2-node path: client -> Node B (10.8.0.2), arms {P2, P2-SPHP};
+    #   * 3-node path: client -> Node C (10.8.0.3, the user-facing gateway),
+    #     arms {3node-P2, 3node-SPHP-from-C}.
+    # = 2 cells x 2 arms = 4 arms, N = 50 / W = 5 / R = 1 -> 4 x (50 + 5) =
+    # 220 pool lines -> pool band 2701..2920 (design §5.1; fits with ZERO
+    # slack and is disjoint from every other registered band).  A 20-request
+    # unshaped sanity pre-flight (0-error gate) is drawn from the FREE pool
+    # tail 3839.. (never touches the measured band).  Each measured record
+    # carries a real-path RTT probe (rtt_probe_ms, a TCP connect to the
+    # cell's gateway service port — the established RTT proxy, since ICMP
+    # ping is blocked in the sandbox).  Characterization / descriptive only
+    # (BH secondary) — never part of the Holm/BH confirmatory families; the
+    # deliverable is the emulation-fidelity table (build_fidelity_table).
+    "genuine-wan": {
+        "pool_line_start": 2701,
+        # First cell's gateway (Node B) — used only to seed the default
+        # --gateway-url in resolve_mode_defaults; the runner queries each
+        # cell's own gateway_ip below.
+        "gateway_ip": "10.8.0.2",
+        "label": "CM-4 genuine-WAN characterization (netem OFF, real path)",
+        # Two real paths the mesh traverses; each is (cell_name, gateway_ip,
+        # [arm_label, arm_label]).  The 2-node path queries the Node B
+        # gateway; the 3-node path queries the Node C (user-facing) gateway
+        # (design §2.2 / §3.3).  Arm labels follow the design's §2.2 keys
+        # (P2 / P2-SPHP for 2-node; 3node-P2 / 3node-SPHP-from-C for 3-node).
+        "cells": [
+            ("2-node", "10.8.0.2", ["P2", "P2-SPHP"]),
+            ("3-node", "10.8.0.3", ["3node-P2", "3node-SPHP-from-C"]),
+        ],
+        # Each arm's variant (mode is hybrid for every genuine-WAN arm;
+        # baseline -> P2 / 3node-P2, sphp -> P2-SPHP / 3node-SPHP-from-C).
+        # The variant list parallels cells (2 cells x 2 variants) so the
+        # pool-slice selector lays out one arm per 55-line block.
+        "variants": ["baseline", "sphp"],
+        "n": 50, "warmups": 5, "repeats": 1,
+        # The unshaped sanity pre-flight: a 20-request 0-error sample from
+        # the FREE pool tail (3839.., the design §5.1 spare) confirming the
+        # real link is healthy before the measured arms run.  Never touches
+        # the measured 2701..2920 band (the master pool has 5,000 lines).
+        "sanity_n": 20, "sanity_warmups": 0, "sanity_repeats": 1,
+        "sanity_pool_start": 3839,
+    },
 }
 
 V1_DEFAULT_QUERIES = "experiments/bench/queries/latency_dev480_seed42.txt"
@@ -540,9 +615,8 @@ def v2_line_range(run_name: str, n_arms: int, n: int, warmups: int) -> Tuple[int
     if spec is None:
         raise ValueError(
             f"unknown v2 run type {run_name!r}; registered run types: "
-            f"{sorted(V2_RUN_SPECS)}. (The dropout / genuine-WAN run "
-            f"types are WS-CM extension points, not implemented in this "
-            f"driver.)")
+            f"{sorted(V2_RUN_SPECS)}. (The dropout run type is a WS-CM "
+            f"extension point, not implemented in this driver.)")
     start = spec["pool_line_start"]
     end = start + n_arms * (n + warmups) - 1
     return start, end
@@ -1101,10 +1175,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--run", default=None, choices=sorted(V2_RUN_SPECS),
                     help="v2 run type (activates v2 mode when given, with or "
                          "without --pool): 'confirmatory' (2-node confirmatory "
-                         "core) or 'three-node' (WS-CM 3-node matrix). dropout "
-                         "/ genuine-WAN are WS-CM extension points, not "
-                         "registered. Default: v1 mode unless --pool is given "
-                         "(then 'confirmatory').")
+                         "core), 'three-node' (WS-CM 3-node matrix), "
+                         "'loss-sweep', 'three-node-stress', or "
+                         "'genuine-wan' (CM-4, netem OFF). 'dropout' is a "
+                         "WS-CM extension point, not registered. Default: v1 "
+                         "mode unless --pool is given (then "
+                         "'confirmatory').")
     ap.add_argument("--rtt-tiers", nargs="+", type=int,
                     default=[0, 15, 40, 80],
                     help="Full-round-trip RTT tiers (ms) to sweep (paper tiers)")
@@ -3226,6 +3302,670 @@ def run_campaign_v3node_stress(
 
 
 # ---------------------------------------------------------------------------
+# v2: genuine-WAN characterization leg (CM-4, final design b239833
+# §3.3/§4.3/§5.1).  Netem OFF — the unshaped real cross-site path is the
+# subject of this leg.  Distinct from the shaping runs: no added-RTT / loss
+# fidelity gate, but a PRISTINE readback precondition (verify no shaping
+# remains before the first request) and a per-record real-path RTT probe.
+# ---------------------------------------------------------------------------
+def build_genuine_wan_arm_list(spec: Dict[str, Any]) -> List[Tuple[str, str, str]]:
+    """Return the ordered CM-4 genuine-WAN arm list: ``(cell, arm_label,
+    variant)``.
+
+    The 2 real paths (cells) the mesh traverses (design §3.3, amended
+    2026-10-14): the 2-node path (client -> Node B, ``10.8.0.2``) and the
+    3-node path (client -> Node C, ``10.8.0.3``, the user-facing gateway),
+    each run with its two placement arms (2-node = {P2, P2-SPHP}; 3-node =
+    {3node-P2, 3node-SPHP-from-C}) = **4 arms**.  Order is cell-major, then
+    the arm's declared order within the cell.  ``variant`` is the shared
+    baseline/sphp label used for pool-slice layout and the SPHP request
+    flag.
+    """
+    arms: List[Tuple[str, str, str]] = []
+    for cell_name, _gw, arm_labels in spec["cells"]:
+        for var, arm_label in zip(spec["variants"], arm_labels):
+            arms.append((cell_name, arm_label, var))
+    return arms
+
+
+def _genuine_wan_arm_label(cell_name: str, variant: str) -> str:
+    """Design §3.3 arm key for a (cell, variant): the 2-node cell maps
+    baseline -> ``P2`` / sphp -> ``P2-SPHP``; the 3-node cell maps baseline
+    -> ``3node-P2`` / sphp -> ``3node-SPHP-from-C`` (mirrors
+    ``arm_label`` / ``three_node_arm_label``)."""
+    if cell_name == "3-node":
+        return three_node_arm_label(variant)
+    return arm_label("hybrid", variant)
+
+
+def select_pool_slices_genuine_wan(
+    all_queries: List[str],
+    arms: List[Tuple[str, str, str]],
+    n: int,
+    warmups: int,
+    line_start: int,
+    line_end: int,
+) -> List[Dict[str, Any]]:
+    """Assign each CM-4 genuine-WAN arm a DISJOINT contiguous pool line
+    slice.
+
+    Arms are laid out in ``build_genuine_wan_arm_list`` order (2-node P2,
+    2-node P2-SPHP, 3-node 3node-P2, 3-node 3node-SPHP-from-C) so the fixed
+    line-range (design §5.1: 2701..2920 = 4 x 55) maps one arm per
+    55-line block.  Arm ``i`` gets lines ``[line_start + i*(N+W) ..
+    line_start + (i+1)*(N+W) - 1]``; the first ``warmups`` are warmups
+    (executed, not recorded), the rest measured.
+
+    Fails fast via ``_check_pool_range`` (range size / bounds / duplicates)
+    and asserts pairwise disjointness.  Returns one dict per arm with keys
+    ``cell, gateway_ip, arm, mode, variant, warmups, measured, pool_start,
+    pool_end``.
+    """
+    spec = V2_RUN_SPECS["genuine-wan"]
+    # Map each (cell, arm, variant) to its cell's gateway ip.
+    cell_to_ip = {c[0]: c[1] for c in spec["cells"]}
+    block = _check_pool_range(all_queries, line_start, line_end,
+                              len(arms), n, warmups)
+    per_arm = n + warmups
+    plan: List[Dict[str, Any]] = []
+    for i, (cell, arm_label, variant) in enumerate(arms):
+        start = (line_start - 1) + i * per_arm
+        end = start + per_arm
+        slice_ = block[i * per_arm:(i + 1) * per_arm]
+        plan.append({
+            "cell": cell,
+            "gateway_ip": cell_to_ip[cell],
+            "arm": arm_label,
+            "mode": "hybrid",
+            "variant": variant,
+            "warmups": slice_[:warmups],
+            "measured": slice_[warmups:end - start],
+            "pool_start": start,
+            "pool_end": end,
+        })
+    # Disjointness assertion over all arm slices (warmups + measured).
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert not (sets[i] & sets[j]), (
+                "internal error: genuine-WAN slices overlap")
+    return plan
+
+
+def build_genuine_wan_manifest(
+    run_id: str,
+    pool_path: str,
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+    plan: List[Dict[str, Any]],
+    n: int,
+    warmups: int,
+    repeats: int,
+    seed: int,
+    pristine: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Build the ``campaign_v2_manifest.json`` document for the CM-4
+    genuine-WAN run (design §5.1).  Same manifest discipline as the other
+    v2 runs; each arm records its cell, the per-cell gateway it queries, and
+    its placement arm label.  The manifest also records the PRISTINE
+    readback precondition outcome (netem OFF verified before the first
+    request) and the fact that no added-RTT / loss fidelity gate applies
+    (the unshaped path is the subject)."""
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in plan]
+    disjoint = all(not (sets[i] & sets[j])
+                   for i in range(len(sets))
+                   for j in range(i + 1, len(sets)))
+    spec = V2_RUN_SPECS["genuine-wan"]
+    return {
+        "schema": "pdc.campaign_manifest/v2",
+        "design_doc": DESIGN_DOC,
+        "design_commit": DESIGN_COMMIT,
+        "run_id": run_id,
+        "generated_at_utc": _now_iso(),
+        "run": "genuine-wan",
+        "pool": {
+            "path": pool_path,
+            "sha256": manifest.get("_verified_sha256"),
+            "manifest_path": str(Path(pool_path).with_name(
+                Path(pool_path).name + ".manifest.json")),
+            "n": manifest.get("n"),
+            "line_start": line_start,
+            "line_end": line_end,
+        },
+        "seed": seed,
+        "n_per_arm": n,
+        "warmups_per_arm": warmups,
+        "repeats_per_query": repeats,
+        "cells": [[c[0], c[1], c[2]] for c in spec["cells"]],
+        "variants": spec["variants"],
+        "shaping": "OFF (netem removed; the unshaped real path is the "
+                   "subject — no added-RTT / loss fidelity gate applies)",
+        "pristine_precondition": pristine,
+        "sanity": {
+            "pool_start": spec["sanity_pool_start"],
+            "n": spec["sanity_n"],
+            "repeats": spec["sanity_repeats"],
+            "gate": "0-error unshaped pre-flight (ABORT on any error)",
+        },
+        "rtt_probe": "per-record rtt_probe_ms (TCP connect to the cell's "
+                     "gateway service port; ICMP ping is blocked)",
+        "deliverable": "emulation-fidelity table (build_fidelity_table) — "
+                       "raw real-path stats recorded here; cost-model "
+                       "comparison is the analysis layer's job (design "
+                       "§3.3)",
+        "arms": [
+            {
+                "cell": a["cell"],
+                "gateway_ip": a["gateway_ip"],
+                "arm": a["arm"],
+                "mode": a["mode"],
+                "variant": a["variant"],
+                "pool_start": a["pool_start"] + 1,   # 1-based line numbers
+                "pool_end": a["pool_end"],
+                "warmups": a["warmups"],
+                "measured": a["measured"],
+            } for a in plan
+        ],
+        "disjointness": {
+            "asserted": disjoint,
+            "n_slices": len(plan),
+            "pairwise_intersection_size": 0 if disjoint else -1,
+        },
+    }
+
+
+def _tc_qdisc_state() -> str:
+    """Return the combined tc qdisc state of the shaped iface + ifb0 (empty
+    string on any failure).  This is the same tc readback the fidelity gate
+    uses (``readback_loss_pct``); the genuine-WAN pristine check reuses it to
+    detect ANY residual netem/htb shaping."""
+    out = ""
+    try:
+        p1 = subprocess.run(["tc", "-s", "qdisc", "show"],
+                            capture_output=True, text=True, timeout=30)
+        out += (p1.stdout or "")
+        p2 = subprocess.run(["tc", "-s", "qdisc", "show", "dev", "ifb0"],
+                            capture_output=True, text=True, timeout=30)
+        out += (p2.stdout or "")
+    except Exception:
+        pass
+    return out
+
+
+def verify_netem_pristine(dry_run: bool) -> Tuple[bool, str]:
+    """CM-4 pristine precondition (design §3.3): verify NO netem/htb
+    shaping remains before the first request.
+
+    Runs ``clear.sh`` (idempotent teardown) and then reads back the tc qdisc
+    state (the same tooling the fidelity gate uses) to confirm no ``netem``
+    or ``htb`` leaf is active on the iface or ifb0.  Returns ``(pristine,
+    detail)`` — ``pristine`` is True only if the readback is clean.  For
+    dry-run it is trivially pristine (no shaping was ever applied).
+    """
+    if dry_run:
+        return True, "dry-run (no shaping applied)"
+    clear_netem(dry_run=False)
+    state = _tc_qdisc_state()
+    if "netem" in state or "htb" in state:
+        tail = (state or "").strip().splitlines()[-1:] or [""]
+        return False, f"shaping still present after clear.sh: {tail[0][:200]}"
+    return True, "no netem/htb qdisc present (pristine)"
+
+
+def rtt_probe_ms(host: str, port: int, timeout: float = 3.0) -> float:
+    """Real-path RTT probe (design §3.3): a single TCP connect round trip
+    (SYN -> SYN/ACK) to ``host:port`` in ms — the established RTT proxy,
+    since ICMP ping is blocked in our environments.  Returns NaN if the
+    connect fails.  Same technique the gateway pre-flight harness uses
+    (``scripts/node_c_prep/run_node_c_benchmark.py::measure_rtt``)."""
+    t0 = time.perf_counter()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            pass
+        return (time.perf_counter() - t0) * 1000.0
+    except OSError:
+        return float("nan")
+
+
+def build_fidelity_table(
+    records: List[Dict[str, Any]],
+    predictions: Optional[Dict[str, Dict[str, float]]] = None,
+) -> List[Dict[str, Any]]:
+    """Deterministic post-pass producing the CM-4 **emulation-fidelity
+    table** (design §3.3 deliverable, LR-7 element-6 fidelity metric).
+
+    ``records`` are the genuine-WAN measured records (each carries its
+    placement ``arm``, the per-record ``rtt_probe_ms`` real-path TCP probe,
+    and the ``ttft_ms`` / ``total_ms`` wall timings).  ``predictions`` is an
+    OPTIONAL mapping ``arm -> {ttft_ms: ...}`` with the cost-model
+    predictions for the nearest shaped regime (the analysis layer supplies
+    these; the driver records raw stats only, per design §3.3).
+
+    Returns one row per arm (sorted by cell then arm) with the real-path
+    RTT distribution (p50 / p95 / IQR) and the per-arm TTFT/E2E p50/p95,
+    plus — when a prediction is supplied for that arm — the predicted TTFT
+    and the emulated-vs-real TTFT gap.  The function is pure (no I/O, no
+    RNG), so it is unit-testable on fixture records.  It is descriptive
+    (characterization) — not part of any Holm/BH confirmatory family.
+    """
+    by_arm: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for r in records:
+        if "error" in r:
+            continue
+        by_arm.setdefault((r.get("cell"), r.get("arm")), []).append(r)
+    rows: List[Dict[str, Any]] = []
+    for (cell, arm), recs in by_arm.items():
+        if not recs:
+            continue
+        probes = [float(r["rtt_probe_ms"]) for r in recs
+                  if r.get("rtt_probe_ms") is not None
+                  and not (isinstance(r.get("rtt_probe_ms"), float)
+                           and math.isnan(r["rtt_probe_ms"]))]
+        ttfts = [float(r["ttft_ms"]) for r in recs
+                 if r.get("ttft_ms") is not None]
+        totals = [float(r["total_ms"]) for r in recs
+                  if r.get("total_ms") is not None]
+        rtt_p25 = percentile(probes, 25) if probes else None
+        rtt_p50 = percentile(probes, 50) if probes else None
+        rtt_p75 = percentile(probes, 75) if probes else None
+        rtt_p95 = percentile(probes, 95) if probes else None
+        rtt_iqr = (rtt_p75 - rtt_p25) if (rtt_p25 is not None
+                                          and rtt_p75 is not None) else None
+        row: Dict[str, Any] = {
+            "cell": cell,
+            "arm": arm,
+            "n": len(recs),
+            "n_rtt_probes": len(probes),
+            "rtt_probe_p50_ms": round(rtt_p50, 3) if rtt_p50 is not None else None,
+            "rtt_probe_p95_ms": round(rtt_p95, 3) if rtt_p95 is not None else None,
+            "rtt_probe_iqr_ms": round(rtt_iqr, 3) if rtt_iqr is not None else None,
+            "ttft_p50_ms": round(percentile(ttfts, 50), 3) if ttfts else None,
+            "ttft_p95_ms": round(percentile(ttfts, 95), 3) if ttfts else None,
+            "total_p50_ms": round(percentile(totals, 50), 3) if totals else None,
+            "total_p95_ms": round(percentile(totals, 95), 3) if totals else None,
+        }
+        if predictions is not None:
+            pred = predictions.get((cell, arm)) or predictions.get(arm)
+            if pred:
+                pred_ttft = pred.get("ttft_ms")
+                row["model_ttft_ms"] = pred_ttft
+                if pred_ttft is not None and ttfts:
+                    row["ttft_gap_ms"] = round(
+                        percentile(ttfts, 50) - pred_ttft, 3)
+                else:
+                    row["ttft_gap_ms"] = None
+        rows.append(row)
+    rows.sort(key=lambda r: (r["cell"], r["arm"]))
+    return rows
+
+
+def print_plan_v2_genuine_wan(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    arm_plan: List[Dict[str, Any]],
+    manifest: Dict[str, Any],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Dry-run plan for the CM-4 genuine-WAN run (no netem, no HTTP, no
+    files)."""
+    spec = V2_RUN_SPECS["genuine-wan"]
+    n_arms = len(arm_plan)
+    per_arm = args.query_sample + args.warmups
+    n_measured_per_arm = len(arm_plan[0]["measured"]) * args.repeats
+    n_warmups_per_arm = len(arm_plan[0]["warmups"])
+    n_total_per_arm = n_warmups_per_arm + n_measured_per_arm
+    n_measured = n_arms * n_measured_per_arm
+    n_warmups = n_arms * n_warmups_per_arm
+    n_total = n_arms * n_total_per_arm
+    n_sanity = spec["sanity_n"] * spec["sanity_repeats"]
+    n_total_all = n_total + n_sanity
+    sets = [set(a["warmups"]) | set(a["measured"]) for a in arm_plan]
+    disjoint = all(not (sets[i] & sets[j])
+                   for i in range(len(sets))
+                   for j in range(i + 1, len(sets)))
+    # The 20-request sanity block stays clear of the measured band.
+    sanity_start = spec["sanity_pool_start"]
+    sanity_end = sanity_start + spec["sanity_n"] - 1
+
+    print("=" * 78)
+    print("CAMPAIGN V2 — CM-4 GENUINE-WAN CHARACTERIZATION (netem OFF) — DRY RUN")
+    print("=" * 78)
+    print(f"  design doc   : {DESIGN_DOC} (commit {DESIGN_COMMIT})")
+    print(f"  run type     : genuine-wan  ({spec['label']})")
+    print(f"  pool file    : {args.pool}  ({len(all_queries)} lines, "
+          f"sha256={manifest.get('_verified_sha256')})")
+    print(f"  pool manifest: VERIFIED OK (sha256 + n={manifest.get('n')} "
+          f"+ line_count all match)")
+    print(f"  pool lines   : {line_start}..{line_end} of the pool file "
+          f"(design §5.1; {n_arms} arms x {per_arm} = "
+          f"{n_arms * per_arm} lines)")
+    print(f"  shaping      : OFF — netem removed; the unshaped real path is "
+          f"the subject (NO §3.1-style added-RTT / loss fidelity gate)")
+    print(f"  pristine     : clear.sh then tc-qdisc readback BEFORE the "
+          f"first request — ABORT if any netem/htb shaping remains")
+    print(f"  cells        : {len(spec['cells'])} real cross-site paths — "
+          f"2-node (client -> Node B 10.8.0.2) and 3-node (client -> Node C "
+          f"10.8.0.3, user-facing)")
+    print(f"  arms         : {n_arms} = 2 cells x 2 placement arms "
+          f"({', '.join(l for _, _, ls in spec['cells'] for l in ls)}) "
+          f"(mode=hybrid, sphp axis)")
+    print(f"  per arm      : W={args.warmups} warmups + N={args.query_sample} "
+          f"x R={args.repeats} = {n_total_per_arm} requests "
+          f"({n_measured_per_arm} measured + {n_warmups_per_arm} warmups)")
+    print(f"  rtt probe    : per-record rtt_probe_ms (TCP connect to the "
+          f"cell's gateway service port; ICMP ping is blocked)")
+    print(f"  sanity       : {n_sanity} unshaped pre-flight requests from the "
+          f"free pool tail {sanity_start}..{sanity_end}; 0-error gate — any "
+          f"error ABORTS")
+    print(f"  deliverable  : emulation-fidelity table (per-arm real-path "
+          f"RTT p50/p95/IQR + TTFT/E2E p50/p95) — calibration only, NOT in "
+          f"any Holm/BH confirmatory family")
+    print(f"  TOTAL        : {n_total} band requests "
+          f"({n_measured} measured + {n_warmups} warmups) + {n_sanity} sanity "
+          f"= {n_total_all} total")
+    print(f"  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm "
+          f"(no cache flush exists; §5.2)")
+    print(f"  campaign manifest: would be written to "
+          f"{args.out_dir}/campaign_v2_manifest.json before any request")
+    print("-" * 78)
+    print("  Execution plan (cells sequentially; netem stays OFF):")
+    for cell_name, gw_ip, arm_labels in spec["cells"]:
+        tag = (f"NETEM OFF: clear.sh + pristine readback (verify no "
+               f"netem/htb) before the first request; query "
+               f"{gw_ip}:8000")
+        cell_arms = [a for a in arm_plan if a["cell"] == cell_name]
+        n_cell_total = sum(len(a["warmups"]) + len(a["measured"]) * args.repeats
+                           for a in cell_arms)
+        n_cell_measured = sum(len(a["measured"]) * args.repeats
+                              for a in cell_arms)
+        print(f"    cell {cell_name}  [{tag}]")
+        for arm_label in arm_labels:
+            arm = next(a for a in cell_arms if a["arm"] == arm_label)
+            a_total = (len(arm["warmups"])
+                       + len(arm["measured"]) * args.repeats)
+            print(f"        arm {arm_label:<18} "
+                  f"(mode={arm['mode']} variant={arm['variant']})  "
+                  f"-> pool lines {arm['pool_start'] + 1}..{arm['pool_end']}  "
+                  f"({len(arm['warmups'])}W + {len(arm['measured'])}x"
+                  f"{args.repeats}R = {a_total} req)")
+        print(f"        cell subtotal: {n_cell_total} requests "
+              f"({n_cell_measured} measured)")
+    print("-" * 78)
+    print(f"  manifest disjointness: {len(arm_plan)} arm slices, pairwise "
+          f"intersection == {'0 (asserted OK)' if disjoint else 'NON-EMPTY (FAIL)'}")
+    print("-" * 78)
+    print("  DRY RUN complete. No network calls, no netem, no files were made.")
+
+
+def run_campaign_v2_genuine_wan(
+    args: argparse.Namespace,
+    all_queries: List[str],
+    manifest: Dict[str, Any],
+    arm_plan: List[Dict[str, Any]],
+    line_start: int,
+    line_end: int,
+) -> None:
+    """Execute the CM-4 genuine-WAN characterization leg (final design
+    §3.3/§4.3/§5.1).
+
+    Netem OFF for the whole leg.  Pre-flight: (a) a PRISTINE readback —
+    ``clear.sh`` then a tc-qdisc readback (the same tooling the fidelity
+    gate uses) confirming NO netem/htb shaping remains; a dirty readback
+    ABORTS (exit 1) BEFORE any request.  (b) a 20-request unshaped sanity
+    sample from the free pool tail (0-error gate — any error aborts, the
+    real link must be healthy).  Then, per cell (2-node then 3-node),
+    re-verify the pristine readback before the cell, run the two placement
+    arms against the cell's own gateway (the 2-node cell -> Node B
+    ``10.8.0.2``, the 3-node cell -> Node C ``10.8.0.3``), and record each
+    measured query with its per-record ``rtt_probe_ms`` real-path TCP probe.
+    No added-RTT / loss fidelity gate applies (the unshaped path is the
+    subject).  The summary carries the **emulation-fidelity table**
+    (``build_fidelity_table`` over the measured records).
+    Writes ``<out-dir>/campaign_v2_manifest.json`` before any request.
+    Exits 1 (with partial artifacts kept) on a pristine or sanity failure.
+    """
+    spec = V2_RUN_SPECS["genuine-wan"]
+    pool_path = str(args.pool)
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    run_id = _run_id()
+    jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
+    if jsonl_path.exists():
+        print(f"ERROR: {jsonl_path} already exists; omit --run-id for a "
+              f"fresh run.", file=sys.stderr)
+        sys.exit(1)
+
+    # -------------------------------------------------------------------
+    # PRISTINE precondition (design §3.3): verify NO shaping before the
+    # first request; a dirty readback ABORTS before any request is sent.
+    # -------------------------------------------------------------------
+    pristine_ok, pristine_detail = verify_netem_pristine(dry_run=False)
+    if not pristine_ok:
+        print(f"ERROR: CM-4 pristine precondition FAILED before any request: "
+              f"{pristine_detail}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Pristine OK (netem OFF): {pristine_detail}")
+
+    # Design §5.1: the campaign manifest is written BEFORE any request.
+    manifest_path = out_dir / "campaign_v2_manifest.json"
+    manifest_doc = build_genuine_wan_manifest(
+        run_id, pool_path, manifest, line_start, line_end,
+        arm_plan, args.query_sample, args.warmups, args.repeats, args.seed,
+        pristine={"verified": True, "detail": pristine_detail,
+                  "shaping": "OFF"})
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_doc, f, indent=2)
+    print(f"Manifest written: {manifest_path} "
+          f"(disjointness asserted: {manifest_doc['disjointness']['asserted']})")
+
+    arms_recs: Dict[Tuple[str, str, str, str], List[Dict[str, Any]]] = {}
+    n_ok = 0
+    n_err = 0
+    n_warmup_ok = 0
+    n_warmup_err = 0
+    exit_code = 0
+    abort_reason: Optional[str] = None
+
+    def _finalize() -> None:
+        summary_rows: List[Dict[str, Any]] = []
+        for (cell, arm_label, mode, variant), recs in arms_recs.items():
+            row = summarize_arm(recs)
+            row = {"cell": cell, "arm": arm_label, "mode": mode,
+                   "variant": variant, **row}
+            summary_rows.append(row)
+        summary_rows.sort(key=lambda r: (r["cell"], r["arm"]))
+        fidelity = build_fidelity_table(
+            [r for recs in arms_recs.values() for r in recs])
+        summary_doc = {
+            "schema": "pdc.campaign_summary/v2",
+            "design_doc": DESIGN_DOC,
+            "design_commit": DESIGN_COMMIT,
+            "run": "genuine-wan",
+            "run_id": run_id,
+            "generated_at": _now_iso(),
+            "status": "completed" if abort_reason is None else "aborted",
+            "abort_reason": abort_reason,
+            "pool": manifest_doc["pool"],
+            "line_range": [line_start, line_end],
+            "seed": args.seed,
+            "query_sample": args.query_sample,
+            "warmups": args.warmups,
+            "repeats": args.repeats,
+            "cells": [[c[0], c[1], c[2]] for c in spec["cells"]],
+            "variants": spec["variants"],
+            "shaping": "OFF",
+            "pristine": manifest_doc["pristine_precondition"],
+            "top_k": args.top_k,
+            "n_ok": n_ok,
+            "n_errors": n_err,
+            "n_warmup_ok": n_warmup_ok,
+            "n_warmup_errors": n_warmup_err,
+            "fidelity_table": fidelity,
+            "summary": summary_rows,
+        }
+        csv_path, json_path = write_summary_outputs(
+            out_dir, run_id, summary_rows, summary_doc)
+        print(f"\nJSONL   : {jsonl_path}")
+        print(f"CSV     : {csv_path}")
+        print(f"JSON    : {json_path}  (carries the emulation-fidelity table)")
+        if abort_reason is not None:
+            print(f"CAMPAIGN ABORTED: {abort_reason}", file=sys.stderr)
+        print("Done.")
+        sys.exit(exit_code)
+
+    jsonl_f = open(jsonl_path, "w", encoding="utf-8")
+    try:
+        # -----------------------------------------------------------------
+        # Unshaped sanity pre-flight: 20 requests from the free pool tail,
+        # 0-error gate (any error ABORTS — the real link must be healthy).
+        # -----------------------------------------------------------------
+        print(f"\n=== unshaped sanity pre-flight "
+              f"(N={spec['sanity_n']}, 0-error gate) ===")
+        sanity_start = spec["sanity_pool_start"]
+        sanity_n = spec["sanity_n"]
+        sanity_reps = spec["sanity_repeats"]
+        sanity_qs = all_queries[sanity_start - 1:
+                                 sanity_start - 1 + sanity_n]
+        sanity_ok = 0
+        sanity_err = 0
+        for q in sanity_qs:
+            for rep in range(sanity_reps):
+                try:
+                    res = http_post_json(args.gateway_url.rstrip("/")
+                                         + "/query/benchmark", {
+                        "query": q, "top_k": args.top_k,
+                        "mode": "hybrid", "sphp": False,
+                    }, timeout=args.timeout)
+                    rec = build_record(
+                        run_id, 0, 0, "hybrid", "baseline", rep, q, res,
+                        netem_applied=False,
+                        extra={
+                            "stratum": stratum_for_repeat(rep),
+                            "rtt_probe_ms": rtt_probe_ms(
+                                spec["cells"][0][1], 8000),
+                            "netem_link_b_applied": None,
+                            "netem_link_c_applied": None,
+                            "pool_file": Path(pool_path).name,
+                            "pool_manifest_sha256":
+                                manifest.get("_verified_sha256"),
+                            "sanity": True,
+                        })
+                    jsonl_f.write(json.dumps(rec) + "\n")
+                    jsonl_f.flush()
+                    sanity_ok += 1
+                except Exception as e:
+                    sanity_err += 1
+                    print(f"    [sanity] {q[:40]} rep={rep} failed: {e}",
+                          file=sys.stderr)
+        if sanity_err > 0:
+            abort_reason = (f"unshaped sanity gate: {sanity_err}/{sanity_n} "
+                            f"sample(s) failed — the real link is NOT "
+                            f"healthy; aborting.")
+            exit_code = 1
+            _finalize()
+        print(f"    [sanity] {sanity_ok}/{sanity_n} OK, 0 errors "
+              f"-> real link healthy")
+
+        # -----------------------------------------------------------------
+        # Per measured cell (2-node then 3-node), netem stays OFF.
+        # -----------------------------------------------------------------
+        for cell_name, gw_ip, arm_labels in spec["cells"]:
+            gw_url = f"http://{gw_ip}:8000"
+            print(f"\n=== cell {cell_name} (gateway {gw_ip}:8000) "
+                  f"[NETEM OFF] ===")
+            # Re-verify the pristine readback before each cell (design
+            # §3.3: re-verified before each of the two cells).
+            p_ok, p_detail = verify_netem_pristine(dry_run=False)
+            if not p_ok:
+                abort_reason = (f"CM-4 pristine precondition re-check FAILED "
+                                f"before cell {cell_name}: {p_detail}")
+                exit_code = 1
+                _finalize()
+            print(f"    [pristine] {p_detail}")
+
+            for variant, arm_label in zip(spec["variants"], arm_labels):
+                if not check_health(gw_url, timeout=15):
+                    abort_reason = (f"gateway /health failed before arm "
+                                    f"{arm_label} in cell {cell_name} "
+                                    f"({gw_url}/health)")
+                    exit_code = 1
+                    _finalize()
+                sphp = (variant == "sphp")
+                arm = next(a for a in arm_plan if a["arm"] == arm_label)
+                arm_key = (cell_name, arm_label, "hybrid", variant)
+                print(f"  arm {arm_label:<18} (mode=hybrid variant={variant} "
+                      f"sphp={sphp})  pool lines "
+                      f"{arm['pool_start'] + 1}..{arm['pool_end']}")
+
+                # Warmups: executed but NOT recorded (disjoint slice).
+                for w, wq in enumerate(arm["warmups"]):
+                    try:
+                        http_post_json(gw_url + "/query/benchmark", {
+                            "query": wq, "top_k": args.top_k,
+                            "mode": "hybrid", "sphp": sphp,
+                        }, timeout=args.timeout)
+                        n_warmup_ok += 1
+                    except Exception as e:
+                        n_warmup_err += 1
+                        print(f"    [warmup] {arm_label} w={w} failed: {e}",
+                              file=sys.stderr)
+
+                # Measured: N queries x R repeats; each record carries the
+                # per-record real-path RTT probe (design §3.3).
+                for query in arm["measured"]:
+                    for rep in range(args.repeats):
+                        probe = rtt_probe_ms(gw_ip, 8000)
+                        extra = {
+                            "cell": cell_name,
+                            "gateway_ip": gw_ip,
+                            "stratum": stratum_for_repeat(rep),
+                            "rtt_probe_ms": probe,
+                            "netem_link_b_applied": None,
+                            "netem_link_c_applied": None,
+                            "pool_file": Path(pool_path).name,
+                            "pool_manifest_sha256":
+                                manifest.get("_verified_sha256"),
+                        }
+                        try:
+                            res = http_post_json(gw_url + "/query/benchmark", {
+                                "query": query, "top_k": args.top_k,
+                                "mode": "hybrid", "sphp": sphp,
+                            }, timeout=args.timeout)
+                            rec = build_record(
+                                run_id, 0, 0, "hybrid", variant, rep,
+                                query, res, netem_applied=False,
+                                extra=extra)
+                            n_ok += 1
+                        except Exception as e:
+                            rec: Dict[str, Any] = {
+                                "run_id": run_id,
+                                "timestamp": _now_iso(),
+                                "query_id": None,
+                                "query": query,
+                                "rtt_ms": 0,
+                                "loss_pct": 0,
+                                "mode": "hybrid",
+                                "variant": variant,
+                                "repeat_index": rep,
+                                "top_k": args.top_k,
+                                "netem_applied": False,
+                                **extra,
+                            }
+                            rec["error"] = str(e)
+                            n_err += 1
+                        jsonl_f.write(json.dumps(rec) + "\n")
+                        jsonl_f.flush()
+                        arms_recs.setdefault(arm_key, []).append(rec)
+    finally:
+        jsonl_f.close()
+
+    _finalize()
+
+
+# ---------------------------------------------------------------------------
 # v2: loss-sweep run (amended design §3.1/§4.3/§5.1, amended 2026-10-14)
 # ---------------------------------------------------------------------------
 def loss_sweep_cell_gate(rtt: int, loss: float, when: str,
@@ -3885,6 +4625,33 @@ def main() -> None:
             return
         run_campaign_v3node_stress(args, all_queries, manifest, arm_plan,
                                    line_start, line_end)
+        return
+
+    if is_v2(args) and args.run == "genuine-wan":
+        # CM-4 genuine-WAN characterization leg (final design §3.3/§4.3/
+        # §5.1, finalized in b239833): 2 real cross-site paths x 2 placement
+        # arms = 4 arms, N=50 / W=5 / R=1 -> 4 x (50+5) = 220 lines -> pool
+        # band 2701..2920 (zero slack); netem OFF; pristine readback
+        # precondition + per-record real-path RTT probe; 20-request unshaped
+        # sanity pre-flight from free tail 3839..
+        spec = V2_RUN_SPECS["genuine-wan"]
+        arms = build_genuine_wan_arm_list(spec)
+        n_arms = len(arms)
+        line_start, line_end = v2_line_range(
+            "genuine-wan", n_arms, args.query_sample, args.warmups)
+        try:
+            arm_plan = select_pool_slices_genuine_wan(
+                all_queries, arms, args.query_sample, args.warmups,
+                line_start, line_end)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+        if args.dry_run:
+            print_plan_v2_genuine_wan(args, all_queries, arm_plan, manifest,
+                                      line_start, line_end)
+            return
+        run_campaign_v2_genuine_wan(args, all_queries, manifest, arm_plan,
+                                    line_start, line_end)
         return
 
     # Build the full arm list FIRST, then assign each arm its query slice.
