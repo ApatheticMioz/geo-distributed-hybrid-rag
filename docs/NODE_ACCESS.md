@@ -153,7 +153,7 @@ Because development can happen on any machine:
 
 | Script | Purpose |
 |:---|:---|
-| `apply.sh RTT_MS LOSS_PCT [RATE]` | Apply bidirectional shaping |
+| `apply.sh RTT_MS LOSS_PCT [RATE]` | Apply bidirectional shaping (LOSS_PCT: 0..100, at most one decimal place; halved per direction) |
 | `clear.sh` | Remove all netem state (idempotent) |
 | `show.sh` | Inspect current qdisc state (read-only) |
 | `validate.sh` | Closed-loop RTT check (clear → baseline → apply → shaped) |
