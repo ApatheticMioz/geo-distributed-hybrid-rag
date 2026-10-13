@@ -1,3 +1,7 @@
+% microtype expansion disabled: acmart falls back to CM bitmap fonts when
+% libertine/newtxmath (texlive-fonts-extra) is absent, and pdfTeX cannot
+% auto-expand non-scalable fonts. Remove this line once fonts-extra is installed.
+\PassOptionsToPackage{expansion=false}{microtype}
 \documentclass[sigconf,anonymous]{acmart}
 
 % ---------------------------------------------------------------------------
@@ -7,6 +11,8 @@
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 \definecolor{todocolor}{rgb}{0.8,0,0}
 \newcommand{\todo}[1]{{\normalfont\color{todocolor}\textbf{[TODO #1]}}}
@@ -41,10 +47,8 @@ Placement Tradeoffs and Speculative Prefill Acceleration}
     }
 }
 
-\maketitle
-
 % ===========================================================================
-%  ABSTRACT
+%  ABSTRACT  (acmart requires the abstract before \maketitle)
 % ===========================================================================
 \begin{abstract}
 Retrieval-Augmented Generation (RAG) systems are increasingly deployed across
@@ -80,6 +84,8 @@ it to show that the SPHP-augmented split placement is optimal across the
 entire swept (RTT, bandwidth) space. All artifacts, including the
 measurement harness and scoring pipeline, are released.
 \end{abstract}
+
+\maketitle
 
 \begin{CCSXML}
 <ccs2012>
