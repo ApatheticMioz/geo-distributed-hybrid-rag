@@ -806,12 +806,14 @@ def test_3node_record_extra_warm_stratum():
 
 
 def test_3node_run_fidelity_gate_dry_run():
-    gates = campaign.run_fidelity_gate_3node(15, 15, "pre", dry_run=True)
+    gates = campaign.run_fidelity_gate_3node(
+        15, 0, 15, 0, "pre", dry_run=True)
     assert len(gates) == 2
     assert [g["link"] for g in gates] == ["b", "c"]
     assert all(g["status"] == "planned" for g in gates)
     # an unshaped (0) leg is recorded skipped-baseline
-    gates2 = campaign.run_fidelity_gate_3node(15, 0, "pre", dry_run=True)
+    gates2 = campaign.run_fidelity_gate_3node(
+        15, 0, 0, 0, "pre", dry_run=True)
     assert gates2[0]["status"] == "planned"
     assert gates2[1]["status"] == "skipped-baseline"
 
