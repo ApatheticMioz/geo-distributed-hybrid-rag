@@ -1,0 +1,35 @@
+# Dry-run evidence for CM-4 genuine-WAN run type (working tree on top of 7b12df9; final run specs per b239833 §3.3 CM-4 genuine-WAN characterization / §5.1 final pool allocation — band 2701..2920, 4 arms, N=50/W=5/R=1, netem OFF, sanity from free tail 3839..)
+# Generated: 2026-10-14T00:00:00Z via: python3 experiments/bench/campaign.py --run genuine-wan --dry-run
+==============================================================================
+CAMPAIGN V2 — CM-4 GENUINE-WAN CHARACTERIZATION (netem OFF) — DRY RUN
+==============================================================================
+  design doc   : docs/campaign_v2_design.md (commit 1f911ef)
+  run type     : genuine-wan  (CM-4 genuine-WAN characterization (netem OFF, real path))
+  pool file    : experiments/bench/queries/campaign_v2_master5000_seed42.txt  (5000 lines, sha256=9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa)
+  pool manifest: VERIFIED OK (sha256 + n=5000 + line_count all match)
+  pool lines   : 2701..2920 of the pool file (design §5.1; 4 arms x 55 = 220 lines)
+  shaping      : OFF — netem removed; the unshaped real path is the subject (NO §3.1-style added-RTT / loss fidelity gate)
+  pristine     : clear.sh then tc-qdisc readback BEFORE the first request — ABORT if any netem/htb shaping remains
+  cells        : 2 real cross-site paths — 2-node (client -> Node B 10.8.0.2) and 3-node (client -> Node C 10.8.0.3, user-facing)
+  arms         : 4 = 2 cells x 2 placement arms (P2, P2-SPHP, 3node-P2, 3node-SPHP-from-C) (mode=hybrid, sphp axis)
+  per arm      : W=5 warmups + N=50 x R=1 = 55 requests (50 measured + 5 warmups)
+  rtt probe    : per-record rtt_probe_ms (TCP connect to the cell's gateway service port; ICMP ping is blocked)
+  sanity       : 20 unshaped pre-flight requests from the free pool tail 3839..3858; 0-error gate — any error ABORTS
+  deliverable  : emulation-fidelity table (per-arm real-path RTT p50/p95/IQR + TTFT/E2E p50/p95) — calibration only, NOT in any Holm/BH confirmatory family
+  TOTAL        : 220 band requests (200 measured + 20 warmups) + 20 sanity = 240 total
+  strata       : repeat 0 = cold-prefix, repeats 1..R-1 = warm (no cache flush exists; §5.2)
+  campaign manifest: would be written to experiments/bench/campaigns/campaign_v2_manifest.json before any request
+------------------------------------------------------------------------------
+  Execution plan (cells sequentially; netem stays OFF):
+    cell 2-node  [NETEM OFF: clear.sh + pristine readback (verify no netem/htb) before the first request; query 10.8.0.2:8000]
+        arm P2                 (mode=hybrid variant=baseline)  -> pool lines 2701..2755  (5W + 50x1R = 55 req)
+        arm P2-SPHP            (mode=hybrid variant=sphp)  -> pool lines 2756..2810  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+    cell 3-node  [NETEM OFF: clear.sh + pristine readback (verify no netem/htb) before the first request; query 10.8.0.3:8000]
+        arm 3node-P2           (mode=hybrid variant=baseline)  -> pool lines 2811..2865  (5W + 50x1R = 55 req)
+        arm 3node-SPHP-from-C  (mode=hybrid variant=sphp)  -> pool lines 2866..2920  (5W + 50x1R = 55 req)
+        cell subtotal: 110 requests (100 measured)
+------------------------------------------------------------------------------
+  manifest disjointness: 4 arm slices, pairwise intersection == 0 (asserted OK)
+------------------------------------------------------------------------------
+  DRY RUN complete. No network calls, no netem, no files were made.
