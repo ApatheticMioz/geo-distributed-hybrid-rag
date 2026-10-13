@@ -261,3 +261,81 @@ numbers) is a separate, explicit subsequent slice.**
 RP-2 adopted (analysis-level), RP-3 rejected. Adoption-port (and any
 re-generation of paper figures / the C3 numbers) is a subsequent, separate
 decision and is out of scope for this slice.*
+---
+
+## Plan-vs-design reconciliation (2026-10-14, consolidated)
+
+**Verdict: adopted (design).** This entry records the final, consolidated
+amendment of `docs/campaign_v2_design.md` that aligns the pre-registered
+run specs with (a) the approved plan's mandate and (b) the in-progress
+(uncommitted) driver implementation.
+
+**What was reconciled:**
+
+1. **Loss-sweep (§3.1/§4.3/§7)** — from P2-only/retrieval-only to
+   **12 arms** (6 cells: RTT {0,40} × loss {0.5,1,2} × {P2, P2-SPHP}) at
+   **full generation**. The key deliverable (per the approved plan mandate)
+   is **per-cell SPHP hit rate with Wilson 95% CI as a function of loss**,
+   which a P2-only sweep cannot produce. Gates frozen: loss-0 0-error sanity
+   pre-flight (abort), shaped cells report per-cell error without abort,
+   11-ping ±30% + fractional-loss readback pre/post each cell. Sized
+   12 × 55 = **660 pool lines** → band 2041..2700.
+
+2. **CM-4 genuine-WAN (§3.3)** — from a single 100-query leg to
+   **2 real paths × 2 arms = 4 arms** (2-node B-gateway / 3-node
+   C-gateway), N=50/W=5/R=1 → **220 pool lines** → band 2701..2920.
+   **Netem OFF** with pristine verification per cell; **no fidelity gate**
+   (the unshaped path is the subject). Per-record real-path RTT (TCP)
+   probe. Deliverable = **emulation-fidelity table**.
+
+3. **CM-5 three-node-stress (NEW §3.4)** — 27 per-leg cells (3 loss tiers
+   {0.5,1,2}% × 3 leg-placements {B, C, both} × 3 (B,C) RTT cells
+   (15,15)/(40,15)/(80,15); C frozen at 15 ms) × 2 arms {3node-P2,
+   3node-SPHP-from-C} = **54 arms**, **N=15/W=2/R=1** → 54 × 17 = **918
+   pool lines** → band 2921..3838. Baseline (0,0) 0-error sanity
+   pre-flight (abort on any error); per-leg fidelity gate (11-ping ±30%
+   + loss readback) pre/post each cell; per-cell error reporting (no
+   abort); per-cell SPHP-from-C hit rate + Wilson 95% CI (key deliverable).
+   Framing: **descriptive/stress (BH secondary); no confirmatory claims.**
+
+4. **§5.1 final pool allocation (5,000-line master pool)** — all bands
+   assigned disjointly with inline arithmetic and an assert-style invariant
+   table (see design §5.1):
+
+   | # | Band | Length | Run |
+   |---|---|---|---|
+   | 1 | 1..1040 | 1040 | Confirmatory core (**frozen, executed**) |
+   | 2 | 1041..1370 | 330 | *reserved gap (unused)* |
+   | 3 | 1371..1910 | 540 | Three-node matrix (**frozen, executed**) |
+   | 4 | 1911..2040 | 130 | Dropout RQ2 |
+   | 5 | 2041..2700 | 660 | Loss-sweep (amended) |
+   | 6 | 2701..2920 | 220 | CM-4 genuine-WAN |
+   | 7 | 2921..3838 | 918 | CM-5 three-node-stress |
+   | 8 | 3839..5000 | 1162 | *free tail (spare)* |
+
+   Sum: 1040 + 330 + 540 + 130 + 660 + 220 + 918 + 1162 = **5,000** ✓.
+   No overlaps. The pre-amendment 2,250-line pool is superseded.
+
+**Evidence:**
+- The **2026-10-14 netem fractional-loss pre-flight**
+  (`scripts/netem/validation_loss_fractional_20261014.md`) confirmed the
+  kernel-level shaping + loss-readback path is healthy (all three tiers
+  PASS; negative tests fail as designed; host left pristine). The
+  11-ping RTT gate was **not executable** (WG peers unreachable), so it is
+  recorded as *not executed* (same status class as the 2026-10-12 A→C
+  gate), not as failed — the loss-readback sub-gate was exercised directly
+  against live kernel state and ALL_PASS.
+- The **approved plan mandate** (the dispatch) explicitly requires headline
+  arms + SPHP hit-rate-under-loss as the key deliverable; the P2-only
+  6-arm reading cannot produce it.
+- The **in-progress driver** (`campaign.py`, uncommitted) registers
+  loss-sweep as 12 arms, CM-4 as 4 arms, and CM-5 as 54 arms — this
+  design amendment makes the pre-registration match the implementation.
+- The **frozen bands** (confirmatory 1..1040, three-node 1371..1910,
+  dropout 1911..2040) are **unchanged** — they are committed and
+  executed.
+
+**Files modified:** `docs/campaign_v2_design.md` (header/status, §3.1,
+§3.3, new §3.4, §4.3, totals table, §5.1, §6 run-order, §7 analysis
+table, §9 deviation log). `docs/revision_log.md` (this entry). No code
+files modified by this slice.
