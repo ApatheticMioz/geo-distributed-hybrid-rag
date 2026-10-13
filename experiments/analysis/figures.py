@@ -30,9 +30,10 @@ Generates IEEE-styled vector PDFs into ``paper/figures/``:
 
 Data sources
 ------------
-  * benchmarks/campaigns/campaign_*.jsonl  (freshest campaign; measured record)
-  * experiments/analysis/results/cost_model_validation.json (campaign-fitted parameters,
-    regime-level LOTO validation)
+  * benchmarks/campaigns/campaign_v2_confirm_2node_20261013.jsonl  (2026-10-13
+    confirmatory re-baseline; measured record, N=120/arm)
+  * experiments/analysis/results/costmodel_refit_v2_20261013.json (refit parameters
+    on the re-baseline + RP-2 adopted SPHP form; regime-level LOTO validation)
   * experiments/analysis/results/crossover_analysis.json (+ _cold.json; model sweeps)
   * experiments/analysis/results/live_retrieval_quality.json (seeded 500-query quality)
 
@@ -66,10 +67,15 @@ from matplotlib.patches import Patch, FancyBboxPatch, FancyArrowPatch
 # ---------------------------------------------------------------------------
 _HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = _HERE.parent.parent          # repo root (script lives in experiments/analysis)
-CAMPAIGN_GLOB = PROJECT_ROOT / "experiments" / "bench" / "campaigns" / "campaign_*.jsonl"
+# Re-baselined 2026-10-13 confirmatory campaign (the paper's dataset of record;
+# pinned explicitly rather than glob-newest so a later bench campaign landing in
+# the same directory cannot silently re-point the paper figures).
+CAMPAIGN_FILE = PROJECT_ROOT / "experiments" / "bench" / "campaigns" / "campaign_v2_confirm_2node_20261013.jsonl"
 CROSSOVER_FILE = _HERE / "results" / "crossover_analysis.json"
 CROSSOVER_COLD_FILE = _HERE / "results" / "crossover_analysis_cold.json"
-VALIDATION_FILE = _HERE / "results" / "cost_model_validation.json"
+# Refit + RP-2 adopted cost model on the re-baseline (supersedes
+# cost_model_validation.json, which was fitted on the 2026-09-18 campaign).
+REFIT_FILE = _HERE / "results" / "costmodel_refit_v2_20261013.json"
 LIVE_QUALITY_FILE = _HERE / "results" / "live_retrieval_quality.json"
 FIG_DIR = PROJECT_ROOT / "paper" / "figures"
 
@@ -164,16 +170,15 @@ def _save(fig: plt.Figure, name: str) -> Path:
 # ---------------------------------------------------------------------------
 # Data loading & statistics
 # ---------------------------------------------------------------------------
-def newest_campaign() -> Path:
-    candidates = sorted(CAMPAIGN_GLOB.parent.glob(CAMPAIGN_GLOB.name))
-    if not candidates:
-        raise FileNotFoundError(f"no campaign JSONL under {CAMPAIGN_GLOB.parent}")
-    return candidates[-1]
+def campaign_path() -> Path:
+    if not CAMPAIGN_FILE.exists():
+        raise FileNotFoundError(f"re-baseline campaign missing: {CAMPAIGN_FILE}")
+    return CAMPAIGN_FILE
 
 
 def load_campaign() -> list[dict]:
     records = []
-    with open(newest_campaign(), "r", encoding="utf-8") as f:
+    with open(campaign_path(), "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -192,8 +197,8 @@ def load_crossover() -> list[dict]:
         return json.load(f)
 
 
-def load_validation() -> dict:
-    with open(VALIDATION_FILE, "r", encoding="utf-8") as f:
+def load_refit() -> dict:
+    with open(REFIT_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -202,17 +207,43 @@ def load_live_quality() -> dict:
         return json.load(f)
 
 
-def model_from_validation(state: str) -> PlacementCostModel:
-    """Rebuild the fitted PlacementCostModel for a cache state."""
-    p = load_validation()["cache_states"][state]["fitted_params"]
+def _rp2_hit_credit_ms(state: str) -> float:
+    """RP-2 state-dependent SPHP KV-prefix hit credit C_s.
+
+    Source: results/rp2_production_port_20261014.json (adopted RP-2 production
+    port; like-for-like PASS 42/44 checks). Cold-only by construction -- the
+    warm state carries C_w = 0.0 (the prefix is already resident).
+    """
+    with open(_HERE / "results" / "rp2_production_port_20261014.json",
+              "r", encoding="utf-8") as f:
+        rp2 = json.load(f)
+    return float(
+        rp2["new_20261013"]["states"][state]["full_fit_C_ms"]["production"]
+    )
+
+
+def model_from_refit(state: str) -> PlacementCostModel:
+    """Rebuild the re-baselined (2026-10-13) PlacementCostModel for a cache state.
+
+    Parameters come from costmodel_refit_v2_20261013.json (per-term refit on the
+    confirmatory campaign). The RP-2 adopted SPHP form adds the cold-only hit
+    credit (64 ms; 0.0 warm by construction). The hydration term keeps the
+    model's 5.0 ms/doc class default: the refit's 5-doc hydration fit is
+    degenerate on this data (top_k = 10 constant, per-doc fit negative -- see
+    the refit MD's linearity note), so there is no sourced per-doc value to
+    adopt.
+    """
+    p = load_refit()["per_term"]["params"]["new"][state]["fitted_params"]
     return PlacementCostModel(
         t_sparse_base_ms=p["t_sparse_base_ms"],
         t_dense_base_ms=p["t_dense_base_ms"],
         t_fusion_base_ms=p["t_fusion_base_ms"],
+        t_hydrate_per_doc_ms=5.0,
         t_prefill_base_ms=p["t_prefill_base_ms"],
         decode_tok_per_sec=p["decode_tok_per_sec"],
-        sphp_hit_rate=p["sphp_hit_rate_measured"],
+        sphp_hit_rate=p["sphp_hit_rate"],
         t_sphp_miss_penalty_ms=p["t_sphp_miss_penalty_ms"],
+        sphp_hit_credit_ms=_rp2_hit_credit_ms(state),
     )
 
 
@@ -607,7 +638,7 @@ def fig6_crossover_map(model_warm: PlacementCostModel,
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
 
     # (a) TTFT vs RTT at 100 Mbps — warm solid, cold dashed; log y so the
-    # warm cluster (≈800-950 ms) and cold band (≈3.3-3.6 s) both resolve.
+    # warm cluster (≈540-670 ms) and the cold band (≈1.3-1.8 s) both resolve.
     rtts = np.linspace(0, 200, 50)
     ax_a.plot(rtts, [model_warm.predict_ttft_p2(r, 100.0) for r in rtts],
               color=C_P2, label="P2 (warm)")
@@ -620,10 +651,10 @@ def fig6_crossover_map(model_warm: PlacementCostModel,
     ax_a.plot(rtts, [model_cold.predict_ttft_p2_sphp(r, 100.0) for r in rtts],
               color=C_SPHP, linestyle="--", alpha=0.55, label="P2-SPHP (cold)")
     ax_a.set_yscale("log")
-    ax_a.set_yticks([800, 1000, 2000, 4000])
-    ax_a.set_yticklabels(["800", "1000", "2000", "4000"])
+    ax_a.set_yticks([500, 1000, 2000])
+    ax_a.set_yticklabels(["500", "1000", "2000"])
     ax_a.yaxis.set_minor_formatter(NullFormatter())
-    ax_a.set_ylim(700, 4500)
+    ax_a.set_ylim(450, 2000)
     ax_a.set_xlabel("WAN RTT (ms)")
     ax_a.set_ylabel("Modelled TTFT (ms)")
     ax_a.set_title("(a) TTFT vs. RTT (BW = 100 Mbps)", loc="left", fontsize=9)
@@ -651,7 +682,7 @@ def fig6_crossover_map(model_warm: PlacementCostModel,
     ax_b.legend(loc="upper right", frameon=False, fontsize=7)
     ax_b.annotate("P3 serialization penalty\n(6 KB hydrated text)",
                   xy=(1.15, model_warm.predict_ttft_p3(80.0, 1.15)),
-                  xytext=(6.0, 900.0), fontsize=8, color=C_P3,
+                  xytext=(6.0, 690.0), fontsize=8, color=C_P3,
                   arrowprops=dict(arrowstyle="->", color=C_P3, lw=0.8))
     _style_axes(ax_b)
 
@@ -715,14 +746,14 @@ def fig7_retrieval_quality() -> Path:
 # Fig 8 -- Regime-level cost-model parity
 # ---------------------------------------------------------------------------
 def fig8_cost_model_parity(campaign: list[dict]) -> Path:
-    val = load_validation()
+    val = load_refit()["per_term"]["params"]["new"]
 
     fig, ax = plt.subplots(figsize=(COL_W, 3.3))
 
     for state, marker, fill in (("cold", "o", True), ("warm", "D", False)):
         recs = [r for r in campaign
                 if (r.get("repeat_index", 0) == 0) == (state == "cold")]
-        model = model_from_validation(state)
+        model = model_from_refit(state)
         for variant, pred_fn, color, label in (
             ("baseline", lambda r: model.predict_ttft_p2(float(r["rtt_ms"])),
              C_P2, f"P2 ({state})"),
@@ -738,7 +769,9 @@ def fig8_cost_model_parity(campaign: list[dict]) -> Path:
                        edgecolor=color, linewidth=1.2, s=34,
                        zorder=3, label=label)
 
-    lim_lo, lim_hi = 600.0, 4200.0
+    # Frame the re-baselined regime points (observed tier means ≈ 490–1720 ms):
+    # old 09-18 data sat near 3.5 s, so the axis shrank with the re-baseline.
+    lim_lo, lim_hi = 400.0, 1800.0
     xs = np.linspace(lim_lo, lim_hi, 2)
     ax.plot(xs, xs, color=INK["primary"], linewidth=1.0, label="y = x")
     ax.plot(xs, 0.9 * xs, color=INK["muted"], linestyle="--", linewidth=0.8,
@@ -747,13 +780,20 @@ def fig8_cost_model_parity(campaign: list[dict]) -> Path:
     ax.set_xlim(lim_lo, lim_hi)
     ax.set_ylim(lim_lo, lim_hi)
 
-    rv = {s: val["cache_states"][s]["regime_validation"] for s in ("cold", "warm")}
+    # Refit regime-LOTO MAPE on the re-baseline (regime_mape_pct per state/arm
+    # in costmodel_refit_v2_20261013.json).
+    rv = {
+        s: {
+            "P2": val[s]["loto_P2"]["regime_mape_pct"],
+            "P2-SPHP": val[s]["loto_P2SPHP"]["regime_mape_pct"],
+        } for s in ("cold", "warm")
+    }
     ax.text(0.03, 0.97,
-            f"regime MAPE (LOTO): "
-            f"P2 {rv['cold']['P2']['regime_mape_pct']:.1f}% cold / "
-            f"{rv['warm']['P2']['regime_mape_pct']:.1f}% warm\n"
-            f"SPHP {rv['cold']['P2-SPHP']['regime_mape_pct']:.1f}% cold / "
-            f"{rv['warm']['P2-SPHP']['regime_mape_pct']:.1f}% warm",
+            f"regime MAPE (LOTO, re-baseline refit): "
+            f"P2 {rv['cold']['P2']:.1f}% cold / "
+            f"{rv['warm']['P2']:.1f}% warm\n"
+            f"SPHP {rv['cold']['P2-SPHP']:.1f}% cold / "
+            f"{rv['warm']['P2-SPHP']:.1f}% warm",
             transform=ax.transAxes, va="top", ha="left", fontsize=6.8,
             color=INK["secondary"],
             bbox=dict(boxstyle="round,pad=0.3", fc="white",
@@ -779,8 +819,8 @@ def main() -> None:
     print("=" * 64)
 
     campaign = load_campaign()
-    model_warm = model_from_validation("warm")
-    model_cold = model_from_validation("cold")
+    model_warm = model_from_refit("warm")
+    model_cold = model_from_refit("cold")
 
     outputs = [
         fig1_arch(model_warm),
