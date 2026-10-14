@@ -693,7 +693,9 @@ def run_rq2(args: argparse.Namespace,
             ok = True
             error: Optional[str] = None
             try:
-                http_post_json(endpoint, dict(DEFAULT_PAYLOAD),
+                payload = dict(DEFAULT_PAYLOAD)
+                payload["query"] = query
+                http_post_json(endpoint, payload,
                                timeout=args.timeout)
             except Exception as e:
                 ok = False
