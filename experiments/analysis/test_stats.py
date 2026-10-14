@@ -266,6 +266,53 @@ def test_wilson_ci_rejects_bad_input():
         wilson_ci(0, 0)
 
 
+def test_wilson_ci_pure_python_without_numpy(monkeypatch):
+    """Regression for the AB-4 host (numpy/scipy absent).  ``stats`` must
+    import cleanly without numpy/scipy and ``wilson_ci`` (the only function
+    the campaign driver needs) must still compute a correct closed-form
+    Wilson interval.  The numpy/scipy-backed routines must then fail at CALL
+    time with a clear ImportError, not break the import.
+
+    Simulates the bare host by shadowing ``numpy``/``scipy`` in
+    ``sys.modules`` and forcing a fresh import of the module."""
+    import sys
+
+    # Shadow the deps so `import numpy` / `from scipy.stats import norm`
+    # inside the fresh module raise ImportError.
+    monkeypatch.setitem(sys.modules, "numpy", None)
+    monkeypatch.setitem(sys.modules, "scipy", None)
+    monkeypatch.setitem(sys.modules, "scipy.stats", None)
+    if "experiments.analysis.stats" in sys.modules:
+        monkeypatch.delitem(sys.modules, "experiments.analysis.stats")
+
+    import experiments.analysis.stats as stats_pure
+
+    # The import succeeded without numpy/scipy.
+    assert stats_pure._HAS_NUMPY is False
+
+    # The pure-python wilson interval is correct for the known case.
+    lo, hi = stats_pure.wilson_ci(201, 240)
+    assert lo == pytest.approx(0.7856, abs=1e-3)
+    assert hi == pytest.approx(0.8788, abs=1e-3)
+    # Task-spec sanity: wilson_ci(201, 240) ≈ [0.784, 0.881] (95%).
+    assert 0.78 <= lo <= 0.79
+    assert 0.87 <= hi <= 0.88
+    # The pure value equals the closed-form formula exactly (same math,
+    # independent of numpy): recompute by hand here.
+    k, n, z = 201, 240, 1.96
+    p = k / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    assert lo == pytest.approx(max(0.0, center - half), abs=1e-12)
+    assert hi == pytest.approx(min(1.0, center + half), abs=1e-12)
+
+    # A numpy-backed routine now fails at call time with a clear error
+    # (the import itself did NOT fail).
+    with pytest.raises(ImportError):
+        stats_pure.percentile([1.0, 2.0, 3.0], 50)
+
+
 # ---------------------------------------------------------------------------
 # holm
 # ---------------------------------------------------------------------------

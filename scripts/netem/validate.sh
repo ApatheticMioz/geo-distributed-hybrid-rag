@@ -150,10 +150,20 @@ validate_loss_readback() {
   expected="$(awk -v x="$loss" 'BEGIN { h = x / 2; if (h == 0) print "0"; else if (h == int(h)) printf "%d", h; else printf "%.2f", h }')"
 
   local egress_line ifb_line
-  egress_line="$(tc qdisc show dev "$iface" | grep 'netem' | grep 'flowid\|parent' | head -n1)"
-  ifb_line="$(tc qdisc show dev "$ifb" 2>/dev/null | grep "netem" | grep "$peer_src" | head -n1)"
+  # NOTE: `tc qdisc show` prints only the qdisc tree — it does NOT emit the
+  # `tc filter` lines, so the peer IP that select() the class is never in this
+  # output.  `grep "$peer_src"` therefore normally matches nothing and, under
+  # this script's `set -euo pipefail`, the resulting non-zero pipeline status
+  # would abort the whole script on the FIRST capture line, before the
+  # fallback below could run — which is exactly why a fractional-loss readback
+  # came back as `loss_gate=None` (the "Loss gate:" line was never printed).
+  # `|| true` makes each capture tolerate a no-match; the explicit `[ -z ]` /
+  # `[ -n ]` checks below do the real validation (and emit a proper FATAL if
+  # no netem leaf exists at all).
+  egress_line="$(tc qdisc show dev "$iface" | grep 'netem' | grep 'flowid\|parent' | head -n1 || true)"
+  ifb_line="$(tc qdisc show dev "$ifb" 2>/dev/null | grep "netem" | grep "$peer_src" | head -n1 || true)"
   # Fallback: ifb leaf is untagged by peer in qdisc-show; take its single netem leaf.
-  [ -n "$ifb_line" ] || ifb_line="$(tc qdisc show dev "$ifb" 2>/dev/null | grep 'netem' | head -n1)"
+  [ -n "$ifb_line" ] || ifb_line="$(tc qdisc show dev "$ifb" 2>/dev/null | grep 'netem' | head -n1 || true)"
 
   if [ -z "$egress_line" ]; then
     echo "FATAL: No netem qdisc found on egress ($iface) — cannot read back loss." >&2

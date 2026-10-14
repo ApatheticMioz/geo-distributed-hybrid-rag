@@ -980,12 +980,44 @@ def readback_loss_pct(dry_run: bool) -> Optional[float]:
             capture_output=True, text=True, timeout=30)
         if proc.returncode != 0:
             return None
-        m = re.search(r"loss\s+([0-9]+(?:\.[0-9]+)?)\s*%", proc.stdout)
-        if not m:
-            return None
-        return float(m.group(1))
+        return parse_netem_loss_pct(proc.stdout)
     except Exception:
         return None
+
+
+def parse_netem_loss_pct(text: str) -> Optional[float]:
+    """Pure parser: extract the netem per-direction loss fraction from a
+    captured ``tc qdisc show`` / ``tc -s qdisc show`` string.
+
+    Handles both qdisc shapes the netem scripts produce:
+
+    * **flat** (``rtt==0`` cells): a ``netem`` leaf directly under the root /
+      ingress qdisc, e.g. ``qdisc netem 10: parent 1:10 limit 1000 loss 0.5%``;
+    * **HTB-hierarchical** (``rtt>0`` cells): the ``netem`` leaf parented under
+      an HTB class, e.g. ``qdisc netem 10: parent 1:10 limit 1000 delay 20ms
+      loss 0.25%`` (the parent ``qdisc htb`` line and the ``tc filter`` that
+      selected the class are separate lines and carry no loss).
+
+    ``tc qdisc show`` renders both cases as a ``qdisc netem ...`` line (and
+    never emits the ``tc filter`` lines), so matching on that line covers both.
+    netem prints the loss as ``loss X%`` where ``X`` is integral (``loss 1%``)
+    or fractional (``loss 0.25%`` / ``loss 0.5%``); the value is returned as a
+    float.  Returns ``None`` when no netem loss parameter is present.
+
+    Pure (no subprocess) so it is unit-testable against realistic captured
+    fixtures; :func:`readback_loss_pct` is its live wrapper.
+    """
+    if not text:
+        return None
+    # Prefer the netem qdisc line itself (both flat and HTB-parented shapes
+    # render as `qdisc netem ...`), staying within that line.
+    m = re.search(r"qdisc\s+netem[^\n]*?loss\s+([0-9]+(?:\.[0-9]+)?)\s*%", text)
+    if m:
+        return float(m.group(1))
+    # Fallback: a bare `loss X%` token (some tool versions omit the qdisc
+    # prefix on the leaf line).
+    m = re.search(r"loss\s+([0-9]+(?:\.[0-9]+)?)\s*%", text)
+    return float(m.group(1)) if m else None
 
 
 def stratum_for_repeat(repeat_index: int) -> str:
@@ -1910,11 +1942,27 @@ def write_summary_outputs(
     summary_rows: List[Dict[str, Any]],
     summary_doc: Dict[str, Any],
 ) -> Tuple[Path, Path]:
-    """Write the summary CSV + JSON; return the paths."""
+    """Write the summary CSV + JSON; return the paths.
+
+    Robust to per-row key heterogeneity: summary rows are built from
+    ``summarize_arm`` plus run-specific extras (e.g. the loss-sweep's
+    ``sphp_hit_rate_wilson`` is added only to ``sphp`` variant rows, so a
+    baseline row's key set alone does not cover a later sphp row).  The CSV
+    ``fieldnames`` are the UNION of every row's keys — declared order from
+    the first row, then any new keys in first-seen order — so a run that
+    aborts on a gate-fail (a mixed set of completed + empty cells) still
+    writes a complete partial ``summary_*.csv`` instead of raising
+    ``ValueError: dict contains fields not in fieldnames`` out of the
+    finalize path.
+    """
     csv_path = out_dir / f"summary_{run_id}.csv"
     json_path = out_dir / f"summary_{run_id}.json"
     if summary_rows:
-        fieldnames = list(summary_rows[0].keys())
+        fieldnames: List[str] = []
+        for row in summary_rows:
+            for key in row.keys():
+                if key not in fieldnames:
+                    fieldnames.append(key)
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
