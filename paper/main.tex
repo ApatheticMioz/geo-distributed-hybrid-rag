@@ -406,14 +406,19 @@ TTFT---rather than total completion time---the salient user-perceived metric,
 and it is the quantity our placement policy optimizes.
 
 \subsection{Network Control}
-\texttt{netem} allows loss to be added on top of delay, but this study shapes
-the link with delay only. A follow-up loss sweep over the A--B link
-(RTT $\in\{0,40\}$~ms $\times$ loss $\in\{0.5,1,2\}$\% $=6$ cells, both
-P2 and P2-SPHP arms, full generation) is pre-registered to measure whether
-the placement and SPHP conclusions are robust to packet loss; the key
-deliverable is the per-cell SPHP hit rate under loss. Until that campaign
-runs the loss dimension is open.
-\todo{AB-4: loss-sweep results (12 arms, band 2041--2700) not yet run; placement/SPHP conclusions currently cover the zero-loss surface only.}
+\texttt{netem} adds loss on top of delay, and the study exercises both
+dimensions. The confirmatory campaign shapes the link with delay only; a
+dedicated loss sweep over the A--B link (RTT $\in\{0,40\}$~ms $\times$
+loss $\in\{0.5,1,2\}$\% $=6$ cells $\times$ \{P2, P2-SPHP\}, $n{=}50$
+fresh seeded queries per arm, one repeat, plus a $2\times10$ loss-free
+sanity pre-flight that aborts on any error) measures whether the placement
+and SPHP conclusions survive packet loss; we report it in
+\S\ref{sec:losssweep}. Shaping fidelity is gated before and after every
+measured window: the per-direction loss readback must match the target
+within $\pm0.05$ percentage points and the added RTT must fall inside the
+$\pm$30\% ping gate; all 12 pre/post gates passed (added RTT
+39.6--40.3~ms at the 40~ms tier; readback 0.25/0.5/1.0\% per direction at
+the 0.5/1/2\% targets).
 
 To study placement under controlled WAN conditions we shape the link with
 Linux \texttt{netem} \cite{netem2024} \emph{bidirectionally}: a
@@ -895,6 +900,92 @@ error. Pooled warm error 5.57\%.}
 \end{tabular}
 \end{table}
 
+\subsection{Robustness under Packet Loss}
+\label{sec:losssweep}
+The confirmatory campaign characterizes the zero-loss surface; a dedicated
+sweep asks whether packet loss changes any of its conclusions. We sweep
+bidirectional loss of 0.5\%, 1\%, and 2\% (split evenly per direction) at
+RTT 0 and 40~ms, both placement arms, $n{=}50$ fresh seeded queries per arm
+(one repeat, cold-prefix state)---600 requests under loss plus a $2\times10$
+loss-free sanity pre-flight.
+
+\textbf{No request fails.} Across all 600 measured requests and both
+sanity arms, zero errors occur at every swept loss level: single-stream
+requests with identifier-sized boundary payloads and a few kilobytes of
+hydrated context are not broken by 2\% loss---TCP retransmission on a
+40~ms path absorbs it within the existing latency budget.
+
+\textbf{TTFT is flat in loss, and the SPHP advantage holds in every cell}
+(Table~\ref{tab:losssweep}). Baseline cold-prefix means vary by 0.7\%
+(RTT~0) and 4.6\% (RTT~40) across the three loss levels---inside
+cold-state dispersion (per-cell $\sigma$ 355--481~ms)---and the SPHP
+reduction ranges over 22.6\%--33.4\%, bracketing the zero-loss
+confirmatory effect of 23.7\%--27.6\%. The RTT-40/1\% SPHP cell mean sits
+$\approx$200~ms above its two siblings, within one per-cell standard
+deviation at $n{=}50$; no monotone loss trend is present in either arm.
+
+\textbf{The hint survives loss.} Per-cell SPHP hit rates run 0.80--0.90
+(pooled 257/300 $=0.857$, Wilson 95\%~CI $[0.813,0.892]$) with mean
+overlaps 0.60--0.65, against the loss-free $h=0.900$
+$[0.883,0.914]$. The pooled interval sits marginally below the loss-free
+one---a residual small effect or sampling noise at $n{=}50$ per cell that
+we cannot distinguish---but per-cell rates show no monotone degradation
+with loss: the 104-byte hint message is retransmitted like any other
+segment, and speculation is orthogonal to packet-level recovery.
+
+\begin{table}[t]
+\centering
+\caption{Loss sweep on the A--B link (bidirectional netem loss, split per
+direction): cold-prefix mean TTFT and per-cell SPHP hit rate, $n{=}50$ per
+arm, one repeat. $\Delta$ is the SPHP reduction in mean TTFT; $h$ is the
+hit rate with Wilson 95\%~CI. All 12 pre/post emulation gates passed; zero
+request errors in all cells.}
+\label{tab:losssweep}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{ll rrr l}
+\toprule
+\textbf{RTT} & \textbf{Loss} & \textbf{P2} & \textbf{P2-SPHP} &
+$\boldsymbol{\Delta}$ & \textbf{$h$ [95\% CI]}\\
+ & & (ms) & (ms) & & \\
+\midrule
+0 ms  & 0.5\% & 2630 & 1850 & 29.7\% & 0.84 $[0.71,0.92]$\\
+0 ms  & 1\%   & 2649 & 1817 & 31.4\% & 0.84 $[0.71,0.92]$\\
+0 ms  & 2\%   & 2631 & 1752 & 33.4\% & 0.90 $[0.79,0.96]$\\
+40 ms & 0.5\% & 2758 & 1895 & 31.3\% & 0.88 $[0.76,0.94]$\\
+40 ms & 1\%   & 2638 & 2041 & 22.6\% & 0.80 $[0.67,0.89]$\\
+40 ms & 2\%   & 2691 & 1814 & 32.6\% & 0.88 $[0.76,0.94]$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Node Dropout and Recovery}
+\label{sec:dropout}
+The placement conclusions so far assume every node stays up; the dropout
+driver removes that assumption. In the executed arm (D-B) the driver kills
+the Node~B gateway mid-stream---fault injected at sequence 65 of a
+2.5~s-paced request sequence over the seeded dropout pool---and restarts it
+after a configured 45~s delay, chosen to exceed the 30~s client timeout so
+the outage produces a genuine error stratum rather than being bridged by
+connection retries. The arm totals 365 requests.
+
+\textbf{The two-node edge tier is binary.} Pre-fault, 65 requests complete
+with zero errors (p50 1.83~s, p95 3.70~s). Inside the outage window, of the
+five requests in flight or launched into it, two hit the 30~s client
+timeout---the only hard failures in the study---and three complete at
+p50 3.09~s. Recovery is declared after three consecutive successes (first
+at sequence~70); time-to-recovery is 86.5~s from the kill---roughly half
+the configured 45~s restart delay, the remainder service restart, index
+warm-up, and health probing (2 of 6 health probes failed inside the
+window). Post-recovery, 295 requests complete with zero errors at p50
+1.86~s and p95 3.38~s---p50 within 1.4\% of the pre-fault level.
+
+In the two-node topology there is no intermediate service level: dropping
+the edge tier halts the pipeline outright, and once the service returns,
+latency is indistinguishable from pre-fault. A dropout
+\emph{gradient}---Node~C departing while the pipeline consolidates to
+P2---requires the third node and completes the RQ2 design
+(\S\ref{sec:roadmap}).
+
 \subsection{Summary of Gains}
 SPHP reduces cold-prefix TTFT by 23.7\%--27.6\% consistently across all four
 RTT tiers (all four one-sided permutation tests significant under Holm-FWER,
@@ -905,7 +996,12 @@ protocol message is 104 bytes and the speculation targets the prefill, not
 the network. The mechanism costs one small extra message, a masked prefill
 that is discarded only on a miss ($\Tmiss{=}124.5$~ms warm, 1{,}076.6~ms cold,
 measured), and a bounded answer-level shift on the hit path
-(\S\ref{sec:sphp}).
+(\S\ref{sec:sphp}). Both results are robust to the link and to failures:
+the SPHP advantage holds in all six cells of a 0.5--2\% loss sweep
+(22.6--33.4\% cold-prefix reduction, hit rates 0.80--0.90,
+\S\ref{sec:losssweep}), and a mid-stream gateway kill costs only the
+requests inside the outage window (two 30~s timeouts), with post-recovery
+latency within 1.4\% of pre-fault (\S\ref{sec:dropout}).
 
 % ===========================================================================
 %  VIII. DISCUSSION
@@ -936,9 +1032,10 @@ so absolute leg times (and the $1.3$--$1.6\times$ warm leg asymmetry) are
 hardware-specific; the ratios we report are qualified by $k$ and by the
 measurement path, and the qualitative conclusions (prefill dominance, cache
 dominance, RTT flatness) are robust to plausible hardware changes.
-\emph{Emulation fidelity:} \texttt{netem} shapes delay bidirectionally but
-with zero loss, no jitter, no reordering, and no route asymmetry; genuine
-WAN validation is future work (\S\ref{sec:roadmap}).
+\emph{Emulation fidelity:} \texttt{netem} shapes delay and loss
+bidirectionally (loss swept to 2\%, \S\ref{sec:losssweep}) but with no
+jitter, no reordering, and no route asymmetry; genuine WAN validation is
+future work (\S\ref{sec:roadmap}).
 \todo{CM-4: genuine-WAN leg (4 arms, 2 public paths $\times$ 2 arms, band 2701--2920, N=50/W=5, netem off) not yet run; the netem-fidelity claim rests on emulation only.}
 \emph{Single dataset and generator:} results are MS~MARCO-specific (verbose
 web queries) and tied to one W4A16-quantized 27B generator with speculative
@@ -988,8 +1085,13 @@ predictions under genuine Internet jitter, loss, and reordering.
 Second,
 quantifying \emph{graceful degradation}: measuring latency and quality
 impacts when an edge node experiences transient disconnects and pipeline
-stages consolidate.
-\todo{CM-3: RQ2 dropout arms D-B/D-C (2 arms, band 1911--2040, N=60/W=5) not yet run; no latency/quality cost of node dropout reported.}
+stages consolidate. The first arm of this study is executed
+(\S\ref{sec:dropout}): on the two-node topology a mid-stream gateway kill
+yields a binary outage---hard errors confined to the outage window,
+post-recovery latency within 1.4\% of pre-fault after an 86.5~s recovery.
+The complementary arm (D-C), in which dropping Node~C consolidates the
+pipeline to P2 and should expose a genuine degradation gradient, awaits
+the third node and completes the RQ2 design.
 Third, generalizing SPHP beyond sparse--dense pairs to
 multi-stage speculative prefetching across distributed multi-hop topologies,
 where the reconciliation test becomes a set-membership check over a larger
