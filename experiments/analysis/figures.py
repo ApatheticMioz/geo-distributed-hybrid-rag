@@ -281,6 +281,17 @@ def _tier_means(records: list[dict], value_key: str = "ttft_ms") -> tuple[list[f
 # Fig 1 -- System architecture
 # ---------------------------------------------------------------------------
 def fig1_arch(model_warm: PlacementCostModel) -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig1_arch(model_warm)
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig1_arch(model_warm: PlacementCostModel) -> Path:
     fig, ax = plt.subplots(figsize=(FULL_W, 3.9))
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 6.6)
@@ -292,17 +303,23 @@ def fig1_arch(model_warm: PlacementCostModel) -> Path:
                            linewidth=1.3, edgecolor=ec, facecolor=fc, zorder=2)
         ax.add_patch(p)
         ax.text(x + w / 2, y + h - 0.16, title, ha="center", va="top",
-                fontsize=8.5, fontweight="bold", color=ec, zorder=3)
+                fontsize=8.5, fontweight="bold", color=figstyle.INK, zorder=3)
         top = y + h - 0.50
         step = (h - 0.66) / max(len(items), 1)
         for i, it in enumerate(items):
             ax.text(x + 0.12, top - i * step, "• " + it, ha="left", va="top",
-                    fontsize=8, color=INK["primary"], zorder=3)
+                    fontsize=8, color=figstyle.INK, zorder=3)
 
-    # Client
+    # Node/machine box fills are light tints of the categorical palette
+    # (figstyle.TINTS); strokes and arrow edges are neutral ink so the tint
+    # carries the node role and grayscale/CVD survival never rests on a
+    # saturated hue.  Role -> tint: Client -> aqua (user/entry side),
+    # Node B -> blue (edge gateway / retrieval), Node A -> orange
+    # (generation host).  The external Client box gets the softer
+    # INK_SECONDARY stroke; the two system nodes get the stronger INK.
     box(0.2, 2.0, 1.7, 2.0, "Client",
         ["User query", "Streamed tokens"],
-        "#F0EAF3", PALETTE["violet"])
+        figstyle.TINTS["aqua"], figstyle.INK_SECONDARY)
 
     # Node B (Edge Gateway) — boxes span y 0.8..4.8; arrows route above/below.
     box(3.0, 0.8, 2.9, 4.0, "Node B — Edge Gateway",
@@ -311,7 +328,7 @@ def fig1_arch(model_warm: PlacementCostModel) -> Path:
          "RRF fusion",
          f"t_sparse ≈ {model_warm.t_sparse_base_ms:.0f} ms (warm)",
          f"t_dense ≈ {model_warm.t_dense_base_ms:.0f} ms (warm)"],
-        "#EAF3FB", C_P2)
+        figstyle.TINTS["blue"], figstyle.INK)
 
     # Node A (Generation Host)
     box(7.15, 0.8, 2.7, 4.0, "Node A — Generation",
@@ -319,34 +336,38 @@ def fig1_arch(model_warm: PlacementCostModel) -> Path:
          "SPHP speculative prefill",
          "vLLM Qwen3.8-27B (W4A16)",
          f"t_prefill ≈ {model_warm.t_prefill_base_ms:.0f} ms (warm)"],
-        "#FDF0E8", C_SPHP)
+        figstyle.TINTS["orange"], figstyle.INK)
 
-    def arrow(x1, y1, x2, y2, label, color, ls="-", dy=0.0, rad=0.0,
+    # Arrows/edges are neutral chrome (figstyle.INK_SECONDARY, lw 1.0) and
+    # their labels share the same token, matching the fig6 idiom.
+    def arrow(x1, y1, x2, y2, label, ls="-", dy=0.0, rad=0.0,
               label_dy=None, fs=8):
         a = FancyArrowPatch(
             (x1, y1), (x2, y2),
             arrowstyle="-|>", mutation_scale=14,
-            linewidth=1.4, color=color, linestyle=ls, zorder=4,
+            linewidth=1.0, color=figstyle.INK_SECONDARY, linestyle=ls,
+            zorder=4,
             connectionstyle=f"arc3,rad={rad}" if rad else "arc3,rad=0")
         ax.add_patch(a)
         ly = (y1 + y2) / 2 + dy if label_dy is None else label_dy
         ax.text((x1 + x2) / 2, ly, label, ha="center",
-                va="bottom", fontsize=fs, color=color, zorder=5)
+                va="bottom", fontsize=fs, color=figstyle.INK_SECONDARY,
+                zorder=5)
 
     # Query: client -> Node B (horizontal, through the free gap).
-    arrow(1.9, 3.0, 3.0, 3.0, "Query", INK["primary"], dy=0.10)
+    arrow(1.9, 3.0, 3.0, 3.0, "Query", dy=0.10)
 
     # Retrieval context: Node B -> Node A, routed ABOVE both boxes.
     arrow(4.4, 4.9, 7.6, 4.9,
           "SparseHint / FusedContext  (gRPC stream · WireGuard)",
-          C_P2, ls="--", label_dy=4.98)
+          ls="--", label_dy=4.98)
 
     # Token stream: Node A -> client, routed BELOW the boxes.
     arrow(8.4, 0.75, 1.9, 1.9, "Token stream (streamed back)",
-          C_SPHP, ls=":", rad=-0.25, label_dy=0.02, fs=8)
+          ls=":", rad=-0.25, label_dy=0.02, fs=8)
 
     ax.set_title("Geo-Distributed Hybrid RAG: System Architecture",
-                 fontsize=9, pad=8)
+                 loc="left", fontsize=8, color=figstyle.INK)
     return _save(fig, "fig1_arch.pdf")
 
 

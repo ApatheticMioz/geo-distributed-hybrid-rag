@@ -14,6 +14,9 @@ Contents
 * ``SEQ_BLUES`` -- a light-to-dark sequential ramp for single-hue gradations.
 * ``DIVERGING`` -- a blue<->red diverging ramp with a neutral gray midpoint,
   for signed quantities (delta, error, correlation).
+* ``TINTS`` -- light tints of the categorical slots (blue / orange / aqua),
+  for filled boxes / node fills in diagram figures (e.g. ``fig1_arch``).
+  Fills carry the color; strokes and arrows use the ink tokens.
 * ``STATUS_GOOD``/``STATUS_WARNING``/``STATUS_SERIOUS``/``STATUS_CRITICAL``
   -- genuine status semantics only (health badges, error-rate callouts).
   NEVER as series colors; status hues live outside the categorical slots.
@@ -87,6 +90,25 @@ DIVERGING: Tuple[str, ...] = (
     "#f0efec",   # midpoint (neutral)
     "#e34948",   # red extreme (most positive)
 )
+
+# ---------------------------------------------------------------------------
+# Light tints of the categorical slots -- for filled boxes / node fills in
+# diagram figures (``fig1_arch``). These are deliberately NOT part of the
+# ``SEQ_BLUES`` ramp (which is a single-hue magnitude ramp); they are the
+# flat, low-saturation variants of the three categorical slots used for
+# node-role backgrounds. Strokes / arrows on these tints use the ink tokens
+# (``INK`` / ``INK_SECONDARY``), never a tinted color.
+#
+# WAN / geo-boundary shading (a background region enclosing the network)
+# uses the diverging midpoint gray, not one of these tints -- route that
+# fill to ``DIVERGING_MID`` ("#f0efec") so it reads as neutral transport
+# chrome rather than as a categorical node.
+# ---------------------------------------------------------------------------
+TINTS: dict[str, str] = {
+    "blue":   "#cde2fb",   # light BLUE   (categorical slot 1)
+    "orange": "#fbddcb",   # light ORANGE (categorical slot 2)
+    "aqua":   "#cdeee2",   # light AQUA   (categorical slot 3)
+}
 
 # ---------------------------------------------------------------------------
 # Status semantics ONLY (health badges / error callouts). Never as series
@@ -230,6 +252,8 @@ __all__ = [
     "BLUE", "ORANGE", "AQUA", "YELLOW",
     "MAGENTA", "GREEN", "VIOLET", "RED",
     "CATEGORICAL", "SAFE_PREFIX",
+    # tints (for diagram node fills)
+    "TINTS",
     # sequential
     "SEQ_BLUES",
     # diverging
