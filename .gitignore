@@ -49,6 +49,7 @@ llama3-awq
 # experiments/analysis/results are primary evidence and stay in git)
 *.jsonl
 !experiments/bench/campaigns/*.jsonl
+!experiments/bench/rq2_runs/**/*.jsonl
 !experiments/analysis/results/*.jsonl
 
 .scratch/
