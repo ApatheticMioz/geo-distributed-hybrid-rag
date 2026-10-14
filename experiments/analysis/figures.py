@@ -81,6 +81,7 @@ FIG_DIR = PROJECT_ROOT / "paper" / "figures"
 
 sys.path.insert(0, str(_HERE))
 from cost_model import PlacementCostModel  # noqa: E402
+import figstyle  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Palette (validated: dataviz six-checks, light surface #ffffff)
@@ -585,6 +586,17 @@ def fig4_stage_breakdown(campaign: list[dict]) -> Path:
 # Fig 5 -- MEASURED TTFT vs. WAN RTT (cold / warm; baseline vs. SPHP)
 # ---------------------------------------------------------------------------
 def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig5_ttft_vs_rtt(campaign)
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
     fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
 
     for ax, (state, title) in zip(axes, [("cold", "(a) Cold prefix (repeat 0)"),
@@ -599,14 +611,21 @@ def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
         sphp_mean = [float(np.mean(v)) for v in sphp_vals]
         sphp_ci = [boot_ci(v) for v in sphp_vals]
 
+        # Series encoded per figstyle slots (CVD/grayscale-safe): slot 0
+        # (blue, solid, o) for P2 baseline, slot 1 (orange, dashed, s) for
+        # P2-SPHP, so distinguishability never depends on hue alone.
+        (c_base, ls_base, mk_base) = figstyle.series_style(0)
+        (c_sphp, ls_sphp, mk_sphp) = figstyle.series_style(1)
         ax.errorbar(tiers, base_mean,
                     yerr=[[m - c[0] for m, c in zip(base_mean, base_ci)],
                           [c[1] - m for m, c in zip(base_mean, base_ci)]],
-                    marker="o", color=C_P2, capsize=3, label="P2 baseline")
+                    marker=mk_base, linestyle=ls_base, color=c_base,
+                    capsize=3, label="P2 baseline")
         ax.errorbar(tiers, sphp_mean,
                     yerr=[[m - c[0] for m, c in zip(sphp_mean, sphp_ci)],
                           [c[1] - m for m, c in zip(sphp_mean, sphp_ci)]],
-                    marker="s", color=C_SPHP, capsize=3, label="P2-SPHP")
+                    marker=mk_sphp, linestyle=ls_sphp, color=c_sphp,
+                    capsize=3, label="P2-SPHP")
 
         if state == "cold":
             lo, hi, rel = boot_ci_rel(
@@ -614,17 +633,18 @@ def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
                 [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"])
             ax.annotate(f"SPHP delta {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
                         xy=(0.28, 0.04), xycoords="axes fraction",
-                        fontsize=7.5, color=INK["secondary"])
+                        fontsize=7, color=figstyle.INK_SECONDARY)
         else:
             ax.annotate("delta within noise at every tier",
                         xy=(0.32, 0.05), xycoords="axes fraction",
-                        fontsize=7.5, color=INK["secondary"])
+                        fontsize=7, color=figstyle.INK_SECONDARY)
 
         ax.set_xticks(tiers)
         ax.set_xlabel("WAN RTT (ms)")
-        ax.set_title(title, loc="left", fontsize=9)
+        ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
         ax.legend(loc="upper right", frameon=False)
-        _style_axes(ax)
+        figstyle.despine(ax)
+        figstyle.grid(ax)
 
     axes[0].set_ylabel("TTFT (ms)")
     return _save(fig, "fig5_ttft_vs_rtt.pdf")
