@@ -9,3 +9,11 @@ FAULT MECHANISM (validated by rehearsal): bash-native async pair from Node A:
   ssh laptop "schtasks /End /TN pdc_gateway" & sleep 4; ssh laptop "schtasks /Run /TN pdc_gateway" & wait
 Returns in ~5s; measured outage ~17s (B restart ~10s after /Run); stream samples the
 window (paced errors) then the K=3 streak completes mid-stream.
+
+UPDATE 2026-10-15 (pre-v8): restart delay raised 4s -> 45s in BOTH fault scripts.
+Rationale: in v6 the ~20s outage was bridged by TCP SYN retry - the in-flight
+request completed ok in 20.6s, ZERO errors, leaving the during_fault stratum
+empty. A 45s restart delay (outage ~= 45s + gateway restart time) exceeds the
+30s request timeout, so in-flight requests genuinely error and during_fault
+carries both ~30000ms timeouts and hard errors. Supersedes the FAULT MECHANISM
+timing note above.

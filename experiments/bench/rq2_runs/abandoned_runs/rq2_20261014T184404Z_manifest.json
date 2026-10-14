@@ -1,0 +1,34 @@
+{
+  "schema": "pdc.rq2_driver_manifest/v1",
+  "design_doc": "docs/campaign_v2_design.md",
+  "run_id": "20261014T184404Z",
+  "generated_at_utc": "2026-10-14T18:44:04Z",
+  "gateway_url": "http://10.8.0.2:8000",
+  "endpoint": "http://10.8.0.2:8000/query/benchmark",
+  "queries_file": "experiments/bench/rq2_runs/launch_20261014/queries_DB.txt",
+  "n_queries": 365,
+  "pacing": "2.5s",
+  "payload": {
+    "top_k": 10,
+    "mode": "hybrid",
+    "sphp": true
+  },
+  "timeout_s": 30.0,
+  "fault": {
+    "at": "65",
+    "mode": "index",
+    "index": 65,
+    "seconds": null,
+    "command": "bash experiments/bench/rq2_runs/launch_20261014/fault_DB.sh",
+    "dry": false
+  },
+  "recovery": {
+    "command": "",
+    "recover_streak": 3
+  },
+  "probe": {
+    "health_url": "http://10.8.0.2:8000/health",
+    "interval_s": 1.0
+  },
+  "dry_run": false
+}

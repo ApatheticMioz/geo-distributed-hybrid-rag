@@ -1,0 +1,4 @@
+FAILED RUN 2026-10-14T18:01:55Z (D-B): every request HTTP 422 - rq2_driver sent
+DEFAULT_PAYLOAD without the required query field (mock-only testing gap; found via
+wire capture with nc, fixed same day). Fault command DID fire at seq 65 (B killed+restarted).
+Not campaign data; kept for the record only.

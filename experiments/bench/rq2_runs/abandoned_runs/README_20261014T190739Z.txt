@@ -1,0 +1,5 @@
+rq2_20261014T190739Z (D-B v7) - quarantined 2026-10-15.
+Interrupted by a WSL VM restart at 2026-10-15T00:10 local, BEFORE the fault fired
+(fault_at=65 never reached): 41 records, all pre_fault, all ok. No during_fault or
+recovered segments. Not a fault-mechanism failure; environment death mid-run.
+Superseded by v8 (same launch kit; fault_DB.sh restart delay 45s).
