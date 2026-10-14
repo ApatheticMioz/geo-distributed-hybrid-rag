@@ -234,6 +234,103 @@ def test_parse_fidelity_gate_output_empty():
                  "added_rtt_ms": None}
 
 
+def test_parse_netem_loss_pct_flat_and_hierarchical(tmp_path):
+    """The readback parser must handle both qdisc shapes the netem scripts
+    produce: the flat (rtt==0) leaf and the HTB-parented (rtt>0) leaf, with
+    integer AND fractional loss.  These are realistic captured
+    ``tc qdisc show`` line shapes (the ifb/egress fixtures from the 2026-10-14
+    fractional-loss validation, plus the rtt=40 hierarchical case from the
+    aborted AB-4 run)."""
+    # Flat leaf, fractional loss (rtt=0 tier): the old regex matched this.
+    flat_frac = "qdisc netem 10: parent 1:10 limit 1000 loss 0.5%\n"
+    # HTB-parented leaf, fractional loss (rtt=40 tier): the leaf is under an
+    # HTB class and carries delay + loss.  The peer IP lives in a `tc filter`
+    # that `tc qdisc show` never prints, so only the qdisc line is present.
+    htb_frac = ("qdisc htb 1: root refcnt 2 r2q 10 default 0x30\n"
+                "qdisc netem 10: parent 1:10 limit 1000 delay 20ms "
+                "loss 0.25%\n")
+    # HTB-parented leaf, integer loss (the kernel renders 1% integral).
+    htb_int = ("qdisc htb 1: root refcnt 65 r2q 10 default 0x30\n"
+               "qdisc netem 10: parent 1:10 limit 1000 delay 20ms loss 1%\n")
+    # Flat leaf, integer loss.
+    flat_int = "qdisc netem 10: parent 1:10 limit 1000 loss 1%\n"
+
+    assert campaign.parse_netem_loss_pct(flat_frac) == 0.5
+    assert campaign.parse_netem_loss_pct(htb_frac) == 0.25
+    assert campaign.parse_netem_loss_pct(htb_int) == 1.0
+    assert campaign.parse_netem_loss_pct(flat_int) == 1.0
+
+    # A netem leaf with delay but NO loss (an rtt-only regime) -> None.
+    no_loss = "qdisc netem 10: parent 1:10 limit 1000 delay 20ms\n"
+    assert campaign.parse_netem_loss_pct(no_loss) is None
+    # No netem at all (pristine) -> None.
+    assert campaign.parse_netem_loss_pct(
+        "qdisc mq 0: root\nqdisc htb 1: root refcnt 2\n") is None
+    # Empty / None-safe input.
+    assert campaign.parse_netem_loss_pct("") is None
+
+
+def test_parse_netem_loss_pct_prefers_netem_line(tmp_path):
+    """The parser stays within the netem qdisc line: a `loss` token on a
+    non-netem line (e.g. an HTB parent) must not be mistaken for the netem
+    leaf's loss, when the netem line is present with its own value."""
+    text = ("qdisc htb 1: root refcnt 2\n"
+            "qdisc netem 10: parent 1:10 limit 1000 delay 20ms loss 0.25%\n")
+    assert campaign.parse_netem_loss_pct(text) == 0.25
+
+
+def test_readback_loss_pct_dry_run_returns_none():
+    """The live wrapper short-circuits in dry-run (no subprocess)."""
+    assert campaign.readback_loss_pct(True) is None
+
+
+def test_write_summary_outputs_extra_row_key(tmp_path):
+    """Regression for the AB-4 abort: ``write_summary_outputs`` must not
+    crash when summary rows carry heterogeneous keys (a baseline row lacks
+    ``sphp_hit_rate_wilson`` but an sphp row adds it).  Before the fix the
+    CSV writer used the FIRST row's keys as ``fieldnames``, so a later row
+    with an extra key raised
+    ``ValueError: dict contains fields not in fieldnames: 'sphp_hit_rate_wilson'``
+    out of the finalize path.  It must now write both CSV and JSON cleanly,
+    covering the union of keys (declared first, then extras in first-seen
+    order)."""
+    baseline_row = {
+        "rtt_ms": 0, "loss_pct": 0.5, "mode": "hybrid",
+        "variant": "baseline", "n": 100, "ttft_mean": 1.5,
+    }
+    sphp_row = {
+        "rtt_ms": 0, "loss_pct": 0.5, "mode": "hybrid",
+        "variant": "sphp", "n": 100, "ttft_mean": 1.4,
+        # The extra key that broke the writer:
+        "sphp_hit_rate_wilson": {"n_hits": 201, "n": 240,
+                                 "rate": 0.8375,
+                                 "ci_95": [0.7856, 0.8788]},
+    }
+    # Order matters: the row WITHOUT the extra key comes first (exactly the
+    # shape the abort produced — first row's keys did not cover the second).
+    summary_rows = [baseline_row, sphp_row]
+    summary_doc = {"schema": "pdc.campaign_summary/v2", "status": "aborted",
+                   "summary": [baseline_row, sphp_row]}
+    csv_path, json_path = campaign.write_summary_outputs(
+        tmp_path, "20261014T201533Z", summary_rows, summary_doc)
+
+    # CSV wrote without ValueError and its header covers the union of keys.
+    assert csv_path.is_file()
+    csv_text = csv_path.read_text(encoding="utf-8")
+    first_line = csv_text.splitlines()[0]
+    for key in ("rtt_ms", "variant", "sphp_hit_rate_wilson"):
+        assert key in first_line, f"header missing {key!r}"
+    # The sphp row's extra value is present in the CSV.
+    assert "sphp_hit_rate_wilson" in csv_text
+    # JSON wrote too and carries both rows (incl. the extra key).
+    assert json_path.is_file()
+    import json as _json
+    doc = _json.loads(json_path.read_text(encoding="utf-8"))
+    assert doc["status"] == "aborted"
+    assert len(doc["summary"]) == 2
+    assert doc["summary"][1]["sphp_hit_rate_wilson"]["ci_95"] == [0.7856, 0.8788]
+
+
 def test_stratum_for_repeat():
     assert campaign.stratum_for_repeat(0) == "cold"
     assert campaign.stratum_for_repeat(1) == "warm"

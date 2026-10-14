@@ -46,10 +46,34 @@ import math
 import sys
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-import numpy as np
-from scipy.stats import norm
+# numpy / scipy are OPTIONAL at import time.  ``wilson_ci`` (the closed-form
+# Wilson score interval) and the pure-python effect-size / multiplicity helpers
+# only need the standard library, so this module must import cleanly on a bare
+# orchestration host (the campaign driver) that lacks numpy/scipy.  When the
+# deps are absent, the numpy/scipy-backed routines (percentile, bootstrap,
+# permutation, cohens_d/cliffs_delta) raise a clear error at CALL time rather
+# than at import time, so the pure functions remain usable.
+try:
+    import numpy as np
+    from scipy.stats import norm
+    _HAS_NUMPY = True
+except ImportError:  # numpy and/or scipy missing on this host
+    np = None  # type: ignore[assignment]
+    norm = None  # type: ignore[assignment]
+    _HAS_NUMPY = False
 
-Numbers = Union[float, int, np.ndarray, Sequence[float]]
+if _HAS_NUMPY:
+    Numbers = Union[float, int, np.ndarray, Sequence[float]]
+else:
+    Numbers = Union[float, int, Sequence[float]]
+
+
+def _require_numpy() -> None:
+    """Raise a clear error if this routine needs numpy/scipy and they are absent."""
+    if not _HAS_NUMPY:
+        raise ImportError(
+            "this routine requires numpy/scipy, which are not installed on this "
+            "host (the pure-python helpers such as wilson_ci still work)")
 
 __all__ = [
     "percentile",
@@ -81,6 +105,7 @@ def percentile(values: Numbers, p: float) -> float:
     ``experiments/eval/make_quality_report.py``.  ``p`` is a percentile
     (95, not 0.95).
     """
+    _require_numpy()
     arr = np.asarray(values, dtype=float).ravel()
     if arr.size == 0:
         raise ValueError("percentile of an empty sample")
@@ -133,6 +158,7 @@ def bootstrap_ci(
 
     Deterministic given ``seed``.
     """
+    _require_numpy()
     if B < 20:
         raise ValueError(f"B={B} too small for a CI")
     x = np.asarray(values, dtype=float)
@@ -239,6 +265,7 @@ def bootstrap_delta_ci(
 
     The relative quantities are the primary effect size (RQ-e1).
     """
+    _require_numpy()
     fa = _stat_fn(stat)
     rng = np.random.default_rng(seed)
     if not paired:
@@ -340,6 +367,7 @@ def permutation_test(
 
     ``seed`` makes the resample sequence (and hence p) deterministic.
     """
+    _require_numpy()
     if alternative not in ("two-sided", "greater", "less"):
         raise ValueError(f"alternative must be 'two-sided', 'greater', 'less' (got {alternative!r})")
     rng = np.random.default_rng(seed)
@@ -467,6 +495,7 @@ def cohens_d(a: Numbers, b: Numbers, paired: bool = False) -> float:
     Independent: pooled-SD d = (mean_a - mean_b) / SD_pooled.
     Paired: d = mean(difference) / SD(difference).
     """
+    _require_numpy()
     if paired:
         if len(a) != len(b):
             raise ValueError("paired Cohen's d requires equal-length samples")
@@ -491,6 +520,7 @@ def cliffs_delta(a: Numbers, b: Numbers) -> float:
     magnitude comparable to ``d``; robust to heavy tails, which is why we
     report it alongside ``d`` for latency (RQ-e1 secondary).
     """
+    _require_numpy()
     xa = np.asarray(a, dtype=float)
     xb = np.asarray(b, dtype=float)
     n = len(xa) * len(xb)
