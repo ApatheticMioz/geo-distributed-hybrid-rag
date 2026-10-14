@@ -785,6 +785,29 @@ def create_app(config: dict) -> FastAPI:
             if run_sparse else None
         )
 
+        # NC-3: dispatch the SPHP hint the moment the sparse leg completes,
+        # so the speculative prefill at Node A overlaps the still-running
+        # dense leg (mirrors Node B's sphp branch, which awaits only
+        # sparse_future before streaming). The hint task and the gather both
+        # await the SAME wrapped task — a bare to_thread coroutine cannot be
+        # awaited twice. The task result is the open SphpStream handle
+        # consumed by the generation leg below.
+        hint_task = None
+        if req.sphp and mode == "hybrid":
+            sparse_future = asyncio.ensure_future(sparse_future)
+
+            async def _dispatch_hint_at_sparse():
+                s_ids, t_s = await sparse_future
+                return await sphp_hint_dispatch(
+                    query_id=query_id,
+                    query_text=query_text,
+                    sparse_doc_ids=s_ids,
+                    t_sparse_ms=t_s,
+                    hint_depth=int(config["retrieval"]["hint_depth"]),
+                )
+
+            hint_task = asyncio.create_task(_dispatch_hint_at_sparse())
+
         if dense_future is not None and sparse_future is not None:
             (dense_ids, t_dense_ms), (sparse_ids, t_sparse_ms) = await asyncio.gather(
                 dense_future, sparse_future,
@@ -824,16 +847,12 @@ def create_app(config: dict) -> FastAPI:
                 media_type="text/plain",
             )
 
-        # Generation leg: SPHP (hint already dispatched at t_sparse) or a
-        # single final message on a fresh stream (non-SPHP).
-        if req.sphp and mode == "hybrid":
-            stream = await sphp_hint_dispatch(
-                query_id=query_id,
-                query_text=query_text,
-                sparse_doc_ids=sparse_ids,
-                t_sparse_ms=t_sparse_ms,
-                hint_depth=int(config["retrieval"]["hint_depth"]),
-            )
+        # Generation leg: SPHP (the hint task opened the stream and sent the
+        # hint at t_sparse — the fused dispatch below shares that stream so
+        # Node A can reconcile) or a single final message on a fresh stream
+        # (non-SPHP).
+        if hint_task is not None:
+            stream = await hint_task
             stream.send_final(
                 query_id=query_id,
                 query_text=query_text,
@@ -915,6 +934,26 @@ def create_app(config: dict) -> FastAPI:
             if run_sparse else None
         )
 
+        # NC-3: dispatch the SPHP hint at sparse completion so the
+        # speculative prefill overlaps the dense leg (see the /query
+        # endpoint for the full rationale; the sparse leg is wrapped in a
+        # shared task — a bare to_thread coroutine cannot be awaited twice).
+        hint_task = None
+        if req.sphp and mode == "hybrid":
+            sparse_future = asyncio.ensure_future(sparse_future)
+
+            async def _dispatch_hint_at_sparse():
+                s_ids, t_s = await sparse_future
+                return await sphp_hint_dispatch(
+                    query_id=query_id,
+                    query_text=query_text,
+                    sparse_doc_ids=s_ids,
+                    t_sparse_ms=t_s,
+                    hint_depth=int(config["retrieval"]["hint_depth"]),
+                )
+
+            hint_task = asyncio.create_task(_dispatch_hint_at_sparse())
+
         if dense_future is not None and sparse_future is not None:
             (dense_ids, t_dense_ms), (sparse_ids, t_sparse_ms) = await asyncio.gather(
                 dense_future, sparse_future,
@@ -975,16 +1014,12 @@ def create_app(config: dict) -> FastAPI:
                 sphp=False,
             )
 
-        # Generation leg: SPHP (hint at t_sparse) or single final message.
+        # Generation leg: SPHP (the hint task opened the stream and sent the
+        # hint at t_sparse; the fused dispatch shares it) or a single final
+        # message on a fresh stream (non-SPHP).
         meta: dict[str, Any] = {}
-        if req.sphp and mode == "hybrid":
-            stream = await sphp_hint_dispatch(
-                query_id=query_id,
-                query_text=query_text,
-                sparse_doc_ids=sparse_ids,
-                t_sparse_ms=t_sparse_ms,
-                hint_depth=int(config["retrieval"]["hint_depth"]),
-            )
+        if hint_task is not None:
+            stream = await hint_task
             stream.send_final(
                 query_id=query_id,
                 query_text=query_text,

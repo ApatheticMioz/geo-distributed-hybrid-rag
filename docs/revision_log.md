@@ -404,3 +404,44 @@ run specs with (a) the approved plan's mandate and (b) the in-progress
 §3.3, new §3.4, §4.3, totals table, §5.1, §6 run-order, §7 analysis
 table, §9 deviation log). `docs/revision_log.md` (this entry). No code
 files modified by this slice.
+
+## RB-2026-10-15: 3node-SPHP-from-C dispatch-timing defect (found during CM-2 analysis; code fix, like-for-like re-run required)
+
+**Defect.** Node C's gateway dispatched the SPHP sparse hint AFTER the
+retrieval barrier instead of at sparse completion. Both `/query` and
+`/query/benchmark` awaited `asyncio.gather(sparse, dense)`, fused, and only
+then called `sphp_hint_dispatch` — while the endpoint comment claimed "hint
+already dispatched at t_sparse". Node B's reference implementation (the
+measured 2-node SPHP path) awaits only `sparse_future` before streaming, so
+the hint leaves at sparse completion and the speculative prefill overlaps the
+dense leg; C's port lost the early dispatch.
+
+**Evidence (CM-2 dataset 20261014T163152Z, committed e9ebccd).** The sphp arm
+behaves exactly like "baseline + vacuous hint":
+- cold hit-vs-miss TTFT statistically indistinguishable (medians 2,660 vs
+  2,730 ms at (15,15); 2,673 vs 2,589 at (40,15); 2,659 vs 2,701 at (80,15))
+  — a real speculative prefill would make hits ~500+ ms faster cold, since
+  sparse_C (median 123-235 ms) completes ~900 ms before dense_B (990-1,180 ms)
+  and the cold prefill residual is ~570 ms;
+- `wasted_prefill_ms` median 14-17 ms on essentially ALL sphp records (2-node
+  semantics: 0 on hits, ~1,077 ms on misses) — the ~15 ms is the speculative
+  prefill progress made in the ~25 ms between the late hint dispatch and the
+  fused message arrival;
+- sphp-vs-baseline deltas within noise in both strata; hit RATE 0.813-0.863
+  is genuine (the hint legitimately predicts the fused set) but buys nothing.
+
+**Decision.** Fix the dispatch timing (early `asyncio.create_task` awaiting
+only `sparse_future`, mirroring Node B), keep everything else identical
+(same stream-sharing contract, same payloads, same failure semantics), and
+**re-run the frozen 6-arm CM-2 matrix (band 1371..1910) like-for-like** once
+the fixed gateway is deployed to Node C. The buggy-stack dataset is retained
+as the as-first-implemented record; the re-run supersedes it for paper
+reporting. The CM-2 numbers are cited nowhere in the paper yet (the paper
+still carries the CM-2 todo), so no published number is invalidated.
+
+**Files modified:** `systems/node_c/implementation/src/gateway.py` (early
+hint dispatch in both endpoints), `docs/revision_log.md` (this entry).
+
+## RB-2026-10-15: 3node-SPHP-from-C dispatch-timing defect (found during CM-2 analysis; code fix, like-for-like re-run required)
+
+**Defect.** Node C\s
