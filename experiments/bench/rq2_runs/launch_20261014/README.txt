@@ -4,3 +4,8 @@ Construction from campaign_v2_master5000_seed42.txt (design b239833 SS5.1 band 4
   D-C: lines 1976..2040 (W=5: 1976-1980, N=60: 1981-2040) + 5x repeat of lines 1981..2040 = 365
 Fault at request index 65 (after pre-fault pass). Recovery: embedded timed restart
 (schtasks /End; sleep 2; /Run) so the K=3 streak completes mid-stream (design SS2.2 R=5 post-failure repeats).
+
+FAULT MECHANISM (validated by rehearsal): bash-native async pair from Node A:
+  ssh laptop "schtasks /End /TN pdc_gateway" & sleep 4; ssh laptop "schtasks /Run /TN pdc_gateway" & wait
+Returns in ~5s; measured outage ~17s (B restart ~10s after /Run); stream samples the
+window (paced errors) then the K=3 streak completes mid-stream.
