@@ -1,0 +1,10 @@
+campaign_20261014T201533Z (AB-4 loss-sweep attempt 1) - aborted 2026-10-15.
+Completed: loss-0 sanity x2 (PASS), RTT-0 tier 6 arms clean (0 query errors at
+0.5/1/2% loss, pool 2041..2370). Aborted at cell rtt=40 loss=0.5%: pre-arm
+fidelity gate FAIL - loss_readback=None. Root cause (fixed in dc5fdcc):
+set -euo pipefail in scripts/netem/validate.sh killed the script on a
+non-matching grep before the fallback could print the Loss gate line; the
+driver parsed None. The abort path then crashed in write_summary_outputs
+(ValueError: sphp_hit_rate_wilson not in fieldnames - first-row-derived
+fieldnames; also fixed in dc5fdcc). Partial RTT-0 data superseded by the
+fresh full re-run; kept as the as-first-attempted record.
