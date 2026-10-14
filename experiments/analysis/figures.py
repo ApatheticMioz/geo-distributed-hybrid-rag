@@ -375,6 +375,17 @@ def _fig1_arch(model_warm: PlacementCostModel) -> Path:
 # Fig 2 -- Placement topology taxonomy
 # ---------------------------------------------------------------------------
 def fig2_topologies() -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig2_topologies()
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig2_topologies() -> Path:
     topologies = [
         ("P0", "Colocated",
          [["Query"], [], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
@@ -389,8 +400,20 @@ def fig2_topologies() -> Path:
     ]
     col_titles = ["", "Client", "Edge (Node B)", "Cloud (Node A)"]
     col_x = [0, 1.4, 4.0, 6.8, 10.0]
-    col_fc = ["white", "#F2F2F2", "#EAF3FB", "#FDF0E8"]
-    col_ec = [INK["muted"], INK["muted"], C_P2, C_SPHP]
+    # Column fills are light tints of the categorical palette (figstyle.TINTS);
+    # strokes are neutral ink so the tint carries the node role and grayscale
+    # / CVD survival never rests on a saturated hue.  Role -> tint: Client ->
+    # aqua (user/entry side), Edge (Node B) -> blue (retrieval), Cloud (Node A)
+    # -> orange (generation host).  The taxonomy-label column (j0) is white
+    # with a muted stroke, like the diagram chrome in fig1_arch.
+    col_fc = ["white",
+              figstyle.TINTS["aqua"],   # Client (entry side)
+              figstyle.TINTS["blue"],   # Edge (Node B) -- retrieval
+              figstyle.TINTS["orange"]]  # Cloud (Node A) -- generation
+    col_ec = [figstyle.INK_MUTED,   # taxonomy-label column
+              figstyle.INK_SECONDARY,  # Client (softer, external)
+              figstyle.INK,   # Edge (Node B)
+              figstyle.INK]  # Cloud (Node A)
 
     n_rows = len(topologies)
     row_h = 1.2
@@ -409,13 +432,14 @@ def fig2_topologies() -> Path:
         ax.add_patch(p)
         if title:
             ax.text((x0 + x1) / 2, y1 - 0.12, title, ha="center", va="top",
-                    fontsize=title_fs, fontweight="bold", color=ec, zorder=3)
+                    fontsize=title_fs, fontweight="bold", color=figstyle.INK,
+                    zorder=3)
         if items:
             top = y1 - 0.32
             step = (y1 - y0 - 0.40) / max(len(items), 1)
             for i, it in enumerate(items):
                 ax.text((x0 + x1) / 2, top - i * step, "• " + it, ha="center",
-                        va="top", fontsize=item_fs, color=INK["primary"], zorder=3)
+                        va="top", fontsize=item_fs, color=figstyle.INK, zorder=3)
 
     y_top = total_h
     for j, ct in enumerate(col_titles):
@@ -426,12 +450,13 @@ def fig2_topologies() -> Path:
         y1 = y_top - header_h - i * row_h
         y0 = y1 - row_h
         cell(col_x[0], col_x[1], y0, y1, name, [desc], "white",
-             INK["primary"], title_fs=8, item_fs=6)
+             figstyle.INK, title_fs=8, item_fs=6)
         for j, items in enumerate(cells):
             cell(col_x[j + 1], col_x[j + 2], y0, y1, "", items,
                  col_fc[j + 1], col_ec[j + 1], item_fs=7)
 
-    ax.set_title("Placement Topology Taxonomy (P0–P3)", fontsize=9, pad=8)
+    ax.set_title("Placement Topology Taxonomy (P0–P3)",
+                 loc="left", fontsize=8, color=figstyle.INK)
     return _save(fig, "fig2_topologies.pdf")
 
 
