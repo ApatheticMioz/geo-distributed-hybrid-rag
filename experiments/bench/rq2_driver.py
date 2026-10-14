@@ -683,8 +683,12 @@ def run_rq2(args: argparse.Namespace,
                 last_probe_t = now
                 probe = {"t": now, "ok": False, "detail": None}
                 try:
+                    # The probe is diagnostic: bound it well below the
+                    # request timeout so a black-holed port (firewall DROP,
+                    # not reject) cannot stall the request stream for a
+                    # full --timeout per probe during the fault window.
                     probe["ok"] = check_health(args.probe_health,
-                                               timeout=args.timeout)
+                                               timeout=2.0)
                 except Exception as e:
                     probe["detail"] = str(e)
                 probes.append(probe)
