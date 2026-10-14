@@ -931,3 +931,98 @@ def test_non_sphp_single_message_path():
             await server.stop(0)
 
     asyncio.run(_go())
+
+
+# ============================================================================
+# NC-3 regression — hint dispatches at sparse completion, NOT after the
+# retrieval barrier (RB-2026-10-15: CM-2's sphp arm was vacuous because both
+# endpoints dispatched the hint after asyncio.gather(sparse, dense)).
+# ============================================================================
+
+class _TimingOrchestrator(hybrid_coordination_pb2_grpc.GenerationOrchestratorServicer):
+    """Fake Node A that records WHEN the hint arrives (time.monotonic)."""
+
+    def __init__(self):
+        self.received = []
+        self.hint_received = asyncio.Event()
+        self.hint_ts = None
+
+    async def GenerateStream(self, request_iterator, context):
+        async for req in request_iterator:
+            self.received.append(req)
+            if req.is_sparse_hint:
+                self.hint_ts = time.monotonic()
+                self.hint_received.set()
+                continue
+            yield hybrid_coordination_pb2.GenerationToken(
+                query_id=req.query_id, token="", is_final=True,
+                sphp_hit=True, sphp_overlap=0.8,
+            )
+            break
+
+
+def test_hint_dispatches_before_retrieval_barrier(tmp_path, monkeypatch):
+    """End-to-end: with a slow dense leg, the hint must reach Node A while
+    dense is still running. Under the pre-RB-2026-10-15 code the dispatch
+    awaited the gather first, so hint_ts > dense_done_ts and this fails."""
+    idx_path = tmp_path / "tantivy_index"
+    _build_tiny_index(idx_path)  # d1: 'distributed computing'
+
+    # Fake Node A in a background thread with its own asyncio loop.
+    servicer = _TimingOrchestrator()
+    port_holder = {}
+    port_ready = threading.Event()
+
+    def _serve():
+        async def _main():
+            server = grpc.aio.server()
+            hybrid_coordination_pb2_grpc.add_GenerationOrchestratorServicer_to_server(
+                servicer, server
+            )
+            port = server.add_insecure_port("127.0.0.1:0")
+            port_holder["port"] = port
+            port_ready.set()
+            await server.start()
+            await server.wait_for_termination()
+
+        asyncio.run(_main())
+
+    thread = threading.Thread(target=_serve, daemon=True)
+    thread.start()
+    assert port_ready.wait(timeout=5)
+    port = port_holder["port"]
+
+    # Sparse resolves immediately; dense stalls past the hint window.
+    monkeypatch.setattr(
+        _gw, "sparse_retrieve",
+        lambda *a, **k: (["d1"], 1.0),
+    )
+    dense_times = {}
+
+    def _slow_dense(*a, **k):
+        time.sleep(1.0)
+        dense_times["done"] = time.monotonic()
+        return [], 0.0
+
+    monkeypatch.setattr(_gw, "dense_forward", _slow_dense)
+
+    app = create_app(_make_config(tmp_path, idx_path))
+    saved_target = _gw._NODE_A_TARGET
+    _gw._NODE_A_TARGET = f"127.0.0.1:{port}"
+    try:
+        with TestClient(app) as client:
+            r = client.post(
+                "/query/benchmark",
+                json={"query": "distributed", "mode": "hybrid", "sphp": True},
+            )
+            assert r.status_code == 200
+            body = r.json()
+            assert body["sphp_hit"] is True  # reconciled on the shared stream
+            assert servicer.hint_ts is not None
+            assert "done" in dense_times
+            # The hint crossed the wire while the dense leg was still stalling.
+            assert servicer.hint_ts < dense_times["done"], (
+                "hint dispatched after the retrieval barrier — RB-2026-10-15 regression"
+            )
+    finally:
+        _gw._NODE_A_TARGET = saved_target
