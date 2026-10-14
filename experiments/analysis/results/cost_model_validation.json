@@ -1,9 +1,9 @@
 {
   "generator": "analysis/cost_model.py (campaign-driven refit)",
-  "campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_20260918T130756Z.jsonl",
-  "n_records": 1200,
-  "n_cold": 400,
-  "n_warm": 800,
+  "campaign": "/home/apath/Work/PDC/Project/experiments/bench/campaigns/campaign_v2_confirm_2node_20261013.jsonl",
+  "n_records": 2880,
+  "n_cold": 960,
+  "n_warm": 1920,
   "top_k_measured": [
     10
   ],
@@ -14,10 +14,10 @@
     80.0
   ],
   "decode": {
-    "warm_median_tok_per_sec": 35.18,
-    "cold_median_tok_per_sec": 35.56,
-    "n_tps_used": 800,
-    "n_tps_excluded_degenerate": 0,
+    "warm_median_tok_per_sec": 35.26,
+    "cold_median_tok_per_sec": 35.78,
+    "n_tps_used": 1919,
+    "n_tps_excluded_degenerate": 1,
     "exclusion_band": [
       1.0,
       500.0
@@ -25,32 +25,32 @@
   },
   "cache_states": {
     "cold": {
-      "n_p2": 200,
-      "n_sphp": 200,
+      "n_p2": 480,
+      "n_sphp": 480,
       "fitted_params": {
-        "t_sparse_base_ms": 1711.29,
-        "t_dense_base_ms": 2680.85,
-        "t_fusion_base_ms": 0.0175,
-        "t_prefill_base_ms": 850.71,
-        "decode_tok_per_sec": 35.18,
-        "sphp_hit_rate_measured": 0.84,
-        "t_sphp_miss_penalty_ms": 2697.8
+        "t_sparse_base_ms": 603.15,
+        "t_dense_base_ms": 1091.67,
+        "t_fusion_base_ms": 0.0159,
+        "t_prefill_base_ms": 568.13,
+        "decode_tok_per_sec": 35.26,
+        "sphp_hit_rate_measured": 0.9,
+        "t_sphp_miss_penalty_ms": 1076.6
       },
       "sphp_measurement": {
-        "n": 200,
-        "measured_hit_rate": 0.84,
+        "n": 480,
+        "measured_hit_rate": 0.9,
         "hit_rate_wilson95": [
-          0.7829,
-          0.8843
+          0.8699,
+          0.9237
         ],
         "per_tier_hit_rate": {
-          "0": 0.8,
-          "15": 0.9,
-          "40": 0.84,
-          "80": 0.82
+          "0": 0.9083,
+          "15": 0.8917,
+          "40": 0.9167,
+          "80": 0.8833
         },
-        "miss_penalty_ms": 2697.8,
-        "n_miss_used_for_penalty": 31
+        "miss_penalty_ms": 1076.6,
+        "n_miss_used_for_penalty": 48
       },
       "regime_validation": {
         "P2": {
@@ -59,31 +59,31 @@
           "per_tier": [
             {
               "rtt_ms": 0.0,
-              "predicted_mean_ms": 3518.5,
-              "observed_mean_ms": 3633.6,
-              "ape_pct": 3.17
+              "predicted_mean_ms": 1668.6,
+              "observed_mean_ms": 1656.8,
+              "ape_pct": 0.72
             },
             {
               "rtt_ms": 15.0,
-              "predicted_mean_ms": 3540.7,
-              "observed_mean_ms": 3569.7,
-              "ape_pct": 0.81
+              "predicted_mean_ms": 1671.0,
+              "observed_mean_ms": 1663.8,
+              "ape_pct": 0.43
             },
             {
               "rtt_ms": 40.0,
-              "predicted_mean_ms": 3557.7,
-              "observed_mean_ms": 3555.7,
-              "ape_pct": 0.06
+              "predicted_mean_ms": 1663.6,
+              "observed_mean_ms": 1720.0,
+              "ape_pct": 3.28
             },
             {
               "rtt_ms": 80.0,
-              "predicted_mean_ms": 3582.6,
-              "observed_mean_ms": 3544.6,
-              "ape_pct": 1.07
+              "predicted_mean_ms": 1709.2,
+              "observed_mean_ms": 1640.5,
+              "ape_pct": 4.19
             }
           ],
-          "regime_mape_pct": 1.28,
-          "regime_r2": -2.2672
+          "regime_mape_pct": 2.15,
+          "regime_r2": -1.2586
         },
         "P2-SPHP": {
           "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
@@ -91,77 +91,77 @@
           "per_tier": [
             {
               "rtt_ms": 0.0,
-              "predicted_mean_ms": 3176.2,
-              "observed_mean_ms": 2948.2,
-              "ape_pct": 7.73
+              "predicted_mean_ms": 1354.2,
+              "observed_mean_ms": 1258.4,
+              "ape_pct": 7.61
             },
             {
               "rtt_ms": 15.0,
-              "predicted_mean_ms": 3323.7,
-              "observed_mean_ms": 2892.1,
-              "ape_pct": 14.92
+              "predicted_mean_ms": 1342.0,
+              "observed_mean_ms": 1204.9,
+              "ape_pct": 11.38
             },
             {
               "rtt_ms": 40.0,
-              "predicted_mean_ms": 3274.5,
-              "observed_mean_ms": 2996.8,
-              "ape_pct": 9.27
+              "predicted_mean_ms": 1337.5,
+              "observed_mean_ms": 1313.0,
+              "ape_pct": 1.87
             },
             {
               "rtt_ms": 80.0,
-              "predicted_mean_ms": 3289.0,
-              "observed_mean_ms": 2982.1,
-              "ape_pct": 10.29
+              "predicted_mean_ms": 1350.5,
+              "observed_mean_ms": 1222.5,
+              "ape_pct": 10.47
             }
           ],
-          "regime_mape_pct": 10.55,
-          "regime_r2": -62.1645
+          "regime_mape_pct": 7.83,
+          "regime_r2": -5.583
         }
       },
       "component_residual_check": {
-        "n": 200,
-        "mape_pct": 3.02,
+        "n": 480,
+        "mape_pct": 4.08,
         "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
       },
       "sphp_branch_check": {
         "hit_branch": {
-          "n": 168,
-          "mape_pct": 7.38
+          "n": 432,
+          "mape_pct": 8.67
         },
         "miss_branch": {
-          "n": 31,
-          "mape_pct": 75.84
+          "n": 48,
+          "mape_pct": 58.01
         },
         "note": "branch-conditional form check with per-record measured components"
       }
     },
     "warm": {
-      "n_p2": 400,
-      "n_sphp": 400,
+      "n_p2": 960,
+      "n_sphp": 960,
       "fitted_params": {
-        "t_sparse_base_ms": 74.8,
-        "t_dense_base_ms": 190.8,
-        "t_fusion_base_ms": 0.0192,
-        "t_prefill_base_ms": 633.27,
-        "decode_tok_per_sec": 35.18,
-        "sphp_hit_rate_measured": 0.84,
-        "t_sphp_miss_penalty_ms": 193.6
+        "t_sparse_base_ms": 79.2,
+        "t_dense_base_ms": 113.96,
+        "t_fusion_base_ms": 0.0151,
+        "t_prefill_base_ms": 423.61,
+        "decode_tok_per_sec": 35.26,
+        "sphp_hit_rate_measured": 0.9,
+        "t_sphp_miss_penalty_ms": 124.5
       },
       "sphp_measurement": {
-        "n": 400,
-        "measured_hit_rate": 0.84,
+        "n": 960,
+        "measured_hit_rate": 0.9,
         "hit_rate_wilson95": [
-          0.8009,
-          0.8727
+          0.8794,
+          0.9174
         ],
         "per_tier_hit_rate": {
-          "0": 0.8,
-          "15": 0.9,
-          "40": 0.84,
-          "80": 0.82
+          "0": 0.9083,
+          "15": 0.8917,
+          "40": 0.9167,
+          "80": 0.8833
         },
-        "miss_penalty_ms": 193.6,
-        "n_miss_used_for_penalty": 62
+        "miss_penalty_ms": 124.5,
+        "n_miss_used_for_penalty": 96
       },
       "regime_validation": {
         "P2": {
@@ -170,31 +170,31 @@
           "per_tier": [
             {
               "rtt_ms": 0.0,
-              "predicted_mean_ms": 830.2,
-              "observed_mean_ms": 817.9,
-              "ape_pct": 1.5
+              "predicted_mean_ms": 550.4,
+              "observed_mean_ms": 510.0,
+              "ape_pct": 7.91
             },
             {
               "rtt_ms": 15.0,
-              "predicted_mean_ms": 837.3,
-              "observed_mean_ms": 815.8,
-              "ape_pct": 2.64
+              "predicted_mean_ms": 552.2,
+              "observed_mean_ms": 531.7,
+              "ape_pct": 3.85
             },
             {
               "rtt_ms": 40.0,
-              "predicted_mean_ms": 851.0,
-              "observed_mean_ms": 817.1,
-              "ape_pct": 4.16
+              "predicted_mean_ms": 555.4,
+              "observed_mean_ms": 560.9,
+              "ape_pct": 0.98
             },
             {
               "rtt_ms": 80.0,
-              "predicted_mean_ms": 851.0,
-              "observed_mean_ms": 875.0,
-              "ape_pct": 2.75
+              "predicted_mean_ms": 565.5,
+              "observed_mean_ms": 587.6,
+              "ape_pct": 3.76
             }
           ],
-          "regime_mape_pct": 2.76,
-          "regime_r2": 0.076
+          "regime_mape_pct": 4.13,
+          "regime_r2": 0.2533
         },
         "P2-SPHP": {
           "protocol": "leave-one-tier-out on RTT tiers; regime (tier-mean) level",
@@ -202,46 +202,46 @@
           "per_tier": [
             {
               "rtt_ms": 0.0,
-              "predicted_mean_ms": 761.1,
-              "observed_mean_ms": 738.9,
-              "ape_pct": 3.0
+              "predicted_mean_ms": 534.9,
+              "observed_mean_ms": 488.1,
+              "ape_pct": 9.59
             },
             {
               "rtt_ms": 15.0,
-              "predicted_mean_ms": 779.4,
-              "observed_mean_ms": 778.1,
-              "ape_pct": 0.18
+              "predicted_mean_ms": 532.6,
+              "observed_mean_ms": 524.0,
+              "ape_pct": 1.64
             },
             {
               "rtt_ms": 40.0,
-              "predicted_mean_ms": 781.9,
-              "observed_mean_ms": 842.2,
-              "ape_pct": 7.16
+              "predicted_mean_ms": 535.6,
+              "observed_mean_ms": 536.8,
+              "ape_pct": 0.22
             },
             {
               "rtt_ms": 80.0,
-              "predicted_mean_ms": 781.1,
-              "observed_mean_ms": 896.8,
-              "ape_pct": 12.9
+              "predicted_mean_ms": 544.9,
+              "observed_mean_ms": 579.8,
+              "ape_pct": 6.01
             }
           ],
-          "regime_mape_pct": 5.81,
-          "regime_r2": -0.2015
+          "regime_mape_pct": 4.37,
+          "regime_r2": 0.1897
         }
       },
       "component_residual_check": {
-        "n": 400,
-        "mape_pct": 11.3,
+        "n": 960,
+        "mape_pct": 29.24,
         "note": "given measured retrieval components; isolates wan+hydrate+prefill form error"
       },
       "sphp_branch_check": {
         "hit_branch": {
-          "n": 336,
-          "mape_pct": 14.84
+          "n": 864,
+          "mape_pct": 32.8
         },
         "miss_branch": {
-          "n": 62,
-          "mape_pct": 14.77
+          "n": 96,
+          "mape_pct": 21.86
         },
         "note": "branch-conditional form check with per-record measured components"
       }
@@ -249,12 +249,12 @@
   },
   "rtt_sensitivity": {
     "warm_baseline_tier_means_ms": {
-      "0": 817.9,
-      "15": 815.8,
-      "40": 817.1,
-      "80": 875.0
+      "0": 510.0,
+      "15": 531.7,
+      "40": 560.9,
+      "80": 587.6
     },
-    "warm_slope_ms_per_ms": 0.729,
+    "warm_slope_ms_per_ms": 0.954,
     "note": "measured TTFT response to netem RTT; the analytical wan term (rtt/2 per modelled crossing) is an upper bound on this response"
   },
   "legacy_reconciliation": {
