@@ -531,6 +531,17 @@ def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> 
 # Fig 4 -- TTFT composition per RTT tier (cold vs. warm)
 # ---------------------------------------------------------------------------
 def fig4_stage_breakdown(campaign: list[dict]) -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig4_stage_breakdown(campaign)
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig4_stage_breakdown(campaign: list[dict]) -> Path:
     tiers_all = sorted({float(r["rtt_ms"]) for r in campaign})
     tier_labels = [f"{int(t)}" for t in tiers_all]
 
@@ -554,13 +565,23 @@ def fig4_stage_breakdown(campaign: list[dict]) -> Path:
             stages["Fusion (RRF)"].append(fusion)
             stages["Prefill (incl. hydrate)"].append(max(ttft - max(sparse, dense) - fusion, 0.0))
 
-        colors = [C_SPARSE, C_FUSION, C_PREFILL]
+        # Stacked segments on the figstyle categorical slots: retrieval =
+        # slot 0 (BLUE), fusion = slot 2 (AQUA), prefill = slot 6 (VIOLET).
+        # In grayscale BLUE (~0.19) and VIOLET (~0.13) land close together
+        # while AQUA (~0.32) is clearly lighter, so the two dark segments
+        # get tone-on-tone hatches (45-deg '/' vs. 135-deg '\') to keep the
+        # stack readable when printed in single color.
+        segments = [
+            (figstyle.CATEGORICAL[0], "/"),     # BLUE  -- retrieval
+            (figstyle.CATEGORICAL[2], ""),      # AQUA  -- fusion
+            (figstyle.CATEGORICAL[6], "\\"),    # VIOLET -- prefill
+        ]
         x = np.arange(len(tiers_all))
         width = 0.58
         bottom = np.zeros(len(tiers_all))
-        for (label, vals), color in zip(stages.items(), colors):
+        for (label, vals), (color, hatch) in zip(stages.items(), segments):
             vals = np.array(vals)
-            ax.bar(x, vals, width, bottom=bottom, color=color,
+            ax.bar(x, vals, width, bottom=bottom, color=color, hatch=hatch,
                    edgecolor="white", linewidth=0.8, label=label)
             for xi, (v, b) in enumerate(zip(vals, bottom)):
                 if v > 300:
@@ -571,9 +592,10 @@ def fig4_stage_breakdown(campaign: list[dict]) -> Path:
         ax.set_xticks(x)
         ax.set_xticklabels(tier_labels)
         ax.set_xlabel("WAN RTT (ms)")
-        ax.set_title(title, loc="left", fontsize=9)
+        ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
         ax.set_ylim(0, bottom.max() * 1.12)
-        _style_axes(ax)
+        figstyle.despine(ax)
+        figstyle.grid(ax)
 
     axes[0].set_ylabel("Mean TTFT (ms)")
     handles, labels = axes[0].get_legend_handles_labels()
@@ -655,21 +677,44 @@ def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
 # ---------------------------------------------------------------------------
 def fig6_crossover_map(model_warm: PlacementCostModel,
                        model_cold: PlacementCostModel) -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig6_crossover_map(model_warm, model_cold)
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig6_crossover_map(model_warm: PlacementCostModel,
+                        model_cold: PlacementCostModel) -> Path:
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
 
-    # (a) TTFT vs RTT at 100 Mbps — warm solid, cold dashed; log y so the
-    # warm cluster (≈540-670 ms) and the cold band (≈1.3-1.8 s) both resolve.
+    # Series slots (figstyle): P2 = slot 0 (BLUE solid o),
+    # P2-SPHP = slot 1 (ORANGE dashed s), P3 = slot 2 (AQUA dotted ^).
+    (c_p2, ls_p2, mk_p2) = figstyle.series_style(0)
+    (c_sphp, ls_sphp, mk_sphp) = figstyle.series_style(1)
+    (c_p3, ls_p3, mk_p3) = figstyle.series_style(2)
+
+    # (a) TTFT vs RTT at 100 Mbps — log y so the warm cluster and cold
+    # band both resolve.  Warm = full alpha; cold = reduced alpha.
     rtts = np.linspace(0, 200, 50)
     ax_a.plot(rtts, [model_warm.predict_ttft_p2(r, 100.0) for r in rtts],
-              color=C_P2, label="P2 (warm)")
+              color=c_p2, linestyle=ls_p2, marker=mk_p2, markevery=10,
+              label="P2 (warm)")
     ax_a.plot(rtts, [model_warm.predict_ttft_p2_sphp(r, 100.0) for r in rtts],
-              color=C_SPHP, label="P2-SPHP (warm)")
+              color=c_sphp, linestyle=ls_sphp, marker=mk_sphp, markevery=10,
+              label="P2-SPHP (warm)")
     ax_a.plot(rtts, [model_warm.predict_ttft_p3(r, 100.0) for r in rtts],
-              color=C_P3, label="P3 (warm)")
+              color=c_p3, linestyle=ls_p3, marker=mk_p3, markevery=10,
+              label="P3 (warm)")
     ax_a.plot(rtts, [model_cold.predict_ttft_p2(r, 100.0) for r in rtts],
-              color=C_P2, linestyle="--", alpha=0.55, label="P2 (cold)")
+              color=c_p2, linestyle=ls_p2, marker=mk_p2, markevery=10,
+              alpha=0.45, label="P2 (cold)")
     ax_a.plot(rtts, [model_cold.predict_ttft_p2_sphp(r, 100.0) for r in rtts],
-              color=C_SPHP, linestyle="--", alpha=0.55, label="P2-SPHP (cold)")
+              color=c_sphp, linestyle=ls_sphp, marker=mk_sphp, markevery=10,
+              alpha=0.45, label="P2-SPHP (cold)")
     ax_a.set_yscale("log")
     ax_a.set_yticks([500, 1000, 2000])
     ax_a.set_yticklabels(["500", "1000", "2000"])
@@ -677,34 +722,42 @@ def fig6_crossover_map(model_warm: PlacementCostModel,
     ax_a.set_ylim(450, 2000)
     ax_a.set_xlabel("WAN RTT (ms)")
     ax_a.set_ylabel("Modelled TTFT (ms)")
-    ax_a.set_title("(a) TTFT vs. RTT (BW = 100 Mbps)", loc="left", fontsize=9)
+    ax_a.set_title("(a) TTFT vs. RTT (BW = 100 Mbps)", loc="left", fontsize=8,
+                   color=figstyle.INK)
     ax_a.legend(loc="center right", frameon=False, fontsize=7)
     ax_a.annotate("SPHP optimal at every measured regime;\nP3 ≈ P2 (payloads are tiny)",
                   xy=(0.04, 0.30), xycoords="axes fraction",
-                  fontsize=8, color=INK["secondary"], va="center")
-    _style_axes(ax_a)
+                  fontsize=8, color=figstyle.INK_SECONDARY, va="center")
+    figstyle.despine(ax_a)
+    figstyle.grid(ax_a)
 
     # (b) TTFT vs BW at 80 ms RTT — the only real crossover is serialization.
     bws = np.logspace(np.log10(0.5), np.log10(1000), 80)
     ax_b.plot(bws, [model_warm.predict_ttft_p2(80.0, b) for b in bws],
-              color=C_P2, label="P2")
+              color=c_p2, linestyle=ls_p2, marker=mk_p2, markevery=20,
+              label="P2")
     ax_b.plot(bws, [model_warm.predict_ttft_p2_sphp(80.0, b) for b in bws],
-              color=C_SPHP, label="P2-SPHP")
+              color=c_sphp, linestyle=ls_sphp, marker=mk_sphp, markevery=20,
+              label="P2-SPHP")
     ax_b.plot(bws, [model_warm.predict_ttft_p3(80.0, b) for b in bws],
-              color=C_P3, label="P3 (hydrated text)")
+              color=c_p3, linestyle=ls_p3, marker=mk_p3, markevery=20,
+              label="P3 (hydrated text)")
     ax_b.set_xscale("log")
     ax_b.set_xlim(0.5, 1000)
     ax_b.set_xticks([0.5, 1, 2, 5, 10, 100, 1000])
     ax_b.set_xticklabels(["0.5", "1", "2", "5", "10", "100", "1000"])
     ax_b.set_xlabel("Bandwidth (Mbps)")
     ax_b.set_ylabel("Modelled TTFT (ms)")
-    ax_b.set_title("(b) TTFT vs. bandwidth (RTT = 80 ms, warm)", loc="left", fontsize=9)
-    ax_b.legend(loc="upper right", frameon=False, fontsize=7)
+    ax_b.set_title("(b) TTFT vs. bandwidth (RTT = 80 ms, warm)", loc="left",
+                   fontsize=8, color=figstyle.INK)
+    ax_b.legend(loc="center right", frameon=False, fontsize=7)
     ax_b.annotate("P3 serialization penalty\n(6 KB hydrated text)",
                   xy=(1.15, model_warm.predict_ttft_p3(80.0, 1.15)),
-                  xytext=(6.0, 690.0), fontsize=8, color=C_P3,
-                  arrowprops=dict(arrowstyle="->", color=C_P3, lw=0.8))
-    _style_axes(ax_b)
+                  xytext=(6.0, 690.0), fontsize=8, color=figstyle.INK_SECONDARY,
+                  arrowprops=dict(arrowstyle="->", color=figstyle.INK_SECONDARY,
+                                  lw=0.8))
+    figstyle.despine(ax_b)
+    figstyle.grid(ax_b)
 
     return _save(fig, "fig6_crossover_map.pdf")
 
@@ -713,34 +766,51 @@ def fig6_crossover_map(model_warm: PlacementCostModel,
 # Fig 7 -- Retrieval quality (Sparse vs. Dense vs. Hybrid)
 # ---------------------------------------------------------------------------
 def fig7_retrieval_quality() -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig7_retrieval_quality()
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig7_retrieval_quality() -> Path:
     live = load_live_quality()
     m = live["metrics"]
     n_queries = live.get("n_queries", 500)
 
     metrics = [("mrr@10", "MRR@10"), ("ndcg@10", "nDCG@10"),
                ("recall@100", "Recall@100"), ("recall@1000", "Recall@1000")]
-    modes = [("sparse", "Sparse (BM25)", C_MODE_SPARSE, "o"),
-             ("dense", "Dense (BGE-M3)", C_MODE_DENSE, "s"),
-             ("hybrid", "Hybrid (RRF)", C_MODE_HYBRID, "D")]
+    # Three retrieval modes on the figstyle categorical slots (BLUE / ORANGE /
+    # AQUA), each with a distinct marker shape and a tone-on-tone hatch so the
+    # series stay separable when printed in grayscale (never hue alone).
+    modes = [
+        ("sparse", "Sparse (BM25)", figstyle.CATEGORICAL[0], "o", "//"),
+        ("dense",  "Dense (BGE-M3)",  figstyle.CATEGORICAL[1], "s", "\\\\"),
+        ("hybrid", "Hybrid (RRF)",    figstyle.CATEGORICAL[2], "D", "x"),
+    ]
 
     # Grouped dot plot (Cleveland): three marker rows per metric; value
     # labels sit beside their own dot, so labels can never collide.
     fig, ax = plt.subplots(figsize=(COL_W, 2.9))
     offsets = {"sparse": 0.24, "dense": 0.0, "hybrid": -0.24}
-    for mode, label, color, marker in modes:
+    for mode, label, color, marker, hatch in modes:
         for yi, (key, _) in enumerate(metrics):
             if key not in m[mode]:
                 continue
             v = m[mode][key]
             y = yi + offsets[mode]
-            ax.scatter([v], [y], marker=marker, color=color, s=26,
-                       zorder=3, label=label if yi == 0 else None)
+            sc = ax.scatter([v], [y], marker=marker, color=color, s=26,
+                            zorder=3, label=label if yi == 0 else None)
+            sc.set_hatch(hatch)
             ax.text(v + 0.018, y, f"{v:.2f}", va="center", ha="left",
-                    fontsize=6.0, color=INK["secondary"])
+                    fontsize=6.0, color=figstyle.INK_SECONDARY)
 
     # Sparse is retrieved at k<=100: its Recall@1000 slot is a cap, not a score.
     ax.annotate("sparse: k ≤ 100", xy=(0.055, 3 - 0.24), xycoords="data",
-                fontsize=6.0, color=INK["muted"], va="center")
+                fontsize=6.0, color=figstyle.INK_MUTED, va="center")
 
     ax.set_yticks(range(len(metrics)))
     ax.set_yticklabels([lbl for _, lbl in metrics], fontsize=7)
@@ -748,15 +818,16 @@ def fig7_retrieval_quality() -> Path:
     ax.set_xlim(0, 1.0)
     ax.set_xlabel("Score")
     ax.set_ylim(3.55, -0.55)
-    ax.set_title("Retrieval Quality", loc="left", fontsize=9)
-    ax.legend(loc="upper left", frameon=False, fontsize=6.0,
+    ax.set_title("Retrieval Quality", loc="left", fontsize=8, color=figstyle.INK)
+    ax.legend(loc="upper right", frameon=False, fontsize=6.0,
               handletextpad=0.2, borderaxespad=0.2)
     ax.grid(axis="y", visible=False)
-    _style_axes(ax)
+    figstyle.despine(ax)
+    figstyle.grid(ax, horizontal=False)
 
     fig.text(0.99, -0.04,
              f"{n_queries} seeded MS MARCO dev queries (seed 42), live on Node B; RRF k=60.",
-             ha="right", va="top", fontsize=6.5, color=INK["secondary"],
+             ha="right", va="top", fontsize=6.5, color=figstyle.INK_SECONDARY,
              style="italic")
 
     return _save(fig, "fig7_retrieval_quality.pdf")
@@ -766,20 +837,39 @@ def fig7_retrieval_quality() -> Path:
 # Fig 8 -- Regime-level cost-model parity
 # ---------------------------------------------------------------------------
 def fig8_cost_model_parity(campaign: list[dict]) -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig8_cost_model_parity(campaign)
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig8_cost_model_parity(campaign: list[dict]) -> Path:
     val = load_refit()["per_term"]["params"]["new"]
 
     fig, ax = plt.subplots(figsize=(COL_W, 3.3))
+
+    # Four data series (arm x state). Arm carries the categorical slot color
+    # (P2 = slot 0 BLUE, P2-SPHP = slot 1 ORANGE); state is carried by the
+    # marker shape plus fill (cold = filled circle, warm = hollow diamond)
+    # so the four points stay separable in grayscale without hue alone.
+    arm_colors = {"P2": figstyle.CATEGORICAL[0],
+                  "P2-SPHP": figstyle.CATEGORICAL[1]}
 
     for state, marker, fill in (("cold", "o", True), ("warm", "D", False)):
         recs = [r for r in campaign
                 if (r.get("repeat_index", 0) == 0) == (state == "cold")]
         model = model_from_refit(state)
-        for variant, pred_fn, color, label in (
+        for variant, pred_fn, arm, label in (
             ("baseline", lambda r: model.predict_ttft_p2(float(r["rtt_ms"])),
-             C_P2, f"P2 ({state})"),
+             "P2", f"P2 ({state})"),
             ("sphp", lambda r: model.predict_ttft_p2_sphp(float(r["rtt_ms"])),
-             C_SPHP, f"P2-SPHP ({state})"),
+             "P2-SPHP", f"P2-SPHP ({state})"),
         ):
+            color = arm_colors[arm]
             vrecs = [r for r in recs if r.get("variant") == variant]
             tiers, vals = _tier_means(vrecs)
             pred = [pred_fn({"rtt_ms": t}) for t in tiers]
@@ -791,12 +881,15 @@ def fig8_cost_model_parity(campaign: list[dict]) -> Path:
 
     # Frame the re-baselined regime points (observed tier means ≈ 490–1720 ms):
     # old 09-18 data sat near 3.5 s, so the axis shrank with the re-baseline.
+    # Perfect-prediction diagonal in muted ink; the +/-10% band edges in the
+    # baseline tone (chrome, not a data series).
     lim_lo, lim_hi = 400.0, 1800.0
     xs = np.linspace(lim_lo, lim_hi, 2)
-    ax.plot(xs, xs, color=INK["primary"], linewidth=1.0, label="y = x")
-    ax.plot(xs, 0.9 * xs, color=INK["muted"], linestyle="--", linewidth=0.8,
+    ax.plot(xs, xs, color=figstyle.INK_MUTED, linestyle="--", linewidth=1.0,
+            label="y = x")
+    ax.plot(xs, 0.9 * xs, color=figstyle.BASELINE, linestyle="-", linewidth=0.8,
             label="±10%")
-    ax.plot(xs, 1.1 * xs, color=INK["muted"], linestyle="--", linewidth=0.8)
+    ax.plot(xs, 1.1 * xs, color=figstyle.BASELINE, linestyle="-", linewidth=0.8)
     ax.set_xlim(lim_lo, lim_hi)
     ax.set_ylim(lim_lo, lim_hi)
 
@@ -809,21 +902,23 @@ def fig8_cost_model_parity(campaign: list[dict]) -> Path:
         } for s in ("cold", "warm")
     }
     ax.text(0.03, 0.97,
-            f"regime MAPE (LOTO, re-baseline refit): "
+            f"regime MAPE (LOTO, re-baseline refit)\n"
             f"P2 {rv['cold']['P2']:.1f}% cold / "
             f"{rv['warm']['P2']:.1f}% warm\n"
             f"SPHP {rv['cold']['P2-SPHP']:.1f}% cold / "
             f"{rv['warm']['P2-SPHP']:.1f}% warm",
             transform=ax.transAxes, va="top", ha="left", fontsize=6.8,
-            color=INK["secondary"],
+            color=figstyle.INK_SECONDARY,
             bbox=dict(boxstyle="round,pad=0.3", fc="white",
-                      ec=INK["axis"], alpha=0.9))
+                      ec=figstyle.BASELINE, alpha=0.9))
 
     ax.set_xlabel("Observed tier-mean TTFT (ms)")
     ax.set_ylabel("Predicted tier-mean TTFT (ms)")
-    ax.set_title("Cost-Model Parity (regime level)", loc="left", fontsize=9)
+    ax.set_title("Cost-Model Parity (regime level)", loc="left", fontsize=8,
+                 color=figstyle.INK)
     ax.legend(loc="lower right", frameon=False, fontsize=6.2)
-    _style_axes(ax)
+    figstyle.despine(ax)
+    figstyle.grid(ax)
 
     return _save(fig, "fig8_cost_model_parity.pdf")
 
