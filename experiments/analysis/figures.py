@@ -156,10 +156,6 @@ COL_W = 3.5
 FULL_W = 7.16
 
 
-def _style_axes(ax: plt.Axes) -> None:
-    ax.set_axisbelow(True)
-
-
 def _save(fig: plt.Figure, name: str) -> Path:
     """Save a figure as a vector PDF with no clipped text."""
     out = FIG_DIR / name
@@ -479,6 +475,17 @@ def _sphp_deltas(campaign: list[dict]) -> dict:
 
 
 def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> Path:
+    # figstyle applies rcParams globally; scope it to this figure and restore
+    # the prior state afterwards so the other paper figures are unaffected.
+    saved_rc = dict(rcParams)
+    figstyle.setup()
+    try:
+        return _fig3_sphp_timeline(model_warm, campaign)
+    finally:
+        rcParams.update(saved_rc)
+
+
+def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> Path:
     rtt, bw, top_k = 40.0, 100.0, 10
 
     sparse = model_warm.t_sparse_base_ms
@@ -489,12 +496,30 @@ def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> 
     wan_hint = model_warm.wan_delay_ms(model_warm.query_bytes + 5 * model_warm.doc_id_bytes, rtt, bw)
     wan_fused = model_warm.wan_delay_ms(model_warm.query_bytes + top_k * model_warm.doc_id_bytes, rtt, bw)
 
+    # Series encoding (figstyle). The three data-carrying stages -- sparse,
+    # dense and generation (prefill) -- take the figstyle CATEGORICAL slots in
+    # slot order (0=BLUE, 1=ORANGE, 2=AQUA). Each bar's FILL is the slot's
+    # light tint (figstyle.TINTS), its STROKE is the full slot color, and its
+    # HATCH is a per-slot secondary encoding so the stages stay separable when
+    # printed in grayscale or viewed by a colorblind reader (hue alone never
+    # carries the distinction).  WAN transport is chrome, not a data series:
+    # it gets the muted ink for both fill and stroke, with no hatch and no
+    # slot color.
+    (c_sparse, _, _) = figstyle.series_style(0)   # BLUE   -> sparse
+    (c_dense, _, _) = figstyle.series_style(1)    # ORANGE -> dense
+    (c_prefill, _, _) = figstyle.series_style(2)  # AQUA   -> generation
+    # Per-slot hatch (grayscale/CVD secondary encoding; fig4 uses the same
+    # idiom of a distinct hatch per categorical slot).
+    _HATCH = {"sparse": "", "dense": "\\", "prefill": "//"}
+    # Slot -> figstyle.TINTS key for the bar fill (light tint of the slot).
+    _TINT = {"sparse": "blue", "dense": "orange", "prefill": "aqua"}
+
     # ---- (a) Baseline P2: serialized ----
     base = [
-        ("Dense leg (BGE-M3)", 0.0, dense, C_DENSE),
-        ("Sparse leg (BM25)", 0.0, sparse, C_SPARSE),
-        ("WAN: fused context", dense + fusion, wan_fused, C_WAN),
-        ("Prefill (incl. hydrate)", dense + fusion + wan_fused, prefill, C_PREFILL),
+        ("Dense leg (BGE-M3)", 0.0, dense, "dense"),
+        ("Sparse leg (BM25)", 0.0, sparse, "sparse"),
+        ("WAN: fused context", dense + fusion, wan_fused, "wan"),
+        ("Prefill (incl. hydrate)", dense + fusion + wan_fused, prefill, "prefill"),
     ]
     base_ttft = dense + fusion + wan_fused + prefill
 
@@ -505,10 +530,10 @@ def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> 
     sphp_ttft = max(fused_arrival, spec_prefill_end)
 
     sphp = [
-        ("Dense leg (BGE-M3)", 0.0, dense, C_DENSE),
-        ("Sparse leg (BM25)", 0.0, sparse, C_SPARSE),
-        ("WAN: sparse hint", sparse, wan_hint, C_WAN),
-        ("Provisional prefill", spec_prefill_start, prefill, C_PREFILL),
+        ("Dense leg (BGE-M3)", 0.0, dense, "dense"),
+        ("Sparse leg (BM25)", 0.0, sparse, "sparse"),
+        ("WAN: sparse hint", sparse, wan_hint, "wan"),
+        ("Provisional prefill", spec_prefill_start, prefill, "prefill"),
     ]
 
     fig, (ax_base, ax_sphp) = plt.subplots(
@@ -519,38 +544,53 @@ def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> 
     def draw_gantt(ax, bars, ttft, title, provisional_idx=None):
         n = len(bars)
         names = []
-        for i, (label, start, dur, color) in enumerate(bars):
+        for i, (label, start, dur, role) in enumerate(bars):
             y = n - 1 - i
             names.append(label)
+            if role == "wan":
+                # Transport chrome: muted-ink fill + stroke, no hatch, no
+                # slot color (WAN is not a data series).
+                fill, edge, hatch = figstyle.INK_MUTED, figstyle.INK_MUTED, None
+            else:
+                slot_color = {"sparse": c_sparse,
+                              "dense": c_dense,
+                              "prefill": c_prefill}[role]
+                fill, edge, hatch = figstyle.TINTS[_TINT[role]], slot_color, _HATCH[role]
             alpha = 0.55 if i == provisional_idx else 1.0
-            hatch = "//" if i == provisional_idx else None
-            ax.barh(y, dur, left=start, height=0.6, color=color,
-                    alpha=alpha, hatch=hatch, edgecolor="white",
-                    linewidth=0.5, zorder=3)
+            # The provisional prefill keeps its slot tint + hatch (so it stays
+            # readable as the same generation stage) at a reduced alpha to
+            # signal it is tentative, matching the pre-change treatment.
+            ax.barh(y, dur, left=start, height=0.6, color=fill,
+                    alpha=alpha, hatch=hatch, edgecolor=edge,
+                    linewidth=1.0, zorder=3)
             if dur >= 250.0:
                 ax.text(start + dur / 2.0, y, f"{label}  ({dur:.0f} ms)",
                         va="center", ha="center", fontsize=8,
-                        color="white" if alpha == 1.0 else INK["primary"],
+                        color=figstyle.INK,
                         zorder=4)
             else:
                 ax.annotate(f"{label} ({dur:.1f} ms)", xy=(start + dur, y),
                             xytext=(start + dur + 15.0, y),
                             va="center", ha="left", fontsize=8,
-                            color=color, zorder=4,
-                            arrowprops=dict(arrowstyle="-", color=color,
-                                            lw=0.6, shrinkA=0, shrinkB=0))
-        ax.axvline(ttft, color=INK["primary"], linestyle="--",
+                            color=figstyle.INK_SECONDARY, zorder=4,
+                            arrowprops=dict(arrowstyle="-",
+                                            color=figstyle.INK_SECONDARY,
+                                            lw=0.8, shrinkA=0, shrinkB=0))
+        # TTFT completion marker: neutral chrome -- secondary-ink dashed
+        # vertical line (0.8-1.2 lw) and a primary-ink label, never a slot color.
+        ax.axvline(ttft, color=figstyle.INK_SECONDARY, linestyle="--",
                    linewidth=1.0, zorder=2)
         ax.text(ttft, n - 0.10, f"TTFT={ttft:.0f} ms ",
-                va="bottom", ha="right", fontsize=8, color=INK["primary"])
+                va="bottom", ha="right", fontsize=8, color=figstyle.INK)
         # Bars are drawn at y = n-1-i in draw order; reverse the tick labels
         # to match, so each stage name sits beside its own bar.
         ax.set_yticks(range(n))
         ax.set_yticklabels(list(reversed(names)), fontsize=8)
-        ax.set_title(title, loc="left", fontsize=9)
+        ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
         ax.set_xlim(0, max(b[1] + b[2] for b in bars) * 1.22)
         ax.set_ylim(-0.6, n + 0.75)
-        _style_axes(ax)
+        figstyle.despine(ax)
+        figstyle.grid(ax)
 
     draw_gantt(ax_base, base, base_ttft,
                f"(a) Baseline P2 — serialized (RTT={rtt:.0f} ms, BW={bw:.0f} Mbps, warm fit)")
@@ -567,7 +607,7 @@ def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> 
              f"Measured TTFT delta vs. baseline (h = {model_warm.sphp_hit_rate:.2f} measured): "
              f"cold {cold['rel_pct']:+.1f}% [95% CI {cold['ci'][0]:+.1f}, {cold['ci'][1]:+.1f}%], "
              f"warm {warm['rel_pct']:+.1f}% [CI {warm['ci'][0]:+.1f}, {warm['ci'][1]:+.1f}%]",
-             ha="right", va="top", fontsize=8, color=INK["secondary"],
+             ha="right", va="top", fontsize=8, color=figstyle.INK_SECONDARY,
              style="italic")
 
     return _save(fig, "fig3_sphp_timeline.pdf")
