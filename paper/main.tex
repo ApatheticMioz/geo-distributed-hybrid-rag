@@ -144,8 +144,7 @@ hardware most machines do not have, data-residency rules can force retrieval
 and generation onto different hosts, and cost pushes work toward whatever
 hardware exists. Yet, to the best of our knowledge, the literature cannot
 answer: \emph{where should each stage of a hybrid RAG pipeline run, under which
-network conditions, and what exactly is lost when the topology degrades?}
-DNN partitioning is studied at the layer level
+network conditions, and what exactly is lost when the topology degrades?} We organize the study around three research questions: \emph{(RQ1)} Which placement maps each pipeline stage to which node under which network regime, and at what measured cost? \emph{(RQ2)} What exactly is lost when a node degrades or departs? \emph{(RQ3)} Can a fitted cost model drive a live placement policy whose prediction error is practically tolerable? DNN partitioning is studied at the layer level
 \cite{kang2017neurosurgeon,teerapittayanon2017ddnn,banitalebi2021autosplit} and LLM
 serving splits model \emph{phases} across machines, but a measurement study of
 \emph{which pipeline stage runs on which machine} in a multi-node hybrid RAG
@@ -852,14 +851,13 @@ placement---and SPHP---leave intact.
 \subsection{Live Policy Demonstration}
 The cost model is not only retrospective: at deployment time it reads the
 fitted parameters, predicts P2 and P2-SPHP TTFT for the \emph{current}
-network regime, and selects the argmin placement. We demonstrate this live:
-under each netem regime the policy selects a placement, executes live
-queries, and logs the predicted versus realized TTFT. In the demonstration
-the policy selects P2-SPHP at \emph{every} regime, consistent with the
-offline crossover analysis. Each regime serves five fresh seed-42 queries
-three times back-to-back (repeat~0 is the cold-prefix reference; repeats
-1--2 are warm), after two unrecorded warmups, at $k{=}10$; selection uses
-the steady-state (warm) fit.
+network regime, and selects the argmin placement. We evaluate this decision
+mechanism post hoc on the re-baselined campaign: under each netem regime the
+policy selects a placement, and Table~\ref{tab:livepolicy} compares the
+predicted TTFT of the selected placement against the realized campaign tier
+means. In that evaluation the policy selects P2-SPHP at \emph{every}
+regime, consistent with the offline crossover analysis; selection uses the
+steady-state (warm) fit.
 
 Table~\ref{tab:livepolicy} reports the outcome on the re-baselined surface.
 The argmin policy selects P2-SPHP at \emph{every} regime in both cache
@@ -983,7 +981,7 @@ In the two-node topology there is no intermediate service level: dropping
 the edge tier halts the pipeline outright, and once the service returns,
 latency is indistinguishable from pre-fault. A dropout
 \emph{gradient}---Node~C departing while the pipeline consolidates to
-P2---requires the third node and completes the RQ2 design
+P2---requires the third node and completes the RQ~2 degradation design
 (\S\ref{sec:roadmap}).
 
 \subsection{Summary of Gains}
@@ -1091,7 +1089,7 @@ yields a binary outage---hard errors confined to the outage window,
 post-recovery latency within 1.4\% of pre-fault after an 86.5~s recovery.
 The complementary arm (D-C), in which dropping Node~C consolidates the
 pipeline to P2 and should expose a genuine degradation gradient, awaits
-the third node and completes the RQ2 design.
+the third node and completes the RQ~2 degradation design.
 Third, generalizing SPHP beyond sparse--dense pairs to
 multi-stage speculative prefetching across distributed multi-hop topologies,
 where the reconciliation test becomes a set-membership check over a larger
