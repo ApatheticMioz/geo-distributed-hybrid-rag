@@ -1,0 +1,5 @@
+cell,arm,mode,variant,n,n_errors,ttft_mean,ttft_p50,ttft_p95,ttft_std,total_mean,total_p95,ttft_repeat0_mean,ttft_warm_mean,sphp_hit_rate,mean_overlap
+2-node,P2,hybrid,baseline,50,0,1730.72,1688.22,2079.35,208.7,2392.94,3098.44,1730.72,0.0,,
+2-node,P2-SPHP,hybrid,sphp,50,0,1308.6,1215.65,2055.54,333.46,1724.47,2922.91,1308.6,0.0,0.82,0.6
+3-node,3node-P2,hybrid,baseline,50,0,2624.11,2616.2,3185.17,271.71,3446.7,4197.94,2624.11,0.0,,
+3-node,3node-SPHP-from-C,hybrid,sphp,50,0,1997.29,1913.99,2634.55,324.96,2265.24,3766.41,1997.29,0.0,0.84,0.6

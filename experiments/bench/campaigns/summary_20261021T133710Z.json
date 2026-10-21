@@ -1,0 +1,1063 @@
+{
+  "schema": "pdc.campaign_summary/v2",
+  "design_doc": "docs/campaign_v2_design.md",
+  "design_commit": "1f911ef",
+  "run": "three-node-stress",
+  "run_id": "20261021T133710Z",
+  "generated_at": "2026-10-21T13:49:59Z",
+  "status": "aborted",
+  "abort_reason": "pre-cell fidelity gate FAIL on link-c at (B=15/0%, C=15/2%): sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.",
+  "gateway_url": "http://10.8.0.3:8000",
+  "pool": {
+    "path": "experiments/bench/queries/campaign_v2_master5000_seed42.txt",
+    "sha256": "9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa",
+    "manifest_path": "experiments/bench/queries/campaign_v2_master5000_seed42.txt.manifest.json",
+    "n": 5000,
+    "line_start": 2921,
+    "line_end": 3838
+  },
+  "line_range": [
+    2921,
+    3838
+  ],
+  "seed": 42,
+  "query_sample": 15,
+  "warmups": 2,
+  "repeats": 1,
+  "cells": [
+    [
+      15,
+      15,
+      0.5,
+      0.0
+    ],
+    [
+      15,
+      15,
+      0.0,
+      0.5
+    ],
+    [
+      15,
+      15,
+      0.5,
+      0.5
+    ],
+    [
+      15,
+      15,
+      1.0,
+      0.0
+    ],
+    [
+      15,
+      15,
+      0.0,
+      1.0
+    ],
+    [
+      15,
+      15,
+      1.0,
+      1.0
+    ],
+    [
+      15,
+      15,
+      2.0,
+      0.0
+    ],
+    [
+      15,
+      15,
+      0.0,
+      2.0
+    ],
+    [
+      15,
+      15,
+      2.0,
+      2.0
+    ],
+    [
+      40,
+      15,
+      0.5,
+      0.0
+    ],
+    [
+      40,
+      15,
+      0.0,
+      0.5
+    ],
+    [
+      40,
+      15,
+      0.5,
+      0.5
+    ],
+    [
+      40,
+      15,
+      1.0,
+      0.0
+    ],
+    [
+      40,
+      15,
+      0.0,
+      1.0
+    ],
+    [
+      40,
+      15,
+      1.0,
+      1.0
+    ],
+    [
+      40,
+      15,
+      2.0,
+      0.0
+    ],
+    [
+      40,
+      15,
+      0.0,
+      2.0
+    ],
+    [
+      40,
+      15,
+      2.0,
+      2.0
+    ],
+    [
+      80,
+      15,
+      0.5,
+      0.0
+    ],
+    [
+      80,
+      15,
+      0.0,
+      0.5
+    ],
+    [
+      80,
+      15,
+      0.5,
+      0.5
+    ],
+    [
+      80,
+      15,
+      1.0,
+      0.0
+    ],
+    [
+      80,
+      15,
+      0.0,
+      1.0
+    ],
+    [
+      80,
+      15,
+      1.0,
+      1.0
+    ],
+    [
+      80,
+      15,
+      2.0,
+      0.0
+    ],
+    [
+      80,
+      15,
+      0.0,
+      2.0
+    ],
+    [
+      80,
+      15,
+      2.0,
+      2.0
+    ]
+  ],
+  "variants": [
+    "baseline",
+    "sphp"
+  ],
+  "top_k": 10,
+  "fidelity_gates": [
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.3,
+      "shaped_median_ms": 17.0,
+      "added_rtt_ms": 14.7,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 4.48,
+      "shaped_median_ms": 18.5,
+      "added_rtt_ms": 14.02,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 1.89,
+      "shaped_median_ms": 16.1,
+      "added_rtt_ms": 14.21,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 4.55,
+      "shaped_median_ms": 18.7,
+      "added_rtt_ms": 14.15,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 2.16,
+      "shaped_median_ms": 16.1,
+      "added_rtt_ms": 13.94,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 5.09,
+      "shaped_median_ms": 19.2,
+      "added_rtt_ms": 14.11,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 3.04,
+      "shaped_median_ms": 16.4,
+      "added_rtt_ms": 13.36,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 4.98,
+      "shaped_median_ms": 18.9,
+      "added_rtt_ms": 13.92,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.01,
+      "shaped_median_ms": 15.8,
+      "added_rtt_ms": 13.79,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 5.0,
+      "shaped_median_ms": 19.0,
+      "added_rtt_ms": 14.0,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.24,
+      "shaped_median_ms": 15.7,
+      "added_rtt_ms": 13.46,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.5,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 3.9,
+      "shaped_median_ms": 18.8,
+      "added_rtt_ms": 14.9,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.13,
+      "shaped_median_ms": 16.3,
+      "added_rtt_ms": 14.17,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 5.2,
+      "shaped_median_ms": 19.1,
+      "added_rtt_ms": 13.9,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.91,
+      "shaped_median_ms": 17.0,
+      "added_rtt_ms": 14.09,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 4.43,
+      "shaped_median_ms": 18.3,
+      "added_rtt_ms": 13.87,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 2.15,
+      "shaped_median_ms": 16.2,
+      "added_rtt_ms": 14.05,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 4.96,
+      "shaped_median_ms": 19.25,
+      "added_rtt_ms": 14.29,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 1.96,
+      "shaped_median_ms": 17.0,
+      "added_rtt_ms": 15.04,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 4.8,
+      "shaped_median_ms": 19.0,
+      "added_rtt_ms": 14.2,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.54,
+      "shaped_median_ms": 16.2,
+      "added_rtt_ms": 13.66,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 3.97,
+      "shaped_median_ms": 19.1,
+      "added_rtt_ms": 15.13,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 1.61,
+      "shaped_median_ms": 16.3,
+      "added_rtt_ms": 14.69,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 1.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 4.6,
+      "shaped_median_ms": 18.2,
+      "added_rtt_ms": 13.6,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 2.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.13,
+      "shaped_median_ms": 15.4,
+      "added_rtt_ms": 13.27,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 4.56,
+      "shaped_median_ms": 18.4,
+      "added_rtt_ms": 13.84,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 2.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": "PASS",
+      "baseline_median_ms": 2.02,
+      "shaped_median_ms": 16.0,
+      "added_rtt_ms": 13.98,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "post",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 4.34,
+      "shaped_median_ms": 18.4,
+      "added_rtt_ms": 14.06,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "b",
+      "rtt_ms": 15,
+      "loss_pct": 0.0,
+      "when": "pre",
+      "status": "PASS",
+      "loss_gate": null,
+      "baseline_median_ms": 2.18,
+      "shaped_median_ms": 16.2,
+      "added_rtt_ms": 14.02,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    },
+    {
+      "link": "c",
+      "rtt_ms": 15,
+      "loss_pct": 2.0,
+      "when": "pre",
+      "status": "FAIL",
+      "loss_gate": null,
+      "baseline_median_ms": 8.29,
+      "shaped_median_ms": 18.6,
+      "added_rtt_ms": 10.31,
+      "output_tail": "2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10001 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10010 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10020 is big. Consider r2q change.\nWarning: sch_htb: quantum of class 10030 is big. Consider r2q change."
+    }
+  ],
+  "per_cell_error_reports": [
+    {
+      "cell": [
+        15,
+        15,
+        0.5,
+        0.0
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    },
+    {
+      "cell": [
+        15,
+        15,
+        0.0,
+        0.5
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    },
+    {
+      "cell": [
+        15,
+        15,
+        0.5,
+        0.5
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    },
+    {
+      "cell": [
+        15,
+        15,
+        1.0,
+        0.0
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    },
+    {
+      "cell": [
+        15,
+        15,
+        0.0,
+        1.0
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    },
+    {
+      "cell": [
+        15,
+        15,
+        1.0,
+        1.0
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    },
+    {
+      "cell": [
+        15,
+        15,
+        2.0,
+        0.0
+      ],
+      "n_errors": 0,
+      "n_total": 30,
+      "error_rate": 0.0,
+      "gate": "report-only (no abort for shaped cells)"
+    }
+  ],
+  "n_ok": 210,
+  "n_errors": 0,
+  "n_warmup_ok": 28,
+  "n_warmup_errors": 0,
+  "summary": [
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.0,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2602.71,
+      "ttft_p50": 2720.43,
+      "ttft_p95": 2932.68,
+      "ttft_std": 270.14,
+      "total_mean": 3584.89,
+      "total_p95": 4211.25,
+      "ttft_repeat0_mean": 2602.71,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.0,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 1984.01,
+      "ttft_p50": 1981.81,
+      "ttft_p95": 2395.36,
+      "ttft_std": 289.49,
+      "total_mean": 2109.43,
+      "total_p95": 2916.85,
+      "ttft_repeat0_mean": 1984.01,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.9333,
+      "mean_overlap": 0.6667,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 14,
+        "n": 15,
+        "rate": 0.9333,
+        "ci_95": [
+          0.7018,
+          0.9881
+        ]
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.0,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2502.85,
+      "ttft_p50": 2435.61,
+      "ttft_p95": 2899.82,
+      "ttft_std": 290.85,
+      "total_mean": 3358.05,
+      "total_p95": 4193.35,
+      "ttft_repeat0_mean": 2502.85,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.0,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 1938.84,
+      "ttft_p50": 1902.16,
+      "ttft_p95": 2398.75,
+      "ttft_std": 290.01,
+      "total_mean": 2214.87,
+      "total_p95": 3185.95,
+      "ttft_repeat0_mean": 1938.84,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.8,
+      "mean_overlap": 0.6133,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 12,
+        "n": 15,
+        "rate": 0.8,
+        "ci_95": [
+          0.5481,
+          0.9295
+        ]
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.5,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2605.4,
+      "ttft_p50": 2499.61,
+      "ttft_p95": 3420.17,
+      "ttft_std": 455.8,
+      "total_mean": 3286.49,
+      "total_p95": 4284.86,
+      "ttft_repeat0_mean": 2605.4,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.5,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 1919.84,
+      "ttft_p50": 1901.39,
+      "ttft_p95": 2260.44,
+      "ttft_std": 249.23,
+      "total_mean": 2174.82,
+      "total_p95": 3184.11,
+      "ttft_repeat0_mean": 1919.84,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.8,
+      "mean_overlap": 0.5867,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 12,
+        "n": 15,
+        "rate": 0.8,
+        "ci_95": [
+          0.5481,
+          0.9295
+        ]
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.5,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2594.23,
+      "ttft_p50": 2543.51,
+      "ttft_p95": 3310.5,
+      "ttft_std": 394.96,
+      "total_mean": 3430.79,
+      "total_p95": 4191.59,
+      "ttft_repeat0_mean": 2594.23,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 0.5,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 1862.64,
+      "ttft_p50": 1833.01,
+      "ttft_p95": 2197.84,
+      "ttft_std": 224.49,
+      "total_mean": 2028.56,
+      "total_p95": 2770.21,
+      "ttft_repeat0_mean": 1862.64,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.9333,
+      "mean_overlap": 0.6267,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 14,
+        "n": 15,
+        "rate": 0.9333,
+        "ci_95": [
+          0.7018,
+          0.9881
+        ]
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 1.0,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2564.58,
+      "ttft_p50": 2523.0,
+      "ttft_p95": 2977.03,
+      "ttft_std": 301.83,
+      "total_mean": 3321.82,
+      "total_p95": 4033.11,
+      "ttft_repeat0_mean": 2564.58,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 1.0,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2086.78,
+      "ttft_p50": 2005.03,
+      "ttft_p95": 2727.05,
+      "ttft_std": 397.33,
+      "total_mean": 2409.77,
+      "total_p95": 3827.33,
+      "ttft_repeat0_mean": 2086.78,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.8,
+      "mean_overlap": 0.6,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 12,
+        "n": 15,
+        "rate": 0.8,
+        "ci_95": [
+          0.5481,
+          0.9295
+        ]
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 1.0,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2565.76,
+      "ttft_p50": 2571.04,
+      "ttft_p95": 2970.97,
+      "ttft_std": 320.13,
+      "total_mean": 3529.85,
+      "total_p95": 4540.93,
+      "ttft_repeat0_mean": 2565.76,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 1.0,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 1970.06,
+      "ttft_p50": 1866.32,
+      "ttft_p95": 2803.48,
+      "ttft_std": 365.8,
+      "total_mean": 2100.41,
+      "total_p95": 3069.37,
+      "ttft_repeat0_mean": 1970.06,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.8667,
+      "mean_overlap": 0.6133,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 13,
+        "n": 15,
+        "rate": 0.8667,
+        "ci_95": [
+          0.6212,
+          0.9626
+        ]
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 2.0,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "arm": "3node-P2",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 2648.37,
+      "ttft_p50": 2591.43,
+      "ttft_p95": 3044.56,
+      "ttft_std": 230.32,
+      "total_mean": 3386.56,
+      "total_p95": 3980.66,
+      "ttft_repeat0_mean": 2648.37,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": null,
+      "mean_overlap": null,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 0,
+        "n": 0,
+        "rate": null,
+        "ci_95": null
+      }
+    },
+    {
+      "rtt_b": 15,
+      "rtt_c": 15,
+      "loss_b": 2.0,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "arm": "3node-SPHP-from-C",
+      "error_rate": 0.0,
+      "n": 15,
+      "n_errors": 0,
+      "ttft_mean": 1924.28,
+      "ttft_p50": 1849.51,
+      "ttft_p95": 2444.02,
+      "ttft_std": 312.55,
+      "total_mean": 2121.84,
+      "total_p95": 2984.43,
+      "ttft_repeat0_mean": 1924.28,
+      "ttft_warm_mean": 0.0,
+      "sphp_hit_rate": 0.8667,
+      "mean_overlap": 0.6133,
+      "sphp_hit_rate_wilson": {
+        "n_hits": 13,
+        "n": 15,
+        "rate": 0.8667,
+        "ci_95": [
+          0.6212,
+          0.9626
+        ]
+      }
+    }
+  ]
+}
