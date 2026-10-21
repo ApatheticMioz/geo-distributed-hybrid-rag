@@ -2,48 +2,182 @@
   "schema": "pdc.campaign_manifest/v2",
   "design_doc": "docs/campaign_v2_design.md",
   "design_commit": "1f911ef",
-  "run_id": "20261014T212435Z",
-  "generated_at_utc": "2026-10-14T21:24:35Z",
-  "run": "loss-sweep",
+  "run_id": "20261021T135808Z",
+  "generated_at_utc": "2026-10-21T14:32:44Z",
+  "run": "three-node-stress",
   "pool": {
     "path": "experiments/bench/queries/campaign_v2_master5000_seed42.txt",
     "sha256": "9159842745493be8a78637478cc59459d333112f373065bff5acba6c322544fa",
     "manifest_path": "experiments/bench/queries/campaign_v2_master5000_seed42.txt.manifest.json",
     "n": 5000,
-    "line_start": 2041,
-    "line_end": 2700
+    "line_start": 2921,
+    "line_end": 3838
   },
   "seed": 42,
-  "n_per_arm": 50,
-  "warmups_per_arm": 5,
+  "n_per_arm": 15,
+  "warmups_per_arm": 2,
   "repeats_per_query": 1,
-  "rtt_tiers": [
-    0,
-    40
-  ],
   "cells": [
     [
-      0,
+      15,
+      15,
+      0.5,
+      0.0
+    ],
+    [
+      15,
+      15,
+      0.0,
       0.5
     ],
     [
-      0,
+      15,
+      15,
+      0.5,
+      0.5
+    ],
+    [
+      15,
+      15,
+      1.0,
+      0.0
+    ],
+    [
+      15,
+      15,
+      0.0,
       1.0
     ],
     [
-      0,
+      15,
+      15,
+      1.0,
+      1.0
+    ],
+    [
+      15,
+      15,
+      2.0,
+      0.0
+    ],
+    [
+      15,
+      15,
+      0.0,
+      2.0
+    ],
+    [
+      15,
+      15,
+      2.0,
       2.0
     ],
     [
       40,
+      15,
+      0.5,
+      0.0
+    ],
+    [
+      40,
+      15,
+      0.0,
       0.5
     ],
     [
       40,
+      15,
+      0.5,
+      0.5
+    ],
+    [
+      40,
+      15,
+      1.0,
+      0.0
+    ],
+    [
+      40,
+      15,
+      0.0,
       1.0
     ],
     [
       40,
+      15,
+      1.0,
+      1.0
+    ],
+    [
+      40,
+      15,
+      2.0,
+      0.0
+    ],
+    [
+      40,
+      15,
+      0.0,
+      2.0
+    ],
+    [
+      40,
+      15,
+      2.0,
+      2.0
+    ],
+    [
+      80,
+      15,
+      0.5,
+      0.0
+    ],
+    [
+      80,
+      15,
+      0.0,
+      0.5
+    ],
+    [
+      80,
+      15,
+      0.5,
+      0.5
+    ],
+    [
+      80,
+      15,
+      1.0,
+      0.0
+    ],
+    [
+      80,
+      15,
+      0.0,
+      1.0
+    ],
+    [
+      80,
+      15,
+      1.0,
+      1.0
+    ],
+    [
+      80,
+      15,
+      2.0,
+      0.0
+    ],
+    [
+      80,
+      15,
+      0.0,
+      2.0
+    ],
+    [
+      80,
+      15,
+      2.0,
       2.0
     ]
   ],
@@ -52,894 +186,2175 @@
     "sphp"
   ],
   "sanity": {
-    "n": 10,
-    "repeats": 1,
-    "ranges": [
-      [
-        3839,
-        3848
-      ],
-      [
-        3849,
-        3858
-      ]
-    ],
-    "gate": "0-error (ABORT on any error \u2014 the shaped link must be healthy before loss is applied)"
-  },
-  "per_cell_gate_semantics": {
-    "loss_0_sanity_preflight": "0-error SANITY gate (ABORT on any error)",
-    "loss_gt_0_measured_cells": "per-cell error-rate REPORT (no abort; loss-driven errors are the signal)",
-    "fidelity": "validate.sh 11-ping \u00b130% added-RTT + fractional-loss readback, pre and post every cell; rtt-0 cells: loss-readback only (no added-RTT gate)"
+    "pool_start": 3839,
+    "n": 20,
+    "repeats": 1
   },
   "arms": [
     {
-      "arm": "P2",
-      "rtt_ms": 0,
-      "loss_pct": 0.5,
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "baseline",
       "netem_link_b_applied": {
-        "rtt_ms": 0,
+        "rtt_ms": 15,
         "loss_pct": 0.5
       },
-      "pool_start": 2041,
-      "pool_end": 2095,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 2921,
+      "pool_end": 2937,
       "warmups": [
-        "how to cancel cbn pledge",
-        "how to cancel garcinia cambogia order",
-        "how to cancel monoprice order",
-        "what's the difference between socialism",
-        "what county is new albany oh in"
+        "average pay for a correctional officer in indiana",
+        "why are accessory pigments important"
       ],
       "measured": [
-        "causes of corneal pigmentation",
-        "what county is new lowellville ohio",
-        "what county is new york new york",
-        "what county is new york ny in?",
-        "what county is newell sd in",
-        "what county is norfolk va",
-        "causes of ear problems in cats",
-        "what language is used in karate",
-        "what county is nunica mi in",
-        "how to change decimals to percentge",
-        "causes of elevated rbc count",
-        "what county is oakdale mn in?",
-        "what do wraps cost",
-        "what tectonic plates make up africa",
-        "what layer of the earth is quartz mainly found in",
-        "causes of getting winded easily",
-        "what led to the downfall of the great society programs?",
-        "what is ideal temperature in a freezer",
-        "what county is petersburg mi in",
-        "causes of infections with intravenous",
-        "how to change vpn to usa",
-        "what is sully's full name from monsters inc",
-        "causes of itchy face skin",
-        "how to change your flight without paying",
-        "what level does p evolve",
-        "what level does silcoon evolve at?",
-        "causes of low calcium levels",
-        "how is atp generated",
-        "what licensed staff are able to put in suppositories",
-        "what county is ripley ohio in",
-        "what life writer wrote camelot story",
-        "how to cite lines of a poem",
-        "how to cite sources in a works cited page",
-        "what made harriet bailey important the narrative of the",
-        "how to cite when another author is already cited",
-        "what major do you need to be a veterinarian",
-        "what major is photography under",
-        "what makes a baby mottled",
-        "cost to attend mount vernon nazarene university",
-        "ph acids biology definition",
-        "causes of sudden ed",
-        "causes of swelling in the feet and ankles",
-        "how to clear acne marks",
-        "how far is springfield to alexandria",
-        "what makes a vitamin prenatal",
-        "how to close tradestation account",
-        "what can you harmonica music play the blues",
-        "what county is starkville. ms located in?",
-        "what county is sterling, dixon in?",
-        "how fast can termites destroy a home"
+        "did oliver cromwell and thomas cromwell were they related",
+        "is colorado one of the states raising minimum wage",
+        "what's the cheapest day of the week to fly on",
+        "did polyphemus island have a name",
+        "is composed of nine cartilaginous structures",
+        "can hair dye cause itching areas in scalp",
+        "what hormone increases blood cell synthesis",
+        "did sue thompson die",
+        "what hormones contain t lymphocyte",
+        "is cramping after sex normal",
+        "did the actress who played sally spectra die",
+        "what's the difference between flovent and advair",
+        "did the bna act became the dominion of canada before or after confederation",
+        "what hotel is across from mgm grand in vegas has gondolas",
+        "what is love veronika bozeman"
       ]
     },
     {
-      "arm": "P2-SPHP",
-      "rtt_ms": 0,
-      "loss_pct": 0.5,
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "sphp",
       "netem_link_b_applied": {
-        "rtt_ms": 0,
+        "rtt_ms": 15,
         "loss_pct": 0.5
       },
-      "pool_start": 2096,
-      "pool_end": 2150,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 2938,
+      "pool_end": 2954,
       "warmups": [
-        "how to complete level 1602 on candy crush",
-        "causes of vulvular hives",
-        "causes of weakened immune causes leukemia",
-        "how to connect to a minecraft server using your phone minechat",
-        "where is cotulla texas located"
+        "is dairy products good for gout",
+        "what's the glycemic index? how is it used to manage blood sugar levels?"
       ],
       "measured": [
-        "how do you cage animals in fallout 4",
-        "how to contact dr gita massey",
-        "what is impact ratio analysis",
-        "how to cook a 3lb pork shoulder roast",
-        "what is the medical practice for cancer",
-        "what material should a back dental bridge be made of?",
-        "cervical osteoarthritis symptoms",
-        "benefits of spearmint",
-        "what materials do i need to make set walls",
-        "what matters for kids classes",
-        "change from republican to democrat kentucky",
-        "how to cook pre bagged fresh collard greens?",
-        "how to cook purple jasmine rice",
-        "how many different types kangaroos live in australia",
-        "what medical issues can cause bleeding from the rectum?",
-        "charitable contributions definition irs",
-        "where is cpk corporate office in ca",
-        "what creates the energy to destroy planets in the death star",
-        "check what is routing and account",
-        "what is symptoms of feeling nervous",
-        "chest pain upper right side feels like something is stuck there when i swallow",
-        "chevrolet avalanche price",
-        "how to create variable number of arrays in nodejs",
-        "what methods did the naacp use to try to gain black civil and political rights?",
-        "how to cure a ham roasts",
-        "chief district court judge",
-        "what might be the average care and food cost per month for one cat",
-        "what currency uses dhs",
-        "what current viruses are going around",
-        "what is an example of politics seen in day to day life?",
-        "what minivan gets the best gas mileage",
-        "chocolate covered frozen bananas price",
-        "choking and feeling of suffocating symptoms",
-        "what date is used to determine foreclosure on credit",
-        "what molecule is the soluble fiber in lemons?",
-        "how to delay a dmv hearing",
-        "how to delete an email address from bt account",
-        "what day does homegoods get new delivery",
-        "how to delete locations in maps on iphone 6s",
-        "what month is a pisces",
-        "how many calories in jumbo shrimp",
-        "chyna wrestler how did she die",
-        "cilantro taste description",
-        "average price of chemo",
-        "cio it meaning",
-        "how to design slab with visual analysis",
-        "how to designate chip value in home poker game",
-        "cisco phone agent what is a dequed call",
-        "how many calories in oatmeal pancakes",
-        "how to determine how much savings bonds are worth"
+        "is datetime object a comparable object c#",
+        "what's the language in africa",
+        "what if everything you eat causes your stomach",
+        "didn't know know know know know you leave at me what time it is",
+        "diet to help inflammation",
+        "are platyhelminthes deuterostomes or protostomes",
+        "how to properly do a sit up",
+        "dietician says juice cleanses are good",
+        "diets to gain weight",
+        "what's the name of my cuw summer",
+        "what's the name of the disease in adulthood from chickenpox",
+        "what includes all the organelles",
+        "what's the price for hulu",
+        "are pork skins classified as chips",
+        "is dothan animal shelter a no=kill facility"
       ]
     },
     {
-      "arm": "P2",
-      "rtt_ms": 0,
-      "loss_pct": 1.0,
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 0.5,
       "mode": "hybrid",
       "variant": "baseline",
       "netem_link_b_applied": {
-        "rtt_ms": 0,
-        "loss_pct": 1.0
+        "rtt_ms": 15,
+        "loss_pct": 0.0
       },
-      "pool_start": 2151,
-      "pool_end": 2205,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 2955,
+      "pool_end": 2971,
       "warmups": [
-        "what is t-zone",
-        "how to develop a distributor",
-        "what county is janesville mn in",
-        "what moving averages are used in stock analysis",
-        "how much is a switch"
+        "is drinking coffee with creamer bad for your liver",
+        "what's the temperature in los angeles right now"
       ],
       "measured": [
-        "cleveland browns roster 2015",
-        "how to divide scientific notation",
-        "how to do a fertility cleanse",
-        "clinical signs and symptoms of tension pneumothorax",
-        "where is the uvula located in the mouth",
-        "what muscles do you use do disc golf",
-        "what museum  is dolly parton coat of many colors displayed",
-        "what musicians need to be union members",
-        "how to do kidney cleansing",
-        "how to do mla format works cited page",
-        "how to do registration vijaya nagar hyderabad",
-        "what determines patient benefits eligibility?",
-        "what determines the coefficient in cyclical unemployment",
-        "mems who is the leader",
-        "what is talic used in",
-        "code of ethics for north carolina educators",
-        "what device driver and interface do most scanners use",
-        "how to draw a airaplane",
-        "what nationality is last name densmore?",
-        "what did amartya sen get the nobel prize for",
-        "what did american colonist protest as taxation without representation ?",
-        "what did betsy ross die from",
-        "what did cesar chavez organization do",
-        "which super bowl did blake shelton perform",
-        "what is tangent alert",
-        "what natural ingredients lighten and brighten african american skin?",
-        "how to edit pictures on imvu after posting",
-        "where do you find barclaycard account number",
-        "what nba youngboy real name",
-        "what did john f kennedy contribution",
-        "what did kanye say about jay z",
-        "what neighborhood is ludlow street ny ny",
-        "what did l. douglas wilder do to stop segregation",
-        "comcast phone number.",
-        "what nervous system consumes energy",
-        "what network does credo use",
-        "how to estimate a remodel",
-        "how to estimate price per square foot when buying a commercial building",
-        "what network is pickles on cartoon",
-        "what network was the outer limits broadcasted on",
-        "how to explain copyright",
-        "what is the score 104 in iq test",
-        "what did the europeans use to sperste the africans",
-        "how to file a patent release online",
-        "what did the mayans use as crops",
-        "calories in a hot dog weiner",
-        "what nutrients are in a carrot",
-        "what nutritional deficiency would cause severely chapped lips",
-        "cost of cosmetic surgery",
-        "how to find btu's of frigidaire"
+        "what information is the most important for effective bid strategy?",
+        "what's the temperature on tybee island ga",
+        "what is the chemical test for ketones",
+        "difference between cultivar and variety",
+        "difference between discrete and process manufacturing",
+        "difference between elastomer and polymer",
+        "difference between endoscopy and enteroscopy",
+        "is megyn kelly staying on nbc?",
+        "what involved in a education health and care plan",
+        "what's the weather tomorrow in jackson tennessee",
+        "is euflexxa covered by medicare",
+        "is evelyn a boy or girl name",
+        "is everyone third person",
+        "how to pull in your gut",
+        "is executing a deed the same thing as signing a quit claim deed?"
       ]
     },
     {
-      "arm": "P2-SPHP",
-      "rtt_ms": 0,
-      "loss_pct": 1.0,
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 0.5,
       "mode": "hybrid",
       "variant": "sphp",
       "netem_link_b_applied": {
-        "rtt_ms": 0,
-        "loss_pct": 1.0
+        "rtt_ms": 15,
+        "loss_pct": 0.0
       },
-      "pool_start": 2206,
-      "pool_end": 2260,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 2972,
+      "pool_end": 2988,
       "warmups": [
-        "how to find circle arc length",
-        "what diet pills r addictive",
-        "how to find fifth third account number",
-        "compressive atelectasis definition",
-        "how to find imei number on iphone"
+        "what's up funky boots?",
+        "what is ! symbol in math"
       ],
       "measured": [
-        "concacaf world cup qualifying schedule",
-        "what operating system does an iphone have",
-        "concrete block installation cost",
-        "how to find my birth record online",
-        "how much is dog wormer cost",
-        "condition that causes hot hands",
-        "conditional grant definition on home loans",
-        "how to find server name for email",
-        "what is carbon cycle",
-        "congo to canada flight map",
-        "what organization did martin luther king, jr. request that maya angelou head",
-        "what is the serial number for tropico 3",
-        "what organs are found in the cavity of frogs",
-        "what organs does a heart scan show",
-        "how to find wells fargo account number",
-        "how many white lions are left in the world 2015",
-        "what county is bourbon mo in",
-        "what is a air gap",
-        "how to fix valve on french horn",
-        "how to fix wifi antenna on iphone 4",
-        "contribution rates retirement plans definition",
-        "contributory aged parent visa cost",
-        "conversationist definition",
-        "what do business operations specialists do",
-        "convert 8 oz to ml new zealand",
-        "convert a shed into a sauna",
-        "what part of asia do tigers live in",
-        "convert bytes to megabytes",
-        "what part of compass is north",
-        "what do cold fronts bring",
-        "convert decimal degrees",
-        "what is the metal connection across an element plug",
-        "how to get 100% financing on a home loan",
-        "what part of texas is the panhandle",
-        "how to get a course approved for cme",
-        "what part of the brain is affected when the oculomotor nerve is affected",
-        "how to get a new vehicle registration document",
-        "is eubacteria unicellular",
-        "how happy retirees spend their time",
-        "convert pounds to short ton",
-        "how to get all the channels on plex",
-        "what parts do i need to build a computer",
-        "what party did alan greenspan",
-        "how to get away with murder season 3 on netflix",
-        "how to get back in with navy federal after a closed overdrawn account",
-        "what do humans depend on in the city of brownsville",
-        "converting minutes to military time",
-        "what pens write on black paper",
-        "what's today's day",
-        "what percent of paycheck should go toward taxes"
+        "is mental retardation still used",
+        "whats does yon mean",
+        "is first amendment capitalized",
+        "is first progress credit card a scam",
+        "difference between operating procedures and operating instructions",
+        "what is the civilian working-age population",
+        "strep symptoms of the body",
+        "whats the price per square foot to.build a church",
+        "is freight taxable in massachusetts?",
+        "difference between qa and qe",
+        "wheen is point pelee open",
+        "is generation z an entitled generation?",
+        "is german an easy language to learn",
+        "when and where does the glass castle take place",
+        "when and where was the gold on earth formed?"
       ]
     },
     {
-      "arm": "P2",
-      "rtt_ms": 0,
-      "loss_pct": 2.0,
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.5,
       "mode": "hybrid",
       "variant": "baseline",
       "netem_link_b_applied": {
-        "rtt_ms": 0,
-        "loss_pct": 2.0
+        "rtt_ms": 15,
+        "loss_pct": 0.5
       },
-      "pool_start": 2261,
-      "pool_end": 2315,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 2989,
+      "pool_end": 3005,
       "warmups": [
-        "cool environment health effects",
-        "copd med called anora",
-        "what do lymph nodes do within the body book",
-        "corn definition",
-        "what do moles eat?"
+        "when and why was the UN established",
+        "when are a parent's rights terminated in sc"
       ],
       "measured": [
-        "calories in grape leaf rolls",
-        "what year did automakers start using safety glass and windshields?",
-        "what do numbers in blood pressure reading mean",
-        "what do ocean currents and waves form",
-        "what percentage of the earth is freshwater",
-        "cortana what is your birthday",
-        "cortana what time is it in beijing.",
-        "how to get rid of a grumpy mood",
-        "what do regulators do",
-        "how many careers are needed to one elderly patient in a care home",
-        "cost car window tinting",
-        "cost concepts in manufacturing accounting",
-        "what do seismic waves carry",
-        "american literature definition",
-        "what do sperm contribute to the embryo?",
-        "what place did the washington wizards come in",
-        "cost for a hot water tank",
-        "how to get the circumference of 2 x 2",
-        "cost for acid dip trailer",
-        "what plants in garden will grow in august",
-        "what do the initials mean on craigslist?",
-        "what was the dark ages",
-        "how to gift a scholarship",
-        "what do they call the spanish language in spain",
-        "how to grill lemon",
-        "what ports use smb",
-        "how to grill steamed lobster",
-        "what position is taught to deliver a baby",
-        "what do we call breathing in and out while at rest",
-        "cost new medical ambulance",
-        "how to hack a cell phone remotely free",
-        "what president is credited with inspiring the slogan  good to the last drop",
-        "how to handle diluted nondetect results",
-        "french translation for where is",
-        "how to help alcohol withdrawal naturally",
-        "cost of a pga professional to play in a tournament",
-        "cost of a picture engine",
-        "what procedure confirms pancreatic cancer",
-        "what process creates nuclear explosion",
-        "what do you do when your baby milk comes out their nose and you can't breathe",
-        "how to hire a brewmaster",
-        "cost of acrylic nail fill",
-        "how to hook up a torqflo fan accessory",
-        "how to implement marketing strategy",
-        "what is the product of ethanol is oxidized",
-        "what program can i use to record music?",
-        "how to improve the strength of your knees",
-        "what program is used for speed painting",
-        "what program opens an eps file",
-        "what programming language is powershell"
+        "is glidden paint known for streaking",
+        "what is a Nucleic acid in biology",
+        "when are mushrooms in season",
+        "when are you required to have harbor pilot",
+        "what is a atmi",
+        "what is a b.a",
+        "when can a dog get a parvo shot",
+        "is head lice considered an infectious disease",
+        "is heart block classified as heart disease",
+        "what is a bao bun",
+        "is hello kitty chinese",
+        "when can i see my baby move",
+        "health benefits of clove essential",
+        "when can i view the shroud of turin",
+        "types of meditation that begin with an r"
       ]
     },
     {
-      "arm": "P2-SPHP",
-      "rtt_ms": 0,
-      "loss_pct": 2.0,
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.5,
       "mode": "hybrid",
       "variant": "sphp",
       "netem_link_b_applied": {
-        "rtt_ms": 0,
-        "loss_pct": 2.0
+        "rtt_ms": 15,
+        "loss_pct": 0.5
       },
-      "pool_start": 2316,
-      "pool_end": 2370,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3006,
+      "pool_end": 3022,
       "warmups": [
-        "who are ann and thomas putnam",
-        "why do the maasai tribe wear red",
-        "what document types does whatsapp support as attachments?",
-        "cost of cataract surgery in sd",
-        "how to install a forced air unit"
+        "when can menopause start",
+        "different types of baseball gloves"
       ],
       "measured": [
-        "how to install a soap dish",
-        "what documents that buyer sign at real estate closing",
-        "cost of closet organizers",
-        "what punctuation mark in used in a contraction?",
-        "what does )r(mean chemistry",
-        "cost of coloured concrete",
-        "what does the american progress imply",
-        "what is the date of the fourth wednesday of this month",
-        "what qualifies as a psychology science class",
-        "how to install netflix app on samsung TD390S smart tv",
-        "how to install ssd on satellite",
-        "what term describes igneous rocks that crystallize",
-        "cost of dog getting fixed",
-        "what does a anthropologist do",
-        "what does a auto vin classify",
-        "what president of the united states was born in lamar missouri and farmed for several years",
-        "cost of establishing a poultry breeding farm",
-        "cost of food in russia us",
-        "what is an obligation number for a mortgage?",
-        "what is the criteria for waterford township teachers to take an early retirement?",
-        "what is the gray market",
-        "what does a copyright does?",
-        "what does a deviated septum feel like",
-        "cost of hearing aid implant",
-        "what regulations govern point-of-care testing?",
-        "what remedy for pulled ligament",
-        "what removes hair dye from floors",
-        "how to link a css file to my java class",
-        "education is key to success",
-        "what requirements must be met for a taxpayer to qualify to file as head of household",
-        "how invented the harlem shake?",
-        "what does a golf gps membership cost?",
-        "cost of jackson hole lift ticket",
-        "how to lose weight drink water",
-        "what does a level 2 social worker earn",
-        "how to maintain a neutral spine with movement",
-        "cost of iste membership",
-        "when a bond is callable, the ability to call the bond is an option for quizlet",
-        "cost of leed construction review",
-        "cost of linzess",
-        "what river splits hungry",
-        "how to make a cast of your bum",
-        "what causes autism during pregnancy",
-        "how to make a dog's collar",
-        "why do you become a credit analyst?",
-        "how much is the us deficit for organ cost dialysis",
-        "average life swap",
-        "cost of netflix plans",
-        "what should i use to seal my pine picnic table",
-        "cost of oakmont senior living membership"
+        "when can you cash out on a multi tab ticket",
+        "when can you enroll in medicare cost plan",
+        "how to quit drinking",
+        "when can you go back to work after food poisoning",
+        "is hsa a good idea",
+        "different types of mediums art",
+        "when did aol launch internet service",
+        "are stratus clouds rain clouds",
+        "what is a boogie's real name",
+        "different types of tapeworms",
+        "what is a boom touch",
+        "is it a stye or chalazion",
+        "what is a bronchiolitis",
+        "is it better to buy a car from a dealer or owner",
+        "what is a bundled section of dna"
       ]
     },
     {
-      "arm": "P2",
-      "rtt_ms": 40,
-      "loss_pct": 0.5,
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3023,
+      "pool_end": 3039,
+      "warmups": [
+        "what is a c/s supervisor",
+        "directioner trivia how many s are there"
+      ],
+      "measured": [
+        "is it normal for baby to sleep a lot before a growth spurt?",
+        "is it normal for kitchen painted cabinet paint to start peeling or why it has dins and dangs",
+        "when did fiat chrysler spin off ferrari?",
+        "disadvantages of buying real estate using ira",
+        "what is a car lemon",
+        "when did fordham university become co-ed?",
+        "what is a career obligation",
+        "when did ga start",
+        "when did germany invade romania",
+        "what is a casrep",
+        "is it safe to eat corn off of a partially developed here",
+        "when did hitler come to power germany",
+        "when did hyundai start keyless entry",
+        "is it true cats go away to die",
+        "how many letter are on a visa card"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3040,
+      "pool_end": 3056,
+      "warmups": [
+        "when did john denver write annie's song",
+        "is javascript oop"
+      ],
+      "measured": [
+        "what is a chemical property of selenium",
+        "when did june carter cash die and johnny cash",
+        "when did kings emerge",
+        "what is a cincture",
+        "distance between singapore and kuala lumpur",
+        "what is the impact of refusal to file",
+        "is ketamine a horse tranquilizer",
+        "when did mlk day become a federal holiday",
+        "distance from uranus to earth",
+        "what is a collateral dependent",
+        "is lead poisoning an emerging infectious disease",
+        "distance scottsdale to grand canyon",
+        "what is a commission fee in auditing",
+        "is legal shield a scam",
+        "distraction medical definition"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3057,
+      "pool_end": 3073,
+      "warmups": [
+        "when did san pellegrino start",
+        "is life shortened by addiction"
+      ],
+      "measured": [
+        "is lilac a flower",
+        "customer service number irs",
+        "what is a consolidation period",
+        "is luke's on gilmore girls set same as sam as i ever was on ghost whisperer set?",
+        "do I have to take out all the grout to regrout",
+        "when did the college football playoff start",
+        "do anastrazole make you lose weight",
+        "when did the eagles win the conference finals",
+        "is malta the largest island in the mediterranean sea",
+        "do atm deposits go through immediately",
+        "what is a costco store",
+        "do beans have a lot of protein",
+        "is marijuana used as an add medicine?",
+        "do birth control implants cause yeast infections",
+        "do calluses on toe cause pain?"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3074,
+      "pool_end": 3090,
+      "warmups": [
+        "how to get to settings on a learnpad",
+        "is mechanic considered a skilled trade"
+      ],
+      "measured": [
+        "do cell numbers have 519 area code",
+        "when did the nation's political atmosphere begin to change and favor less involvement in social programs?ask",
+        "do chickens pick their feathers when bored",
+        "is melania trump going to divorce donald",
+        "how is genetic information exchanged by conjugation",
+        "what is a ct of thoracic",
+        "when did the railroads begin",
+        "do copper and lead nitrate react",
+        "is mexican petunia",
+        "what is the best fly fishing combo for beginners",
+        "do drs prescribe one unit of insulin",
+        "is misa annie a sister of light amalgama",
+        "do fat jigglers work",
+        "what is a decanter?",
+        "why vitamin d deficiency"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3091,
+      "pool_end": 3107,
+      "warmups": [
+        "is mono fat same thing as saturated fat",
+        "when did u.s. women get the right to vote"
+      ],
+      "measured": [
+        "when did upton park became the boleyn ground",
+        "what is hpp header",
+        "what is a demo",
+        "when did william henry harrison graduate",
+        "what is a direct service professional",
+        "is nitrogen an ideal gas",
+        "is non-exempt hourly",
+        "is northern mutual financial network a life insurance",
+        "is nuclear energy feasible",
+        "is nuclear power generation associated with producing greenhouse gases",
+        "when do i have to change tires",
+        "do liver flukes affect the tongue",
+        "do married people share bank accounts",
+        "what is a draft in banking terms",
+        "what is a dvt?"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3108,
+      "pool_end": 3124,
+      "warmups": [
+        "do nqts get a pay rise",
+        "do opiates affect kidney function"
+      ],
+      "measured": [
+        "do ovens have a fuse",
+        "what is the temperature in vermont?",
+        "when do symptoms of seasonal affective disorder start?",
+        "do physician assistants have residencies",
+        "when do the parades start for mardi gras",
+        "when do the reward points go on a scheels card",
+        "what is a extended player says add one how do i add one",
+        "do police cars have cruise control",
+        "is pentazocine a benzodiazepine",
+        "when do you apply for an auto loan",
+        "do rider rewards expire",
+        "is physical therapy necessary after back surgery",
+        "when do you know a mole is concerning",
+        "do security guards need to go to school",
+        "when does a buprenorphine prescription expire"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3125,
+      "pool_end": 3141,
+      "warmups": [
+        "arizona department of finance and administration fax number",
+        "when does an adverb describe a noun"
+      ],
+      "measured": [
+        "do us toll free numbers work in australia",
+        "who proposed the four characteristics of service",
+        "what is a functional markup code",
+        "is quarterback colin kaepernick fired?",
+        "do wild parrots name their babies",
+        "what is the best music production and recording software",
+        "who is considered central royalty",
+        "why was seth rich killed",
+        "symptoms of worsening kidney function",
+        "do you have to refrigerate used oil",
+        "what is a gic, financial",
+        "do you have to step on the brake when starting a car",
+        "what is the symbol used to represent the energy? ____",
+        "is rosacea treatable",
+        "what is a gn modifier used for"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3142,
+      "pool_end": 3158,
+      "warmups": [
+        "how long do hard boiled eggs last in fridge",
+        "is salesforce a database"
+      ],
+      "measured": [
+        "do you need dentures",
+        "do you need economics a level to be a lawyer",
+        "what does green watery diarrhea mean",
+        "when does pearland independent schools start",
+        "what is a dry chemical fire extinguisher",
+        "what is a good level for ldl cholesterol",
+        "what is trackview",
+        "what is a good lunch",
+        "do you take your synthroid before your tsh test",
+        "is senior dental medicaid covered in wilmington n.c.",
+        "what is a grecian",
+        "how to remove trovi from internet explorer 11",
+        "is skyrim a sandbox game",
+        "when does the next avengers come out",
+        "what characteristic is related to hashimoto's thyroiditis"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3159,
+      "pool_end": 3175,
+      "warmups": [
+        "does a bobcat have a title?",
+        "is socialist centralized"
+      ],
+      "measured": [
+        "is southern regions capitalized",
+        "what age does your wisdom teeth come in",
+        "how to renew a passport same day",
+        "do okra have fiber",
+        "what is a heller",
+        "when elvis met nixon",
+        "is stainmaster vinyl planks waterproof",
+        "is standard sharepoint support list search",
+        "does a warranty deed prove ownership",
+        "does a will need to be signed in canada",
+        "what age groups does binge eating affect",
+        "does acer aspire e15 support vtx",
+        "what is a hoax",
+        "is suffering from anxiety a mental illness",
+        "when is a heart attack considered critical"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3176,
+      "pool_end": 3192,
+      "warmups": [
+        "when is a libra birthday",
+        "does american airlines charge for luggage"
+      ],
+      "measured": [
+        "does an ear infection have vertigo symptoms",
+        "is tea okay for bladder",
+        "when is big sale at bath and body works",
+        "does apple cider vinegar help for a low gfr",
+        "is tequila",
+        "when is catholic confirmation",
+        "is teva pharmaceuticals sick and dying",
+        "what do the colors on the russian mean",
+        "is the a app where i can watch jem and the holograms movie for free",
+        "is the baby giraffe died",
+        "what is meant by the all-or-none law of the action potential?",
+        "what is a juris masters degree",
+        "is the black panther just a black leopard?",
+        "does bluetooth interrupt gps sound",
+        "how to replace a 2013 mazda 3 i cabin air filter"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 15,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3193,
+      "pool_end": 3209,
+      "warmups": [
+        "is the electric vehicle tax credit taxable on state tax return",
+        "does caffeine absorb through skin"
+      ],
+      "measured": [
+        "when is it safe to announce pregnancy",
+        "is the hypodermis considered a layer of the skin?",
+        "how long do indigo snakes get",
+        "when is nadh produced cellular respiration",
+        "what is a lincoln copper penny",
+        "is the nutrient content of organic foods superior to non-organic foods?",
+        "when is off season in greece",
+        "when is panic at the discos next tour",
+        "what is a loge seating",
+        "is the riu yucatan crowded",
+        "what is a lube",
+        "what is the cusip",
+        "what is a major issue with the content of training and assessment strategy",
+        "is the virginia tech freedom center open",
+        "does drinking milk help teeth"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 15,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3210,
+      "pool_end": 3226,
+      "warmups": [
+        "what is a marginal approach",
+        "what is a master limited partnership"
+      ],
+      "measured": [
+        "when is the best time to rent your timeshare?",
+        "is there a doctoral program for pa",
+        "how long does a physician have to sign an order for observation",
+        "do remend drops ease pain",
+        "does estrogen make me start my period",
+        "is there a generic for prolensa eye drops",
+        "what is a medical mc provider",
+        "what is a melamine sponge",
+        "when is the full moon in taurus",
+        "is there a test to diagnose mesafilaoma",
+        "does fortesta cause back pain",
+        "is there a trent state park in pa",
+        "is there a way to reset stats in bloodborne",
+        "is there a zoo in spain",
+        "when is the new naruto english dub episode coming out"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "baseline",
       "netem_link_b_applied": {
         "rtt_ms": 40,
         "loss_pct": 0.5
       },
-      "pool_start": 2371,
-      "pool_end": 2425,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3227,
+      "pool_end": 3243,
       "warmups": [
-        "what does a senior specialist benefits delivery",
-        "cost of passport at post office",
-        "is gates rubber company hiring in galesburg illinois",
-        "how to make alcoholic fish bowl",
-        "what section is the congressional notification in ddtc"
+        "does glycerin tincture need to be refrigerated",
+        "does glycogen can be ubiquitinated"
       ],
       "measured": [
-        "what senate group makes decisions related to tax codes",
-        "how much does duck thru pay start",
-        "how to make homemade cheese powder",
-        "how to make ketchup and mayonnaise sauce ?",
-        "what shirt does ricegum wear",
-        "waynesboro pa in what county",
-        "what does all traffic is filtered on your security meaning",
-        "what shortcode is used for doppler radiology studies",
-        "how to make mp3 cd",
-        "how to make my cat sleep",
-        "what does an aerator key do for faucet",
-        "how to make profile icon move on imvu",
-        "what does an atp cell look like",
-        "when and why was the geneva convention",
-        "how to make washer pits in ground",
-        "what party is governor of florida",
-        "what shows can i get on amazon fire stick",
-        "how to make your spotify account premium",
-        "cost of wooden shutters",
-        "what does arthralgia mean in medical terms",
-        "what side of the island is lahaina on",
-        "what does ashley nicole amann mean",
-        "what side should a patient lie on to get enema",
-        "what does at parity mean",
-        "what county is wilder idaho in",
-        "difference between wedge and incline",
-        "what is the airport code for sendai japan",
-        "when are funds available for federal refund checks",
-        "what does bb7 mean avid juicy brake pads",
-        "what size does a child have to be to move to a booster seat",
-        "what size filter catches diesel algea",
-        "how to mix soil , compost, potting mix",
-        "cost to administer connor davidson resilience scale",
-        "what size is a dl envelope",
-        "why does children need healthy relationships",
-        "how to name aromatic hydrocarbons",
-        "cost to build a retail website",
-        "what does bmp test for",
-        "cost to build garage",
-        "how to notify of upcoming hearings",
-        "what size jig head do you use for sea trout",
-        "what size motor on a boat",
-        "why does depreciation and amortization increase net cash provided by operating activities on the statement of cash flows",
-        "how to organize bingo order of games",
-        "what does carbamide peroxide used for",
-        "cost to install mulch per sf",
-        "how to perfect garlic butter shrimp",
-        "cost to paint a car in oshawa",
-        "what does class b building mean",
-        "what specific type of phishing attack uses the telephone to target a victim?"
+        "does google earth use true north or magnetic north",
+        "when is the rainy season in costa rica",
+        "does gutka show in blood and urine samples",
+        "is there cytoplasm in bacteria",
+        "when is the solar eclipse in south carolina",
+        "does hemp open receptors",
+        "does hud pay for damage deposit",
+        "does i input jr in first name or last name on a form",
+        "what is a mra business definition",
+        "what is a mu mu",
+        "does inflatable neck traction work",
+        "is too much diarrhea bad for you",
+        "when must lar be made available to public",
+        "is total blindness genetic",
+        "is touch estrogen in my birth control causing heavy menstrual"
       ]
     },
     {
-      "arm": "P2-SPHP",
-      "rtt_ms": 40,
-      "loss_pct": 0.5,
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "sphp",
       "netem_link_b_applied": {
         "rtt_ms": 40,
         "loss_pct": 0.5
       },
-      "pool_start": 2426,
-      "pool_end": 2480,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3244,
+      "pool_end": 3260,
       "warmups": [
-        "what does compounds mean",
-        "how to plug in my phone at keflavik airport",
-        "cost to repair hail damaged vehicle",
-        "what is the annual appreciation rate in fresno california?",
-        "how to prepare jars for canning"
+        "when sc tax refund",
+        "what is a navy reo"
       ],
       "measured": [
-        "what state grows the most squash",
-        "how to prepare the car before spray painting",
-        "weather chicago to nashville",
-        "what does curah mean",
-        "how to prevent +sibling from getting head mouth and foot",
-        "how to prevent a filter from blocking microbiology",
-        "how to price an asset based of earnings",
-        "what state is goiania brazil in",
-        "costco citibank phone number",
-        "what does democracy means",
-        "what state is the amazon river located",
-        "how to pronounce eamon",
-        "cota license verification",
-        "could i catch mrsa from a lady whose leg is weeping?",
-        "what statement did trump make about abraham lincoln",
-        "couldn't get enough blood drawn for tests why? hypo",
-        "how to protect formulas excel",
-        "what states are considered mink",
-        "what does dominica flag represent",
-        "county of dunwoody, ga",
-        "what does ebr stand for medical device company",
-        "what were artists who practiced realism concerned with?",
-        "what std code is 01764",
-        "spelling 1 to 100",
-        "how to play devil went down to georgia on violin",
-        "how to read periodic table neutrons",
-        "how to rearrange songs in itunes",
-        "how to rebuild a ford tractor power steering motor",
-        "How long from the time you are exposed to influenza B do you get symptoms",
-        "what structure in the carpal tunnel is most vulnerable to damage",
-        "what does euc mean on ebay?",
-        "how to recover deleted memory stick files",
-        "what does evocative mean",
-        "how to recover windows media player music window 10 erased",
-        "crydom power module definition",
-        "css hover effect",
-        "what suis transparent",
-        "how to reinstall android os on samsung galaxy tab 3",
-        "what does fnp certification means",
-        "how to remove a judgement against you",
-        "cumulative score definition",
-        "how to remove burnt food",
-        "current assets / current liabilities",
-        "what does gb mean in computers",
-        "current fl lottery winning numbers",
-        "what does genetic testing for babies include",
-        "what taskeng.exe",
-        "current pe ratio of the market",
-        "how is testosterone checked",
-        "how to remove rust from leather"
+        "when should i replace the drive belt on my lexus",
+        "is uber delivery popular in arlington texas?",
+        "what is a no payment contract",
+        "what is a node?",
+        "where is nickerie located",
+        "is usb wireless",
+        "what is a nookbook",
+        "is utah a recreational marijuana state",
+        "what is a flat style roof called?",
+        "is veganism better for you than eating meat",
+        "what is a normal k spring constant",
+        "does marijuana affect women trying to get pregnant",
+        "does market equilibrium occur when the total benefits = total costs",
+        "what is the definition of a decision under the administrative procedures act",
+        "when to cut back roses for winter in zone 5"
       ]
     },
     {
-      "arm": "P2",
-      "rtt_ms": 40,
-      "loss_pct": 1.0,
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3261,
+      "pool_end": 3277,
+      "warmups": [
+        "is waxing better or shaving",
+        "is western international university legit"
+      ],
+      "measured": [
+        "what is a page view in google analytics",
+        "what is a parody",
+        "does neem help acne scars",
+        "is yahoo owned by microsoft",
+        "when to use basis points over percentage",
+        "is your subscription active xbox one",
+        "what is a peg",
+        "when tooth whitening hurts",
+        "when does abx report earnings?",
+        "what is a person called that does acupuncture",
+        "it developer definition",
+        "what is the interest rate on on taxes owed to the government",
+        "ity definition",
+        "define task identity",
+        "jackfruit recipe vegan"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3278,
+      "pool_end": 3294,
+      "warmups": [
+        "japanese word for bluerry",
+        "what is cape ratio"
+      ],
+      "measured": [
+        "what is a podiatry",
+        "what is a popular periodical",
+        "johnstown pa wic office fax number",
+        "will 60w burn a circuit board",
+        "does silvadene contain silver",
+        "when was gold paint first introduced in the baroque era",
+        "what is a precis",
+        "does soy have anything to do with constipation",
+        "does staphylococcus aureus have a capsule",
+        "when was james comey appointed fbi director",
+        "what is a product employee",
+        "kentucky child care regulations how many kids",
+        "does tea help cure urinary tract infection",
+        "what is a prophylactic mastectomy",
+        "does the aorta enter the heart"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.5
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3295,
+      "pool_end": 3311,
+      "warmups": [
+        "what is a provision in a p&l",
+        "kindergarten practice numbers"
+      ],
+      "measured": [
+        "when was maryland founded as a colony",
+        "when was maus published?",
+        "king cotton definition us history",
+        "king transport llc",
+        "kirsten streart movie 2015",
+        "knees pop when i squat",
+        "knight rider what kind of car",
+        "what term is defined as mathematical equations based on rules of physics?",
+        "what is a qualifying relative on your taxes",
+        "what is a quarter system",
+        "does the oil company inspect the tank prior to first delivery",
+        "when was packard founded",
+        "does the plaintiff bring a motion for a directed verdict?",
+        "kynect ky phone number",
+        "does the start of menopause cause tiredness"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.5
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3312,
+      "pool_end": 3328,
+      "warmups": [
+        "does the walt disney dolphin resort have a slide",
+        "what is a rbf"
+      ],
+      "measured": [
+        "what is a recapture agreement on real estate",
+        "does tonic water make your blood sugar go up",
+        "lambda debugging cost cloud watch expensive",
+        "lamenasseah meaning in hebrew",
+        "what is a regulatory agency",
+        "what is uneven skin tone on the face",
+        "what is a release clause in a rental",
+        "language is best defined as what",
+        "what is a residual solvent",
+        "what is a retail bonus for publix",
+        "largest black population",
+        "does vitamins permanently increase stats in pokemon",
+        "when was the book i know why the caged bird sings published",
+        "largest city in minnesota",
+        "does whooping cough go away"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "baseline",
       "netem_link_b_applied": {
         "rtt_ms": 40,
         "loss_pct": 1.0
       },
-      "pool_start": 2481,
-      "pool_end": 2535,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3329,
+      "pool_end": 3345,
       "warmups": [
-        "what team is kixstar on rainbow six",
-        "how to remove water stuck in ear after swimming",
-        "curse defined",
-        "how to renew notary license online",
-        "how to repaint auto with spray cans"
+        "does wool conduct electricity",
+        "does xtandi cause pancytopenia"
       ],
       "measured": [
-        "what does honey contain",
-        "why does oppression exist",
-        "what does hymen mean",
-        "how to replace water pump 2001 gmc sierra",
-        "atlanta uber driver rates",
-        "what does ignition relay fuse do",
-        "what does insulin shock",
-        "what does integrated care insurance",
-        "what temperature is dangerous for food",
-        "darth vader star wars",
-        "why do teenagers sleep so late",
-        "can a person with aids donate organs",
-        "how to rit liquid dye",
-        "how to run a credit check on someone",
-        "what does it mean if a girls blatter hruts",
-        "what term describes a situation in which an individual's behavior changes when he or she is able to shift the risks of decisions to others?",
-        "what term describes when medicines work together is a positive way",
-        "how to say i in shakespearean language",
-        "when does gsa networx universal contract expire",
-        "decimal fractions definition",
-        "what terminal is american in lax",
-        "what terminal is spirit airlines located at seatac",
-        "lingual braces cost london",
-        "deed restrictions",
-        "what test is done for triglycerides",
-        "what does it mean to see yourself at an unknown place and finding it difficult to get home",
-        "what test is used to diagnose asthma",
-        "how long does it take to get mink lashes",
-        "what tests are done for thyroid cancer",
-        "what does it mean when congress raises the debt limit every year?",
-        "what does it mean when it hurts to breathe",
-        "what the best router bit for inlay",
-        "what does it mean when something move in my stomach and not pregnant",
-        "what does it mean when the extra amount is applied to the priciple",
-        "how to serve eggplant parmesan",
-        "what name of icon of tools in internet explorer",
-        "what does it mean when you feel a buzzing sound in cervix area",
-        "define a multichannel radio",
-        "how to set default printer every boot windows 10",
-        "what is another word for xylophone",
-        "when did British women get the right to vote",
-        "define acceptable risk",
-        "what does it say on spellbook fire emblem awakening",
-        "define ala aeolian processes",
-        "1968 median income in the us",
-        "define alleles of a gene",
-        "define amitotic",
-        "what does kappa restricted plasma cell population",
-        "how to setup asus rt-ac66u as repeater",
-        "what can you do with black magic"
+        "largest fish in lake erie",
+        "what is a safety minute",
+        "when was the first form of transportation",
+        "what is a samurai gashira",
+        "largest lake on an island",
+        "largest lottery ever won",
+        "when was the first records of the usa",
+        "what is a sealed porcelain tile",
+        "largest rabbit breeds",
+        "largest rodent on earth",
+        "what is a self regulating climate control",
+        "largest safari park in the world",
+        "when was the last year making the toyota scion",
+        "largest swimming pool in hawaii",
+        "dow jones industrial average in excel"
       ]
     },
     {
-      "arm": "P2-SPHP",
-      "rtt_ms": 40,
-      "loss_pct": 1.0,
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "sphp",
       "netem_link_b_applied": {
         "rtt_ms": 40,
         "loss_pct": 1.0
       },
-      "pool_start": 2536,
-      "pool_end": 2590,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3346,
+      "pool_end": 3362,
       "warmups": [
-        "what time can i check in at premier inn",
-        "define arnold chiari",
-        "what time does day end",
-        "what does less sugar do",
-        "how to sign up for medicare"
+        "largest zoo in the world",
+        "what is the iroquois league"
       ],
       "measured": [
-        "what can one use sick and safe leave for?",
-        "what time does option trading close",
-        "what time does the eclipse srart tonight",
-        "what time does the market close",
-        "what time is it in Sercy France",
-        "what time is it in suzhou and london",
-        "how to stack jenga blocks",
-        "how to stamp concrete",
-        "what time is sunrise tomorrow in newport beach",
-        "what does melanocytic nevus mean",
-        "what time of year is the best to sell your house",
-        "define chattering class",
-        "what does mht stand for in transportation",
-        "define cleft",
-        "define clinical paranoia",
-        "how to stop a period for the water park",
-        "what does mod mean in moderation",
-        "what does modern time mean",
-        "define concept plan",
-        "what does mrsa mdro mean",
-        "average yearly income",
-        "is interpolation y or x",
-        "what was a major result of the second great awakening?",
-        "how to switch contract phone to pay as you go",
-        "what to do for dry eyes",
-        "what to do if lightning strikes your house",
-        "who buried in grant's tomb",
-        "what is a camber on a car ?",
-        "what does npsf stand for",
-        "how to take soffit off",
-        "what does nutritional yeast do for seiten",
-        "what does ocean mean",
-        "define dior",
-        "how to tear down rides",
-        "how to tell a coworker you appreciate them",
-        "what does omega equal to in angular momentum",
-        "how to tell if a patent has international rights",
-        "how to tell if a snapchat is fake",
-        "what to do when you lose your golf swing",
-        "what to do with dot log book once turned in",
-        "how to tell if you're bipolar",
-        "how to tell if your chicken in minecraft s a girl",
-        "what does orthosis mean",
-        "how to tell recruiter salary range",
-        "define effective borrowing cost",
-        "how to test cover photo facebook",
-        "how to tie gele styles",
-        "what does pervasive behavior mean",
-        "vertebral artery pathway",
-        "how to tow a toolcat"
+        "what is microsoft silverlight for",
+        "when was the speckled band published",
+        "atmospheric engine significance",
+        "what is the relationship between distributor and crankshaft",
+        "drug derived from poisons",
+        "leadership is __________.",
+        "who is jessica alba",
+        "dude perfect who is in the panda suit",
+        "during gene expression the process by which dna is made into rna is called",
+        "there are how many different amino acids",
+        "dvafcu telephone number",
+        "when will columbia tuition statements go out",
+        "when will i start puberty quiz for girls",
+        "what is a straddle",
+        "what is a strategy a reader can use to understand better what he has read?"
       ]
     },
     {
-      "arm": "P2",
-      "rtt_ms": 40,
-      "loss_pct": 2.0,
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3363,
+      "pool_end": 3379,
+      "warmups": [
+        "liberal senators under investigation",
+        "what is a subclassification code"
+      ],
+      "measured": [
+        "what anime is shion from",
+        "lightning strikes how far away can cause damage?",
+        "eczema financial cost per family",
+        "effect of benadryl on eyelid muscles",
+        "what is used to make a boat deck?",
+        "effect of light on juglone production",
+        "effect of oxidative stress on lungs",
+        "where and when to see solar eclipse?",
+        "list of allergies",
+        "list of spinal injection sites",
+        "list of streets in jackson ky",
+        "where are ga psma pet scans facilities",
+        "what is a thermo sender sensor",
+        "where are john fluevog shoes made",
+        "electrical definition us and up"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3380,
+      "pool_end": 3396,
+      "warmups": [
+        "local government definition",
+        "location of damage in grand mal seizure"
+      ],
+      "measured": [
+        "target price ford",
+        "how many people die from vector illness each year",
+        "what is a transition gasket plumbing",
+        "long range costa rica surf forecast",
+        "what is a triptych?",
+        "what is a trowel?",
+        "where are the choroid plexuses found, and what is their function.",
+        "what is a true experimental design and advantages /disadvantages",
+        "what is a tte test for the heart",
+        "where are the maldives maps",
+        "encephalitis symptoms like stroke",
+        "who is audrey williamson",
+        "where are the wilson from in ireland",
+        "what is a uploma",
+        "engineering operations manager definition"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3397,
+      "pool_end": 3413,
+      "warmups": [
+        "longest serving marine",
+        "english paper quilting definition"
+      ],
+      "measured": [
+        "how to differentiate your brand",
+        "where are yamaha outboard motors made?",
+        "what is a value date in hedge",
+        "where can I buy quilt pattern stamps",
+        "where can I find in Harford Co. a small compost bin",
+        "lottery numbers georgia",
+        "enzyme substrate complex definition",
+        "louisville ky weather",
+        "how many fat calories are in frosted flakes",
+        "lowest dose of lyrica",
+        "what is a vgm",
+        "equi meaning",
+        "what is a visual pelvic examination",
+        "what is a vocal fill",
+        "esophageal tumor symptoms"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3414,
+      "pool_end": 3430,
+      "warmups": [
+        "english meaning of les miserables",
+        "what is a war zone"
+      ],
+      "measured": [
+        "what are the shifts of the admitting and discharge clerk",
+        "what is a watership",
+        "where can you watch dance camp",
+        "lyrics like a lovely melody that everyone can sing",
+        "lyrics of we belong together toy story",
+        "what is the noise level of the lem rocket engine",
+        "how long does 1 unit of alcohol take to leave the body",
+        "when drains are removed after mastectomy is that billable",
+        "euless texas is in what county?",
+        "mackinac population",
+        "mad dog alchohol percentage",
+        "evaluating costs and benefits",
+        "major respiratory organs in order from entrance of air into lungs",
+        "what is aadhaar pdf password",
+        "make revit dimensions equal"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "baseline",
       "netem_link_b_applied": {
         "rtt_ms": 40,
         "loss_pct": 2.0
       },
-      "pool_start": 2591,
-      "pool_end": 2645,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3431,
+      "pool_end": 3447,
       "warmups": [
-        "what does pi radius",
-        "what to put as a temporary license plate",
-        "define facelift",
-        "when did cds come on the market",
-        "how to transfer sms from windows phone to pc"
+        "malarone vs mefloquine cost",
+        "man who's family was killed and burned has remarried"
       ],
       "measured": [
-        "define fluence",
-        "how to treat cramps from diuresis",
-        "what does potassium sorbate do to your body",
-        "how to treat wood flooring which has warped",
-        "what does president emeritus mean",
-        "how to tune an acoustic guitar to sound like a bass",
-        "what to wear to a graduation",
-        "what to wear to airport summer",
-        "define gesamtkunstwerk",
-        "what to wear to basketball game",
-        "how to turn off keyboard light windows 10",
-        "how to turn off vpn on windows 8 asus tablet",
-        "what to write in college graduation cards",
-        "when did chuck connors die",
-        "how to uninstall audio driver windows 10",
-        "when did clinton get elected",
-        "what does qualiatative research employ",
-        "what is spatial grid indexes",
-        "how to unlock levequests",
-        "what causes hallucinations in elderly people",
-        "what does refugees get benefits",
-        "what does respiratory fluoroquinolone mean",
-        "what does rsv stand for medical adults",
-        "what does russia's flag represent",
-        "how to use juniper essential oil for kidney functions",
-        "how many drugs in clinical development",
-        "how to use notary stamp",
-        "what two modern nations make up the iberian peninsula",
-        "what is a business strategy plan",
-        "how many years for a bachelor degree wou",
-        "how to use weapon sack in way of samuri 4",
-        "how to use wifi calling on oneplus",
-        "define marmite",
-        "how to ventilate engine room on sailing yacht",
-        "exact dimensions of a soda can",
-        "define memorandum of understanding",
-        "what type of appraisal is used for geodesic home?",
-        "what does solarwinds do?",
-        "who created a neon lamp",
-        "define middle latitude",
-        "what does speed rating mean for quality of tires",
-        "what does spherical aberration do",
-        "what type of bleeding is more difficult to control and why",
-        "how to wear the australian operational service badge",
-        "what are shaking eyes called",
-        "how much protein in coconut oil",
-        "how to withhold federal income tax as an employer",
-        "what does stereotype mean in media do to the public",
-        "how to write a conclusion to an essay",
-        "average monthly rainfall chicago"
+        "manoeuvring definition",
+        "what is acceptable humidity in office or work space",
+        "many thousands of times more energy is released from 1g of nuclear fuel",
+        "exception is caught when exception is not thrown",
+        "where is roca located",
+        "where did the name blasious originate from",
+        "where is rock island il",
+        "what is acquired etiology?",
+        "what is verbiage mean",
+        "explain what citizenship mean to you and what you think it takes to be a good world citizen",
+        "mattis what makes you lose sleep",
+        "what is adrenal gland cancer",
+        "how long to bake a pork chop",
+        "what is aerobic culture",
+        "where do i buy bamboo plants toronto"
       ]
     },
     {
-      "arm": "P2-SPHP",
-      "rtt_ms": 40,
-      "loss_pct": 2.0,
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
       "mode": "hybrid",
       "variant": "sphp",
       "netem_link_b_applied": {
         "rtt_ms": 40,
         "loss_pct": 2.0
       },
-      "pool_start": 2646,
-      "pool_end": 2700,
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3448,
+      "pool_end": 3464,
       "warmups": [
-        "how to write a essay about theme",
-        "how to write a letter to end janitorial contract",
-        "what type of cattle did they move in lonesome dove",
-        "how to write a mail if person not reachable in phone",
-        "interactive world maps for geography"
+        "where do i find the disk cleanup time?",
+        "where do i find what location to take postal exam 473"
       ],
       "measured": [
-        "define nuclear option",
-        "what type of chemo is for pancreatic cancer cancer",
-        "what type of college degree is required for wildlife rehabilitator?",
-        "what type of companies use the concept just-in-time production?",
-        "how to write learning objectives",
-        "what type of consumers are osteichthyes",
-        "what type of data do you need to make a scatter plot",
-        "what does the 17th amendment mean",
-        "how typical is it to require weekly pregnancy doctor visits",
-        "define patient instruction manager",
-        "difference between zoning ordinance and land development",
-        "how was life under slavery before the civil war?",
-        "what does the cardiovascular system do",
-        "how was the black death plague treated",
-        "what type of energy does a spinning turbine have? brainly",
-        "what does the duodenal glands do quizlet",
-        "who is the director of titanic",
-        "how were black figure pots decorated",
-        "define proton motive force and atp synthase",
-        "what does the fiber in diet pills do?",
-        "how were erik erikson's stages of development influential",
-        "what type of fuel is domestic gas",
-        "what type of genome does prokaryotes have",
-        "how often should rabies vaccine be given to dogs",
-        "what language does latvia speak",
-        "what does the indian flag colors represent",
-        "what type of heels for short women",
-        "what type of horse is bojack horseman",
-        "where is ergot fungus found",
-        "how would a blend of intrinsic and extrinsic motivations be valuable in the classroom",
-        "how would a shang king extend his power?",
-        "how would i look with glasses",
-        "what does the mean name mean of tray?",
-        "what does the midrange do",
-        "what type of layers make curly hair look thicker",
-        "what type of light goes in the kitchen",
-        "howes fuel treatment",
-        "hp how to boot in safe mode when problem",
-        "hp mini laptop change hdd",
-        "define selective",
-        "why is cellular respiration necessary for living organisms",
-        "what type of mri for tumor in ear",
-        "define similarity",
-        "hulk sketches",
-        "how heavy are road bikes",
-        "human rights right and how it works",
-        "cost recovery systems greenville sc",
-        "what does the name kaloka mean",
-        "what does the name luna stand for",
-        "definition of hepatitis b surface antibody symptoms"
+        "what is aggravated battery in ny",
+        "where do i pay perc card fee",
+        "mcg meaning in medicine",
+        "factors affecting demand of labour",
+        "cost of a stairwell",
+        "meaning a disease condition of heart muscle is",
+        "what is airport code ia",
+        "where do osterichs live",
+        "what is al qaeda's purpose",
+        "meaning name of ellie",
+        "what is style con",
+        "meaning of b2c",
+        "tell me how many sick days does a person take",
+        "meaning of braces in programming",
+        "how many cups will one half gallon of"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3465,
+      "pool_end": 3481,
+      "warmups": [
+        "meaning of classification of mixture",
+        "meaning of current ratio"
+      ],
+      "measured": [
+        "fastest someone conceive after miscarriage",
+        "meaning of dust storm in turkey",
+        "meaning of errantly",
+        "where do you find a fusion pulse charge in fallout 3",
+        "ocd disorder disorder definition",
+        "average annual income australia",
+        "average cost for lawn mowing in aurora il",
+        "what is amc",
+        "meaning of name Imara",
+        "meaning of name aragorn",
+        "feminist geography definition",
+        "meaning of name nairi",
+        "when does up and vanished new episode drop?",
+        "meaning of name ramson",
+        "what is an acl"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3482,
+      "pool_end": 3498,
+      "warmups": [
+        "where does hamms beer come from",
+        "who are the largest steel producers in the world?"
+      ],
+      "measured": [
+        "where does kirsten dunst live",
+        "what is an air chipping hammer",
+        "where does music producer Asif Khan live",
+        "meaning of steeze",
+        "finest foods distributing company ltd",
+        "where does oogenesis occur",
+        "best way to cook seafood mix",
+        "first defense nasal filter sales numbers",
+        "what is the minimum amount of sodium per day",
+        "fisher price cradle n swing mold",
+        "world's largest bass caught",
+        "where does the french name come from",
+        "can tylenol pm cause dehydration?",
+        "where does the last name eads come from",
+        "florida how file non-resident agency license application"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 40,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3499,
+      "pool_end": 3515,
+      "warmups": [
+        "what is an artist's life-work show called",
+        "flour meaning"
+      ],
+      "measured": [
+        "world's largest trees by species",
+        "what is an attachment hearing",
+        "where does the period go in in text citation apa",
+        "what deficiency produces white spot on nails",
+        "meaning pseudo",
+        "meaning stock rights expire",
+        "what is the knee jerk protecting",
+        "average bookkeeper salary in columbus ohio",
+        "what is chromite used for on madagascar",
+        "what year was the tennis court oath established",
+        "medi-cal eligibility phone number",
+        "where does tundra begin in ontario",
+        "foods not to eat because of my arthritis",
+        "where dow jones name come from",
+        "foods that are neither alkaline or acidic"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 40,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 40,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3516,
+      "pool_end": 3532,
+      "warmups": [
+        "what is an encysted  hydrocele",
+        "medication administration closed system"
+      ],
+      "measured": [
+        "medication aide definition",
+        "what is an equipment show",
+        "medication treatment centers denver colorado",
+        "how did we gain alaska",
+        "foods to better diaphragm",
+        "weight of a xanax pill",
+        "where is alexander ,kentucky ?",
+        "temperature in quito ecuador in may",
+        "foods to help prevent liver cancer",
+        "what is an fcb machine",
+        "where is an 868 area code from",
+        "crohn's in children symptoms",
+        "foods with little to no calories",
+        "does alcohol poisoning cause vomiting",
+        "merle color definition"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.5
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3533,
+      "pool_end": 3549,
+      "warmups": [
+        "forceful definition",
+        "what is an impending spine"
+      ],
+      "measured": [
+        "metabolic rate versus temperature in elodea plant",
+        "what is an impugned legislation?",
+        "forkful definition",
+        "method programming definition",
+        "when is a stored procedure plan compiled",
+        "meu units medical definition",
+        "mexican fiesta calories",
+        "michigan time zone who in mountain time",
+        "average combined score in nfl game",
+        "what is an inventory reserve account",
+        "free birthday card through facebook",
+        "where is bethel new york",
+        "where is big bend",
+        "french last name meanings",
+        "how did wyatt earp die"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.5
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3550,
+      "pool_end": 3566,
+      "warmups": [
+        "what is an mp3 format",
+        "where is bluebay hotel lanzarote"
+      ],
+      "measured": [
+        "frontier baggage cost",
+        "minimum age to work at party city",
+        "where is boystown in chicago",
+        "where is brelyna maryon's house",
+        "what are centromeres",
+        "function of an eosinophils",
+        "function of coarse focus on microscope",
+        "how many weeks in a school year in nc",
+        "function of tongue",
+        "where is burgess falls located",
+        "function to count a certain character in cell",
+        "where is butler county pennsylvania",
+        "minimum width for two rows of parking",
+        "ministry of law permanent secretary before 2006",
+        "where is camas wa"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3567,
+      "pool_end": 3583,
+      "warmups": [
+        "what is mymacupdater on mac",
+        "furrow definition"
+      ],
+      "measured": [
+        "furthest distance man has traveled in space",
+        "mla format how to site short story from textbook",
+        "model of glucose and how many atp",
+        "where is center grove, in",
+        "what is naacp mission statement",
+        "how many regular season games do each nfl team get",
+        "how precipitation affect hydrographs",
+        "what is andiamo corp",
+        "monoclonal antibodies biology definition",
+        "where is city center houston tx",
+        "mononeuropathy is a disorder",
+        "what is anhedonic",
+        "gendered phenomenon definition",
+        "what are the stages of development",
+        "monty tech ice hockey 2014 record"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3584,
+      "pool_end": 3600,
+      "warmups": [
+        "benefit of umbrella coverage",
+        "generate proposal numbers"
+      ],
+      "measured": [
+        "generic blood thinners for afib",
+        "where is state farms main office",
+        "where is cosmel",
+        "what is another word for sample selection",
+        "xml definition file generation",
+        "german name sachs meaning",
+        "germination temperature for cucumbers",
+        "gestalt law of symmetry definition",
+        "how quickly does leg muscle atrophy",
+        "can you bruise your sternum",
+        "operations coordinator average pay in philadelphia market",
+        "what are the standards",
+        "what is application networking",
+        "where is devonian area",
+        "where is discord.exe"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.5
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3601,
+      "pool_end": 3617,
+      "warmups": [
+        "where is disney",
+        "girl found guilty boy"
+      ],
+      "measured": [
+        "giving vyvanse dose in milk",
+        "most dangerous and famous volcano in peru",
+        "glaser definition",
+        "volt prime price",
+        "global convergence meaning",
+        "global primacy definition",
+        "where are the mumford and sons from",
+        "what's the difference between screensaver, wallpaper, background?",
+        "what is the name of the trout in washington",
+        "most effective interview questions",
+        "most entertaining puppy toes",
+        "what contains polychlorinated biphenyls",
+        "most expensive hotel in hawaii",
+        "how to tag images twitter",
+        "what font do you use for a screenplay script"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 0.5,
+      "rtt_c": 15,
+      "loss_c": 0.5,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.5
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.5
+      },
+      "pool_start": 3618,
+      "pool_end": 3634,
+      "warmups": [
+        "what does the prefix cuti mean",
+        "good credit score"
+      ],
+      "measured": [
+        "what is ascii and non ascii character",
+        "where is enterprise msds book located",
+        "co op credit union black river falls routing number",
+        "where is erin, wi",
+        "google what causes bacteria in the gut",
+        "gorge camping phone number",
+        "price for used shipping containers",
+        "most miles recorded on a honda accord",
+        "government grants for students when does it stop",
+        "most popular dishes",
+        "most popular dogs in u.s.",
+        "what qualities did teddy roosevelt consider top men for his unit in rough riders",
+        "grand palladium punta cana address and phone number",
+        "most popular item in tamilnadu",
+        "grants ge stainless gas range"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3635,
+      "pool_end": 3651,
+      "warmups": [
+        "where is frontier internet available",
+        "what was the zyklon b?"
+      ],
+      "measured": [
+        "where is gaineswood located in alabama",
+        "what is australia's currency to a us dollar",
+        "how secure are xfinity hotspots",
+        "what is the legal age for drinking in florida?",
+        "lassie meaning",
+        "would human urine keep deer away",
+        "most profitable starbucks location",
+        "where is gilbert located",
+        "most recent republican delegate count",
+        "greenhorns meaning",
+        "what is average mileage on a car",
+        "what is average price for doing body work on side",
+        "tesla service cost",
+        "most shocking sports moment",
+        "where is graycliff cigars based"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3652,
+      "pool_end": 3668,
+      "warmups": [
+        "where is greenfield ca",
+        "what is azotemia mean"
+      ],
+      "measured": [
+        "what is background research for science fair",
+        "mouth cancer symptoms warning signs",
+        "mouth distance braces",
+        "mouth is itchy and sore after eating cherries",
+        "which states do not observe daylight savings time",
+        "when is groundhog day this year",
+        "movie mildred pierce cast",
+        "where is hennessey performance located",
+        "where is hickman county",
+        "mr belvedere cast",
+        "what is barron",
+        "what to do when one parent gives up on child",
+        "halls cough drop ingredients",
+        "mucocutaneous bleeding definition",
+        "what to do when someone chokes"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3669,
+      "pool_end": 3685,
+      "warmups": [
+        "where is hot dimethyl terephthalate manufactured",
+        "muppet song lyrics manamana"
+      ],
+      "measured": [
+        "why can pregnant women be mean",
+        "harassment censorship definition",
+        "muscles that move bones are called",
+        "what is beach chic attire",
+        "why are supreme court cases important to u.s. citizens?",
+        "mutually advantageous agreements define",
+        "how much does a weight bar weigh",
+        "where is italy located geographically",
+        "my name is jeff meaning",
+        "my salary is 11 lakhs so much fd or ppf i should take",
+        "why are heavy metals so present in the environment naturally",
+        "what is college readiness programs",
+        "has amy bosley been released from prison",
+        "myocardial viability definition",
+        "whorf's linguistic determinism hypothesis"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3686,
+      "pool_end": 3702,
+      "warmups": [
+        "myth religion definition",
+        "what is ben affleck's brother's name?"
+      ],
+      "measured": [
+        "who wrote there was a time",
+        "nahara price age",
+        "has josh gates ever found anything of value",
+        "has savannah ga ever been hit by a hurricane",
+        "who won the terrier group at westminster dog show",
+        "who were the members of the jordanaires",
+        "who were the ainu?",
+        "what is best to major in before med school",
+        "haven't felt love til you hit the floor",
+        "name meaning of tonas",
+        "who was the tribal leader of the apaches at sand creek?",
+        "head sores scalp",
+        "where is la costa ca",
+        "heal meaning in marathi",
+        "health benefits of apple cider vinegar with mother daily"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3703,
+      "pool_end": 3719,
+      "warmups": [
+        "who was the bambino",
+        "name the man who pees at the grand national"
+      ],
+      "measured": [
+        "where is langley virginia",
+        "when is jennifer hudson's birthday?",
+        "who was shooter at florida schonicklos cruz history family background",
+        "health is defined by the world health organization (who) as",
+        "who was jos\u00e9 mart\u00ed?",
+        "who was joseph addabbo",
+        "where is lindsay heights milwaukee",
+        "nashik average rainfall",
+        "who was jada pinkett married to",
+        "what is blanket property insurance coverage",
+        "who was eddie eagan",
+        "zimbabwe is known by what in the world",
+        "who was cab calloway married to",
+        "where is lyons ga",
+        "definition of neglect in child protection"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 1.0,
+      "rtt_c": 15,
+      "loss_c": 1.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 1.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 1.0
+      },
+      "pool_start": 3720,
+      "pool_end": 3736,
+      "warmups": [
+        "what is bmw e",
+        "nba finals lakers vs pacers"
+      ],
+      "measured": [
+        "what year did the song vehicle by the ides of march come out",
+        "who started boston",
+        "needing your appendix out after a colonoscopy",
+        "what is bonfyre",
+        "zithromax dosage odontogenic infections",
+        "is the aluminum compound in antiperspirants carcinogenic",
+        "hemp hearts side effects",
+        "how long does it take to get your cpa",
+        "where is mercer community college located at",
+        "net worth nicholas cage",
+        "who recorded the song slow dancing",
+        "heritage lamb tallow",
+        "how to do encoder for streaming",
+        "who plays martini in one flew over the cuckoo's nest?",
+        "heroes tv channel schedule"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3737,
+      "pool_end": 3753,
+      "warmups": [
+        "hertz regional manager",
+        "what is competitive admissions policy"
+      ],
+      "measured": [
+        "hfmd mouth sores what helps",
+        "who passed the legal drinking age",
+        "hhsc rates for hcs",
+        "who owns wilson sporting goods",
+        "who owns photographs",
+        "who needs an employment identification number",
+        "where is mount greylock",
+        "who manages embarc club intrawest",
+        "highest cbd strain",
+        "definition of ionization e",
+        "where is murrieta ca senior center located",
+        "who is the person that does the stewie on family guy",
+        "what is business processes",
+        "where is my waist",
+        "where is my website mentioned"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 0.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 0.0
+      },
+      "pool_start": 3754,
+      "pool_end": 3770,
+      "warmups": [
+        "who is the father of seismogram studies in relation to earthquakes",
+        "nippon japan population"
+      ],
+      "measured": [
+        "nist assist",
+        "who is the current president of the senate?",
+        "how many skittles in a bag",
+        "who is the author of all progress takes place outside the comfort zone",
+        "what is california annual filing fee for non profit corp",
+        "highest point on earth's surface",
+        "nonprofit benefits for employees",
+        "who is richard mason",
+        "who is rhonda rousey married to",
+        "who is rene paul fonck in aviation?",
+        "who played penny proud",
+        "who is nicholas cruz parkdale fl",
+        "normal insulin level in human body",
+        "hilton in baltimore",
+        "what does ubiqu"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3771,
+      "pool_end": 3787,
+      "warmups": [
+        "where is orpington kent",
+        "who is megan mccain's husband"
+      ],
+      "measured": [
+        "how are lightning strikes counted",
+        "what is condensate coils",
+        "who is known as the founder or father of experimental science?",
+        "who is julia b",
+        "where is pemberville, oh",
+        "what is cast stainless",
+        "who is jerome in gotham",
+        "who is jeff probst married to?",
+        "nox electric plant definition",
+        "where is physician assisted death legal",
+        "what is rosemary good for",
+        "how much does air conditioner cost",
+        "how long is the confidentiality under a disclosure after the contract is executed",
+        "hologram hollywood blvd theater in los angeles",
+        "holy cow meaning in tamil"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 0.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 0.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3788,
+      "pool_end": 3804,
+      "warmups": [
+        "who is f lee bailey in op kansas",
+        "number of calories in food"
+      ],
+      "measured": [
+        "what is the county for madison, al",
+        "who is erica bojack",
+        "number of endoscopy procedures per year",
+        "number of exelon employees",
+        "where is prauge",
+        "where is prince nelson mother buried",
+        "who is christopher columbus define",
+        "number of preventable deaths from medication errors",
+        "home security monitoring systems",
+        "who is bess kalb",
+        "what does the name elize mean",
+        "who is assigned on an assignment of mortgage",
+        "who is annie pearl avery?",
+        "who is alan cohen",
+        "what is certificate of liability insurance"
+      ]
+    },
+    {
+      "arm": "3node-P2",
+      "rtt_b": 80,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "baseline",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3805,
+      "pool_end": 3821,
+      "warmups": [
+        "who is a natural person in a deposition",
+        "what is cetirizine generic for"
+      ],
+      "measured": [
+        "what is chalk talk",
+        "ambulance price",
+        "who has access to the second stage recycle bin",
+        "what is chaplain",
+        "where is rocking horse ranch",
+        "definition of elastin",
+        "where is roosters restaurant",
+        "what is check request form",
+        "obesity oms",
+        "where is rumors bar in nj",
+        "objectification theory definition",
+        "what is chemical weathering ?",
+        "who developed the iq test that is most widely used today?",
+        "hostile termination definition",
+        "who controls the internet servers"
+      ]
+    },
+    {
+      "arm": "3node-SPHP-from-C",
+      "rtt_b": 80,
+      "loss_b": 2.0,
+      "rtt_c": 15,
+      "loss_c": 2.0,
+      "mode": "hybrid",
+      "variant": "sphp",
+      "netem_link_b_applied": {
+        "rtt_ms": 80,
+        "loss_pct": 2.0
+      },
+      "netem_link_c_applied": {
+        "rtt_ms": 15,
+        "loss_pct": 2.0
+      },
+      "pool_start": 3822,
+      "pool_end": 3838,
+      "warmups": [
+        "who composed the transformers prime theme",
+        "who built the first cotton gin in texas"
+      ],
+      "measured": [
+        "who believed that an ideal society, the government should be controlled by philosopher kings",
+        "definition of digital wealth and wellness",
+        "hotel/motel tax rate south padre island tx",
+        "who also discovered gamma radiation",
+        "hotels in cameron mo",
+        "hotels in severn, md",
+        "oklahoma sooners mascot meaning",
+        "where is seoul?",
+        "which type of mountain is formed due to the collision of two different kinds of plates?",
+        "definition of customize",
+        "what is cimc interface",
+        "hours for copy max",
+        "which three months make up the meteorol",
+        "which terminal is hainan airline",
+        "on average how much money does a physicist make"
       ]
     }
   ],
   "disjointness": {
     "asserted": true,
-    "n_slices": 12,
+    "n_slices": 54,
     "pairwise_intersection_size": 0
   }
 }

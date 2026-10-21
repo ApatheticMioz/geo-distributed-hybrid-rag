@@ -943,6 +943,9 @@ def run_fidelity_gate_3node(rtt_b: int, loss_b: float, rtt_c: int,
         if loss:
             validate_args.append(_fmt_loss(loss))
         ok, gate_out = run_netem(VALIDATE_SH, *validate_args, timeout=300)
+        if not ok:
+            time.sleep(3)
+            ok, gate_out = run_netem(VALIDATE_SH, *validate_args, timeout=300)
         parsed = parse_fidelity_gate_output(gate_out)
         out.append({"link": link,
                     "rtt_ms": rtt,
@@ -3026,11 +3029,29 @@ def run_campaign_v3node_stress(
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    run_id = _run_id()
+    resume = bool(getattr(args, "resume", False))
+    explicit_run_id = getattr(args, "run_id", None)
+    if explicit_run_id is not None:
+        run_id = explicit_run_id
+    elif resume:
+        target, ambig = find_resumable_jsonl(out_dir, None)
+        if ambig == "ambiguous":
+            print(f"ERROR: --resume without --run-id is ambiguous in {out_dir}",
+                  file=sys.stderr)
+            sys.exit(1)
+        if target is None:
+            run_id = _run_id()
+        else:
+            run_id = target.stem.replace("campaign_", "")
+            print(f"Resuming existing JSONL: {target}")
+    else:
+        run_id = _run_id()
+
     jsonl_path = out_dir / f"campaign_{run_id}.jsonl"
-    if jsonl_path.exists():
-        print(f"ERROR: {jsonl_path} already exists; omit --run-id for a "
-              f"fresh run.", file=sys.stderr)
+    if jsonl_path.exists() and not resume:
+        print(f"ERROR: {jsonl_path} already exists. Pass --resume to append and skip "
+              f"already-measured records, or omit --run-id for a fresh run.",
+              file=sys.stderr)
         sys.exit(1)
 
     # Design §5.1: the campaign manifest is written BEFORE any request.
@@ -3046,6 +3067,7 @@ def run_campaign_v3node_stress(
     # Clean slate before any shaping.
     clear_netem(dry_run=False)
 
+    skip_triples: Set[Tuple[Tuple[int, int, float, float, str, str], str, int]] = set()
     arms_recs: Dict[Tuple[int, int, float, float, str, str],
                     List[Dict[str, Any]]] = {}
     gates_log: List[Dict[str, Any]] = []
@@ -3056,6 +3078,31 @@ def run_campaign_v3node_stress(
     n_warmup_err = 0
     exit_code = 0
     abort_reason: Optional[str] = None
+    sanity_done = False
+
+    if resume and jsonl_path.exists():
+        existing_recs, n_trunc = load_jsonl_records(jsonl_path)
+        for r in existing_recs:
+            if r.get("sanity"):
+                sanity_done = True
+                continue
+            rtt_b = r.get("rtt_ms")
+            loss_b = r.get("loss_pct")
+            rtt_c = (r.get("netem_link_c_applied") or {}).get("rtt_ms", 15)
+            loss_c = (r.get("netem_link_c_applied") or {}).get("loss_pct", 0.0)
+            mode = r.get("mode", "hybrid")
+            variant = r.get("variant", "baseline")
+            q = r.get("query")
+            rep = r.get("repeat_index", 0)
+            arm_key = (rtt_b, rtt_c, loss_b, loss_c, mode, variant)
+            skip_triples.add((arm_key, q, rep))
+            arms_recs.setdefault(arm_key, []).append(r)
+            if "error" in r:
+                n_err += 1
+            else:
+                n_ok += 1
+        print(f"Resume: {len(existing_recs)} records loaded from {jsonl_path.name} "
+              f"({len(skip_triples)} measured query triples); {n_trunc} truncated lines skipped.")
 
     def _finalize() -> None:
         summary_rows: List[Dict[str, Any]] = []
@@ -3112,66 +3159,88 @@ def run_campaign_v3node_stress(
         print("Done.")
         sys.exit(exit_code)
 
-    jsonl_f = open(jsonl_path, "w", encoding="utf-8")
+    jsonl_f = open(jsonl_path, "a" if resume else "w", encoding="utf-8")
     try:
         # -----------------------------------------------------------------
         # (0,0) unshaped sanity sample: 0-error gate (any error ABORTS —
         # the link must be healthy before loss is applied).
         # -----------------------------------------------------------------
-        print("\n=== (0,0) unshaped sanity pre-flight "
-              f"(N={spec['sanity_n']}, 0-error gate) ===")
-        sanity_pool_start = spec["sanity_pool_start"]
-        sanity_n = spec["sanity_n"]
-        sanity_reps = spec["sanity_repeats"]
-        # The sanity sample is drawn from the free pool tail (a small
-        # disjoint block, same pattern as the loss-sweep sanity pre-flight)
-        # — it never touches the measured 2921..3838 band.
-        sanity_queries = all_queries[sanity_pool_start - 1:
-                                     sanity_pool_start - 1 + sanity_n]
-        sanity_ok = 0
-        sanity_err = 0
-        for q in sanity_queries:
-            for rep in range(sanity_reps):
-                try:
-                    res = http_post_json(endpoint, {
-                        "query": q, "top_k": args.top_k,
-                        "mode": "hybrid", "sphp": False,
-                    }, timeout=args.timeout)
-                    rec = build_record(
-                        run_id, 0, 0, "hybrid", "baseline", rep, q, res,
-                        netem_applied=False,
-                        extra={
-                            "stratum": stratum_for_repeat(rep),
-                            "rtt_ping_median_ms": None,
-                            "netem_link_b_applied": None,
-                            "netem_link_c_applied": None,
-                            "pool_file": Path(pool_path).name,
-                            "pool_manifest_sha256":
-                                manifest.get("_verified_sha256"),
-                            "sanity": True,
-                        })
-                    jsonl_f.write(json.dumps(rec) + "\n")
-                    jsonl_f.flush()
-                    sanity_ok += 1
-                except Exception as e:
-                    sanity_err += 1
-                    print(f"    [sanity] {q[:40]} rep={rep} failed: {e}",
-                          file=sys.stderr)
-        if sanity_err > 0:
-            clear_netem(dry_run=False)
-            abort_reason = (f"(0,0) sanity gate: {sanity_err}/{sanity_n} "
-                            f"sample(s) failed — the unshaped link is NOT "
-                            f"healthy; aborting before loss is applied.")
-            exit_code = 1
-            _finalize()
-        print(f"    [sanity] {sanity_ok}/{sanity_n} OK, 0 errors "
-              f"-> link healthy before loss is applied")
+        if resume and sanity_done:
+            print("\n=== (0,0) unshaped sanity pre-flight already passed in existing JSONL; skipping. ===")
+        else:
+            print("\n=== (0,0) unshaped sanity pre-flight "
+                  f"(N={spec['sanity_n']}, 0-error gate) ===")
+            sanity_pool_start = spec["sanity_pool_start"]
+            sanity_n = spec["sanity_n"]
+            sanity_reps = spec["sanity_repeats"]
+            sanity_queries = all_queries[sanity_pool_start - 1:
+                                         sanity_pool_start - 1 + sanity_n]
+            sanity_ok = 0
+            sanity_err = 0
+            for q in sanity_queries:
+                for rep in range(sanity_reps):
+                    try:
+                        res = http_post_json(endpoint, {
+                            "query": q, "top_k": args.top_k,
+                            "mode": "hybrid", "sphp": False,
+                        }, timeout=args.timeout)
+                        rec = build_record(
+                            run_id, 0, 0, "hybrid", "baseline", rep, q, res,
+                            netem_applied=False,
+                            extra={
+                                "stratum": stratum_for_repeat(rep),
+                                "rtt_ping_median_ms": None,
+                                "netem_link_b_applied": None,
+                                "netem_link_c_applied": None,
+                                "pool_file": Path(pool_path).name,
+                                "pool_manifest_sha256":
+                                    manifest.get("_verified_sha256"),
+                                "sanity": True,
+                            })
+                        jsonl_f.write(json.dumps(rec) + "\n")
+                        jsonl_f.flush()
+                        sanity_ok += 1
+                    except Exception as e:
+                        sanity_err += 1
+                        print(f"    [sanity] {q[:40]} rep={rep} failed: {e}",
+                              file=sys.stderr)
+            if sanity_err > 0:
+                clear_netem(dry_run=False)
+                abort_reason = (f"(0,0) sanity gate: {sanity_err}/{sanity_n} "
+                                f"sample(s) failed — the unshaped link is NOT "
+                                f"healthy; aborting before loss is applied.")
+                exit_code = 1
+                _finalize()
+            print(f"    [sanity] {sanity_ok}/{sanity_n} OK, 0 errors "
+                  f"-> link healthy before loss is applied")
 
         # -----------------------------------------------------------------
         # Per measured (B, C, lossB, lossC) cell.
         # -----------------------------------------------------------------
         for rtt_b, rtt_c, loss_b, loss_c in cells:
             fb, fc = _fmt_loss(loss_b), _fmt_loss(loss_c)
+            # Check if this cell is already completely measured in existing records
+            cell_completed = True
+            for variant in spec["variants"]:
+                arm_key = (rtt_b, rtt_c, loss_b, loss_c, "hybrid", variant)
+                arm = next(a for a in arm_plan
+                           if a["rtt_b"] == rtt_b and a["rtt_c"] == rtt_c
+                           and a["loss_b"] == loss_b and a["loss_c"] == loss_c
+                           and a["variant"] == variant)
+                for query in arm["measured"]:
+                    for rep in range(args.repeats):
+                        if (arm_key, query, rep) not in skip_triples:
+                            cell_completed = False
+                            break
+                    if not cell_completed:
+                        break
+                if not cell_completed:
+                    break
+            if cell_completed:
+                print(f"    [resume] cell (B={rtt_b}ms/{fb}%, C={rtt_c}ms/{fc}%) "
+                      f"already complete; skipping.")
+                continue
+
             print(f"\n=== cell (B={rtt_b}ms/{fb}%, C={rtt_c}ms/{fc}%) "
                   f"[shaped] ===")
 
