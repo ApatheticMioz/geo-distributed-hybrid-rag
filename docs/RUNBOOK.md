@@ -214,13 +214,19 @@ sufficient for campaign days.
 window):**
 
 ```bash
-ssh node-c "Test-NetConnection 10.8.0.1 -Port 50052 -InformationLevel Quiet"   # C→A gRPC, expect True
-ssh node-c "Test-NetConnection 10.8.0.2 -Port 8000 -InformationLevel Quiet"    # C→B gateway (relayed via A), expect True
-ssh node-c "curl.exe -s http://127.0.0.1:8000/health"                          # C gateway itself, expect {"status":"ok","node":"C"}
+# Using direct WireGuard SSH (friend-wg @ 10.8.0.3):
+ssh friend-wg "Test-NetConnection 10.8.0.1 -Port 50052 -InformationLevel Quiet"   # C→A gRPC, expect True
+ssh friend-wg "Test-NetConnection 10.8.0.2 -Port 8000 -InformationLevel Quiet"    # C→B gateway (relayed via A), expect True
+ssh friend-wg "curl.exe -s http://127.0.0.1:8000/health"                          # C gateway itself, expect {"status":"ok","node":"C"}
+ssh friend-wg "curl.exe -s http://10.8.0.2:8000/health"                           # C→B via relay, expect {"status":"ok","node":"B",...}
 ```
 
-`C→B:8000` passing is the definitive proof that A's relay (forwarding +
-firewall + B's widened `AllowedIps`) is in place.
+`C→B:8000` returning `"node":"B"` is the definitive proof that A's relay (forwarding +
+firewall + B's widened `AllowedIps`) is in place and that traffic is not looping back to C.
+If `wg_a` loses peer C after recreation, reload from backup:
+```powershell
+wg set wg_a peer xlDsqUKCAxiIre4FtV1XizY5aEfw3zHp5ajfatiNrFE= allowed-ips 10.8.0.3/32 persistent-keepalive 25
+```
 
 ---
 

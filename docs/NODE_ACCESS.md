@@ -50,14 +50,16 @@ The generation host (RTX 3090 + vLLM). Runs in WSL2 Ubuntu on PC.
 * Start: `bash scripts/node_a/start_stack.sh`
 * Stop: `bash scripts/node_a/stop_stack.sh`
 
-**SSH / firewall ground truth (2026-10-12):**
-* Node A's **sshd has no inbound firewall rule for TCP 22 on any profile**
-  (default-inbound is Block everywhere). Consequently the `ssh pc` path from
-  Node B (matrix row above) is **currently non-functional** until an
-  `OpenSSH Server In` inbound allow rule is added on A.
-* Node A's WSL-side `~/.ssh/config` contains **no `Host pc` block** — the
-  `~/.ssh/config` ground-truth claim in §Ground-Truth Sources below only
-  holds for the *other* aliases (`laptop`, `node-c`).
+**Lifecycle** (orchestrator only):
+* Start: `bash scripts/node_a/start_stack.sh`
+* Stop: `bash scripts/node_a/stop_stack.sh`
+
+**SSH / firewall ground truth (Updated 2026-10-20):**
+* Node A's Windows OpenSSH server is **live and elevated**; inbound TCP 22 firewall rule is active.
+* While Node A's WSL `~/.ssh/config` lacks a direct `Host pc` entry, loopback admin access to Node A Windows from WSL is fully operational via Node B:
+  `ssh laptop "ssh pc <command>"` (provides elevated Windows command execution without interactive UAC prompts).
+* WireGuard `wg_a` tunnel configuration with both peers (`10.8.0.2` Node B, `10.8.0.3` Node C) is persistently backed up at `C:\ProgramData\WireGuard\wg_a.conf`. Following any interface restart or Windows host reboot, forwarding must be asserted:
+  `ssh laptop "ssh pc 'powershell -Command \"Set-NetIPInterface -InterfaceAlias wg_a -Forwarding Enabled\"'"`
 
 ---
 
@@ -111,8 +113,15 @@ The sparse-retrieval (Tantivy BM25) + user-facing gateway tier. Clients send req
   first — `schtasks /Change /TN pdc_gateway_c /ENABLE` — or `/Run` fails
   silently. If the task was found Disabled, enable it and then `schtasks
   /Run`; the gateway comes up in ~10 s (verified 2026-10-12).
-* Verification: `curl.exe -s http://127.0.0.1:8000/health`
+* Verification: `curl.exe -s http://127.0.0.1:8000/health` (local check on Node C)
 * **Remote Ops Pattern (from A or B)**: Always use single-line commands when issuing commands over SSH into Node C.
+* **Direct WireGuard SSH**: Use `ssh friend-wg` (`10.8.0.3`) for low-latency direct connectivity (especially if Tailscale `node-c` is offline).
+* **Critical Relay Verification (Mandatory before campaigns)**:
+  ```bash
+  ssh friend-wg "curl.exe -s --max-time 6 http://10.8.0.2:8000/health"
+  ```
+  **Assertion:** MUST return `{"status":"ok","node":"B",...}`. If it returns `"node":"C"`, C's requests to B are looping back locally.
+* **Interface Hygiene**: Verify via `ssh friend-wg "wg show"` that only `wg0` is active. Never allow secondary tunnels (e.g., stale test tunnels like `T`) to capture `10.8.0.0/24`.
 
 ---
 
