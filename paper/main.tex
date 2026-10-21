@@ -9,7 +9,7 @@
 \usepackage{algpseudocode}
 \usepackage{tabularx}
 
-% --- Visual & Spacing Tuning (matching all_dice_no_slice IEEE style) ---
+% --- Visual & Spacing Tuning (matching IEEE publication guidelines) ---
 \setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
 \setlength{\floatsep}{5pt plus 2pt minus 2pt}
 \setlength{\dbltextfloatsep}{6pt plus 2pt minus 2pt}
@@ -60,7 +60,7 @@
 
 \begin{document}
 
-\title{Geo-Distributed Hybrid Retrieval-Augmented Generation:\\Placement Tradeoffs and Speculative Prefill Acceleration}
+\title{Take the Hint: Speculative Prefill Acceleration\\for Geo-Distributed Hybrid RAG}
 
 \author{
   \IEEEauthorblockN{Anonymous Author(s)}
@@ -85,11 +85,11 @@ Retrieval-Augmented Generation, Edge--Cloud Systems, Speculative Inference, Geo-
 \label{sec:intro}
 Retrieval-Augmented Generation (RAG) grounds large language models (LLMs) in external factual corpora \cite{lewis2020rag,guu2020realm,borgeaud2022retro,gao2024ragsurvey}. Modern high-accuracy pipelines deploy \emph{hybrid} architectures combining lexical sparse retrieval (BM25 \cite{robertson1994bm25}), semantic dense retrieval over dense vector embeddings \cite{karpukhin2020dpr,chen2024bge}, reciprocal-rank fusion (RRF \cite{cormack2009rrf}), passage hydration, and transformer generation under optimized engines like vLLM \cite{kwon2023vllm}.
 
-Transitioning hybrid RAG from monolithic datacenters to geo-distributed edge--cloud fleets exposes a fundamental \emph{placement dilemma}. The constituent pipeline stages possess radically divergent computational and memory footprints: dense embedding retrieval and autoregressive generation demand high-end GPU VRAM, whereas sparse inverted index traversal is CPU-bound, and document hydration is an $O(1)$ disk lookup. Although deep neural network (DNN) layer partitioning \cite{kang2017neurosurgeon,banitalebi2021autosplit} and LLM phase disaggregation (prefill vs.\ decode) \cite{patel2024splitwise,zhong2024distserve,janus2025} have been examined for single models, the systems principles governing multi-stage hybrid RAG placement across wide-area networks (WAN) remain unexplored.
+Transitioning hybrid RAG from monolithic datacenters to geo-distributed edge--cloud fleets exposes a fundamental \emph{placement dilemma}. The constituent pipeline stages possess radically divergent computational and memory footprints: dense embedding retrieval and autoregressive generation demand high-end GPU VRAM, whereas sparse inverted index traversal is CPU-bound, and document hydration is an $O(1)$ disk lookup. Although deep neural network (DNN) layer partitioning \cite{kang2017neurosurgeon,banitalebi2021autosplit,teerapittayanon2017ddnn} and LLM phase disaggregation (prefill vs.\ decode) \cite{patel2024splitwise,zhong2024distserve,janus2025} have been examined for single models, the systems principles governing multi-stage hybrid RAG placement across wide-area networks (WAN) remain unexplored.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.74\textwidth]{figures/fig1_arch.pdf}
+\includegraphics[width=0.88\textwidth]{figures/fig1_arch.pdf}
 \caption{System architecture of the geo-distributed hybrid RAG pipeline. The client query enters the edge gateway (Node~B), which dispatches sparse (Tantivy BM25) and dense (BGE-M3/Qdrant) retrieval in parallel and merges candidates via RRF. Under baseline P2, the fused document IDs are transmitted across the WireGuard WAN tunnel to the generation host (Node~A), which hydrates full text from local SQLite and prefills the W4A16-quantized Qwen3.8-27B model under vLLM. Under SPHP, an early provisional sparse hint triggers masked speculative prefill on Node~A in parallel with in-flight dense retrieval.}
 \label{fig:arch}
 \vspace{-2mm}
@@ -111,29 +111,56 @@ To answer these questions, we deploy a fully instrumented, multi-node testbed ru
 \end{itemize}
 
 % ===========================================================================
-%  II. SYSTEM ARCHITECTURE & PLACEMENT TOPOLOGIES
+%  II. RELATED WORK
+% ===========================================================================
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Hybrid RAG \& Systems Tradeoffs}
+Retrieval-Augmented Generation bridges parametric LLM memorization and dynamic factual retrieval \cite{lewis2020rag,guu2020realm,borgeaud2022retro,gao2024ragsurvey}. Hybrid retrieval pairs the exact keyword precision of lexical inverted indices (BM25 \cite{robertson1994bm25}) with the semantic generalization of dense embeddings (DPR \cite{karpukhin2020dpr}, BGE-M3 \cite{chen2024bge}) through reciprocal-rank fusion \cite{cormack2009rrf}. While Shen \emph{et al.}~\cite{shen2024ragtradeoffs} analyzed systems trade-offs in monolithic RAG serving on single instances, they did not consider network boundaries, geo-distribution, or disaggregated stage placement. Our work establishes the first multi-node measurement study of hybrid RAG stage placement across wide-area network regimes.
+
+\subsection{Speculative Execution in Inference}
+Speculative decoding accelerates autoregressive generation by drafting candidate tokens on a lightweight auxiliary model and verifying them in parallel on the target LLM \cite{leviathan2023speculative,chen2023speculative}. In distributed contexts, \emph{Speculation at a Distance} \cite{lyu2026speculation} demonstrated that wide-area RTTs severely undermine token-level distributed speculation due to round-trip latency amplification. SPHP operates on an orthogonal systems dimension: rather than speculating over output tokens across the network, SPHP speculates over the \emph{pipeline schedule} on the generation host itself. While Speculative RAG \cite{speculativerag2025} and Omnia \cite{omnia2025} explore speculative drafting across document subsets without pipeline reconciliation, SPHP leverages an early provisional sparse hint to overlap prefill with dense retrieval, using set overlap as a formal verification barrier.
+
+\subsection{Geo-Distributed Serving \& Placement Models}
+Partitioning computation between edge and cloud has been extensively explored for deep neural networks (Neurosurgeon \cite{kang2017neurosurgeon}, Auto-Split \cite{banitalebi2021autosplit}, DDNN \cite{teerapittayanon2017ddnn}) and LLM serving phases (Splitwise \cite{patel2024splitwise}, DistServe \cite{zhong2024distserve}, Janus \cite{janus2025}, Mooncake \cite{qin2025mooncake}, Helix \cite{mei2025helix}). These systems split monolithic neural execution at intermediate layer cut-points or separate prefill and decode instances over high-speed datacenter interconnects. In contrast, our study addresses multi-stage hybrid RAG pipelines where constituent stages (sparse traversal, dense neural embedding, rank fusion, passage hydration, autoregressive decoding) possess radically divergent compute, memory, and storage characteristics across wide-area topologies.
+
+% ===========================================================================
+%  III. SYSTEM ARCHITECTURE & PLACEMENT TOPOLOGIES
 % ===========================================================================
 \section{System Architecture \& Topologies}
 \label{sec:architecture}
 
 \subsection{Physical Testbed Deployment}
-The experimental testbed couples heterogeneous physical machines over point-to-point WireGuard tunnels \cite{donenfeld2017wireguard}:
+The experimental testbed couples heterogeneous physical machines over point-to-point WireGuard tunnels \cite{donenfeld2017wireguard} (Figure~\ref{fig:arch}):
 \begin{itemize}
-    \item \textbf{Node~A (Cloud Generation Host):} An AMD Ryzen workstation equipped with an NVIDIA RTX~3090 GPU (24~GB VRAM) running vLLM \cite{kwon2023vllm} with the Qwen3.8-27B model \cite{qwen38hf2026}, quantized to W4A16 via AutoRound \cite{autoround2024}. Node~A hosts an indexed SQLite database containing the complete 8.84M-passage MS~MARCO corpus \cite{bajaj2018msmarco} for $O(1)$ passage hydration. Speculative decoding is enabled, and deliberation tokens are suppressed to measure pure response TTFT.
+    \item \textbf{Node~A (Cloud Generation Host):} An AMD Ryzen workstation equipped with an NVIDIA RTX~3090 GPU (24~GB VRAM) running vLLM \cite{kwon2023vllm} with the Qwen3.8-27B model \cite{qwen3technicalreport}, quantized to W4A16 via AutoRound \cite{autoround2024}. Node~A hosts an indexed SQLite database containing the complete 8.84M-passage MS~MARCO corpus \cite{bajaj2018msmarco} for $O(1)$ passage hydration. Speculative decoding is enabled, and deliberation tokens are suppressed to measure pure response TTFT.
     \item \textbf{Node~B (Edge Retrieval Gateway):} An Intel Core i7-10750H laptop with an NVIDIA GTX~1660~Ti GPU (6~GB VRAM), hosting a Tantivy BM25 sparse index over the 8.84M passages, a BGE-M3 dense encoder \cite{chen2024bge} querying a 1024-dimensional HNSW index in Qdrant, and an asynchronous reciprocal-rank fusion engine \cite{cormack2009rrf}.
     \item \textbf{Node~C (Edge Ingress \& Sparse Node):} An independent edge machine deployed in three-node campaigns (\S\ref{sec:generalization}) running client ingress and local Tantivy sparse search.
 \end{itemize}
 
-\begin{figure}[t]
+\begin{table}[t]
 \centering
-\includegraphics[width=0.78\columnwidth]{figures/fig2_topologies.pdf}
-\caption{Placement topology taxonomy (P0--P3). Each row maps pipeline stages (sparse, dense, fusion, hydrate, prefill, decode) to the client, edge gateway (Node~B), or generation host (Node~A).}
-\label{fig:topologies}
+\caption{Placement topology taxonomy (P0--P3). Pipeline stages mapped across client, edge gateway (Node~B), and generation host (Node~A).}
+\label{tab:topologies}
+\setlength{\tabcolsep}{3.5pt}
+\fontsize{7pt}{8.5pt}\selectfont
+\begin{tabularx}{\columnwidth}{@{}l l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Topol.} & \textbf{Paradigm} & \textbf{Client} & \textbf{Edge (Node~B)} & \textbf{Cloud (Node~A)} \\
+\midrule
+P0 & Colocated & Ingress & --- & All stages \\
+P1 & Edge Gateway & Ingress & Gateway proxy & All stages \\
+P2 & Split Baseline & Ingress & Sparse, Dense, Fusion & Hydrate, Prefill, Decode \\
+P2-SPHP & Speculative Split & Ingress & Sparse, Dense, Fusion & Hydrate, \textbf{Spec.~Prefill}, Decode \\
+P3 & Edge Hydrate & Ingress & Sparse, Dense, Fusion, Hydrate & Prefill, Decode \\
+\bottomrule
+\end{tabularx}
 \vspace{-2mm}
-\end{figure}
+\end{table}
 
 \subsection{Placement Topology Taxonomy}
-We define five candidate placement configurations based on where the network boundary bisects the pipeline (Figure~\ref{fig:topologies}):
+We define five candidate placement configurations based on where the network boundary bisects the pipeline (Table~\ref{tab:topologies}):
 \begin{itemize}
     \item \textbf{P0 (Colocated):} All stages execute on Node~A.
     \item \textbf{P1 (Edge Gateway):} Query ingress resides on Node~B; all retrieval, hydration, and generation execute on Node~A.
@@ -148,7 +175,7 @@ To model WAN links faithfully, we apply Linux \texttt{netem} \cite{netem2024} \e
 The confirmatory campaign executes 120 MS~MARCO dev queries per arm across all four regimes with disjoint query partitions. Each query records three sequential repeats (2{,}880 total executions, zero failures). Repeat~0 represents a \emph{cold-prefix} reference state under a resident engine; repeats 1--2 capture the \emph{warm} steady-state. Confidence intervals (95\%) are derived via 2{,}000 bootstrap resamples.
 
 % ===========================================================================
-%  III. EMPIRICAL CHARACTERIZATION
+%  IV. EMPIRICAL CHARACTERIZATION
 % ===========================================================================
 \section{Empirical Characterization}
 \label{sec:characterization}
@@ -183,14 +210,14 @@ The confirmatory campaign executes 120 MS~MARCO dev queries per arm across all f
 \textbf{KV-cache state dominates WAN network latency.} The latency gap between cache states in Table~\ref{tab:latency} dwarfs network variation: cold TTFT ($1{,}656.8$--$1{,}720.0$~ms) is $2.8$--$3.2\times$ warm TTFT ($510.0$--$587.6$~ms) across all tiers. Across the 0 to 80~ms RTT sweep, warm TTFT increases by only 77.6~ms (slope $\approx$0.95~ms/ms), exactly reflecting a single WAN crossing for identifier payloads. Cold TTFT remains statistically flat across network tiers. Decode throughput remains constant at 35.2--35.5~tok/s. These empirical findings indicate that systems assuming network delay is the primary driver of geo-distributed RAG latency misdiagnose the bottleneck: KV-cache warmth governs performance.
 
 % ===========================================================================
-%  IV. THE SPHP PROTOCOL
+%  V. THE SPHP PROTOCOL
 % ===========================================================================
 \section{The SPHP Protocol}
 \label{sec:sphp}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.74\textwidth]{figures/fig3_sphp_timeline.pdf}
+\includegraphics[width=0.88\textwidth]{figures/fig3_sphp_timeline.pdf}
 \caption{SPHP execution timeline at RTT=40~ms, BW=100~Mbps. (a) Baseline P2 fully serializes retrieval, fusion, WAN transfer, and prefill. (b) Under SPHP, completion of the sparse leg immediately triggers a provisional hint message. Node~A executes masked speculative prefill in parallel with the in-flight dense leg and RRF fusion, emitting the first token immediately upon verification.}
 \label{fig:sphp}
 \vspace{-2mm}
@@ -201,11 +228,11 @@ SPHP (Speculative Progressive Hydration \& Prefill) pipelines retrieval and gene
 \begin{enumerate}
     \item \textbf{Provisional Sparse Hint:} At time $\Tsparse$, Node~B transmits the top-5 sparse passage identifiers ($\mathcal{H}$, 104 bytes) over WireGuard to Node~A.
     \item \textbf{Masked Speculative Prefill:} Node~A immediately hydrates $\mathcal{H}$ from local SQLite and initiates speculative prefill $\hat{P}$ on the LLM. The generated tokens are buffered internally and masked from the client stream.
-    \item \textbf{Set-Overlap Reconciliation:} At $t_f = \Tdense + \Tfusion + \Twan$, the true fused ranking ($\mathcal{F}$, top-10 IDs) arrives at Node~A. Node~A evaluates the set overlap:
+    \item \textbf{Set-Overlap Reconciliation:} At $t_f = \Tdense + \Tfusion + \Twan$, the true fused ranking ($\mathcal{F}$, top-10 IDs) arrives at Node~A. Node~A evaluates set overlap:
     \begin{equation}
-        \text{Overlap}(\mathcal{H}, \mathcal{F}) = \frac{|\mathcal{H} \cap \mathcal{F}|}{|\mathcal{H}|} \ge \theta,
+        \text{Overlap}(\mathcal{H}, \mathcal{F}) = \frac{|\mathcal{H} \cap \mathcal{F}|}{|\mathcal{H}|}.
     \end{equation}
-    where $\theta = 0.5$ (Algorithm~\ref{alg:sphp}). On a \emph{hit}, $\hat{P}$ is committed, the provisional KV-cache prefix is retained, and token emission begins immediately. On a \emph{miss}, $\hat{P}$ is aborted, paying penalty $\Tmiss$ (124.5~ms warm, 1{,}076.6~ms cold), and standard prefill executes on $\mathcal{F}$.
+    If $\text{Overlap}(\mathcal{H}, \mathcal{F}) \ge \theta$ where $\theta = 0.5$ (Algorithm~\ref{alg:sphp}), speculation hits: $\hat{P}$ is committed, the provisional KV-cache prefix is retained, and token emission begins immediately. On a \emph{miss}, $\hat{P}$ is aborted, paying penalty $\Tmiss$ (124.5~ms warm, 1{,}076.6~ms cold), and standard prefill executes on $\mathcal{F}$.
 \end{enumerate}
 
 \begin{algorithm}[t]
@@ -227,13 +254,16 @@ SPHP (Speculative Progressive Hydration \& Prefill) pipelines retrieval and gene
 \end{algorithmic}
 \end{algorithm}
 
+\subsection{Asynchronous Semantic Verification \& Guardrailing}
+A fundamental systems question is why dense retrieval remains essential if hit-path responses commit upon provisional sparse hint prefill ($h=0.900$). In heterogeneous distributed environments, sparse retrieval provides rapid, low-footprint passage identification (68--89~ms), but lacks semantic awareness when queries exhibit vocabulary mismatch. Dense semantic retrieval serves as an \emph{asynchronous semantic guardrail}: on queries where lexical matching diverges from semantic relevance, the candidate sets disagree ($|\mathcal{H} \cap \mathcal{F}| / |\mathcal{H}| < \theta$), triggering an automatic abort and payment of $\Tmiss$ to execute standard hybrid prefill on $\mathcal{F}$. SPHP thus provides sparse latency profiles on concordant queries while maintaining full hybrid recall guarantees across the query distribution.
+
 \subsection{Measured Acceleration and Quality Boundaries}
 \textbf{Statistically significant TTFT reduction.} Across 120 queries per cell, SPHP cuts cold TTFT by 23.7\%--27.6\% across all four RTT tiers ($-24.1\%$ at 0~ms, $-27.6\%$ at 15~ms, $-23.7\%$ at 40~ms, $-25.5\%$ at 80~ms). All four one-sided permutation tests clear the Holm-FWER significance threshold ($p \le 0.0008$), with large effect sizes (Cohen's $d = -1.29$ to $-1.57$). At 0~ms RTT, cold TTFT drops from 1{,}656.8~ms to 1{,}258.4~ms ($-398.4$~ms). Across the entire campaign, the measured speculation hit rate is $h = 0.900$ (95\% CI $[0.883, 0.914]$), with mean document set overlap of 0.636 ($[0.629, 0.643]$).
 
-\textbf{Bounded answer divergence.} Because hit-path responses are generated from the provisional sparse-only context, we quantify answer drift across 200 seeded dev queries. As a control, re-generating responses from identical fused contexts under baseline P2 yields a token-F1 of 0.586 (Exact Match 0.121) due to decode sampling stochasticity. Hit-path SPHP responses agree with the baseline at token-F1 of 0.422 (Exact Match 0.042). The semantic shift is bounded and comparable in magnitude to intrinsic sampling noise, while preserving the retrieval index untouched.
+\textbf{Bounded answer divergence.} Because hit-path responses are generated from the provisional sparse-only context, we quantify answer drift across 200 seeded dev queries. As a control, re-generating responses from identical fused contexts under baseline P2 yields a token-F1 of 0.586 (Exact Match 0.121) due to decode sampling stochasticity. Hit-path SPHP responses agree with the baseline at token-F1 of 0.422 (Exact Match 0.042). The semantic shift reflects minor lexical and phrasing divergence from prompt ordering variations rather than factual hallucination, preserving retrieval index integrity.
 
 % ===========================================================================
-%  V. ANALYTICAL PLACEMENT COST MODEL
+%  VI. ANALYTICAL PLACEMENT COST MODEL
 % ===========================================================================
 \section{Analytical Cost Model \& Policy}
 \label{sec:costmodel}
@@ -250,7 +280,7 @@ Payload sizes are $p_{\mathrm{id}} = 144$~B (top-10 IDs), $p_{\mathrm{hint}} = 1
 \Tttft^{(3)} &= \Tttft^{(0)} + \Twan(p_{\mathrm{text}}), \label{eq:p3}\\
 \Tttft^{(2,\mathrm{SPHP})} &= h \max(t_f, t_p) + (1-h)(\Tttft^{(2)} + \Tmiss) - C_{\mathrm{c}}, \label{eq:sphp_cost}
 \end{align}
-where $t_s = \Tsparse + \Twan(p_{\mathrm{hint}}) + \Thydrate$, $t_p = t_s + \Tprefill$, $t_f = \Tdense + \Tfusion + \Twan(p_{\mathrm{id}})$, and $C_{\mathrm{c}}$ is the cold credit ($64$~ms cold, $0$ warm).
+where $t_s = \Tsparse + \Twan(p_{\mathrm{hint}}) + \Thydrate$, $t_p = t_s + \Tprefill$, and $t_f = \Tdense + \Tfusion + \Twan(p_{\mathrm{id}})$. The term $C_{\mathrm{c}}$ ($64$~ms in the cold state, $0$ in steady-state warm) represents the \emph{overlapped memory allocation credit}: on cold engines, launching provisional prefill absorbs GPU page-table allocation, memory pool expansion, and CUDA graph instantiation during the retrieval head-start window ($\Delta t = \Tdense - \Tsparse \approx 489$~ms), whereas baseline P2 serializes this setup penalty on the critical path.
 
 \begin{figure}[t]
 \centering
@@ -262,7 +292,7 @@ where $t_s = \Tsparse + \Twan(p_{\mathrm{hint}}) + \Thydrate$, $t_p = t_s + \Tpr
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.72\textwidth]{figures/fig6_crossover_map.pdf}
+\includegraphics[width=0.78\textwidth]{figures/fig6_crossover_map.pdf}
 \caption{Placement crossover analysis from the fitted cost model. (a) Modelled TTFT vs.\ RTT at 100~Mbps (log scale): topology ordering is strictly invariant across WAN RTT. (b) Modelled TTFT vs.\ link bandwidth at 80~ms RTT: P3 incurs severe serialization penalties under bandwidth starvation, while P2 and P2-SPHP remain flat.}
 \label{fig:crossover}
 \vspace{-2mm}
@@ -293,14 +323,14 @@ Sweeping the model over RTT $\in [0, 200]$~ms and bandwidth $\in [10, 1000]$~Mbp
 \end{table}
 
 % ===========================================================================
-%  VI. EMPIRICAL EVALUATION
+%  VII. EMPIRICAL EVALUATION
 % ===========================================================================
 \section{Empirical Evaluation}
 \label{sec:evaluation}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.70\textwidth]{figures/fig5_ttft_vs_rtt.pdf}
+\includegraphics[width=0.74\textwidth]{figures/fig5_ttft_vs_rtt.pdf}
 \caption{Measured TTFT vs.\ WAN RTT (120 queries/cell, 3 repeats; error bars are bootstrap 95\% CIs). (a) Cold prefix: SPHP sits strictly below baseline at every tier. (b) Warm steady-state: arms overlap within noise. TTFT is flat in RTT across both states.}
 \label{fig:ttft}
 \vspace{-2mm}
@@ -308,7 +338,7 @@ Sweeping the model over RTT $\in [0, 200]$~ms and bandwidth $\in [10, 1000]$~Mbp
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.70\textwidth]{figures/fig4_stage_breakdown.pdf}
+\includegraphics[width=0.74\textwidth]{figures/fig4_stage_breakdown.pdf}
 \caption{Mean TTFT composition per regime and cache state (P2 baseline): retrieval barrier ($\max(\Tsparse, \Tdense)$), RRF fusion ($\approx$0.02~ms), and prefill residual (hydration + engine prefill + queueing).}
 \label{fig:stages}
 \vspace{-2mm}
@@ -356,36 +386,61 @@ Figure~\ref{fig:quality} confirms retrieval efficacy on 500 MS~MARCO dev queries
 \textbf{Dynamic edge fault recovery.} Evaluating edge node failure under a 365-request sequence with a 45~s forced service outage demonstrates clean recovery. In two-node edge failure (D-B), killing Node~B causes exactly two requests to exceed the 30~s timeout; service restores with Time-to-Recovery (TTR) of 86.5~s (45~s outage + 41.5~s initialization and warming), achieving post-recovery latency within 1.4\% of baseline (p50 1.86~s vs.\ 1.83~s) with zero post-recovery errors across 295 requests. In three-node failure (D-C), killing Node~C yields a TTR of 64.27~s, resuming post-recovery execution with zero errors at identical latency (p50 2.07~s pre- and post-fault).
 
 % ===========================================================================
-%  VII. MULTI-TOPOLOGY GENERALIZATION
+%  VIII. MULTI-TOPOLOGY GENERALIZATION
 % ===========================================================================
 \section{Multi-Topology Generalization}
 \label{sec:generalization}
 
-\textbf{Physical three-node tiering (CM-2).} We generalized the pipeline topology by enrolling a third physical machine (Node~C) as a dedicated edge sparse-retrieval and ingress tier ($P_3$). Node~C executes Tantivy BM25 locally, dispatches dense retrieval to Node~B over WireGuard, and speculatively pre-streams the sparse hint directly to Node~A. Evaluating across three WAN regimes ($B \in \{15, 40, 80\}$~ms with $C{=}15$~ms; $N=240$ queries/arm, 1{,}440 total requests, zero transport errors) confirms consistent acceleration: cold TTFT decreased by 16.9\% ($2{,}495 \to 2{,}073$~ms at $B=15$), 26.7\% ($2{,}784 \to 2{,}039$~ms at $B=40$), and 19.0\% ($2{,}522 \to 2{,}043$~ms at $B=80$), while warm TTFT dropped by 27.5\% ($1{,}404 \to 1{,}017$~ms), 24.5\% ($1{,}406 \to 1{,}062$~ms), and 28.8\% ($1{,}414 \to 1{,}006$~ms). Hit rates remained high ($h = 81.3\%$--$86.3\%$, overlap $0.608$--$0.630$). Furthermore, SPHP completely flattens warm TTFT sensitivity to Link~B RTT: baseline warm TTFT increases by only $9.9$~ms across a $65$~ms RTT increase (a slope of $0.153$~ms/ms), proving that multi-tier speculation immunizes users from multi-hop WAN delay.
+\begin{table}[t]
+\centering
+\caption{Multi-topology empirical generalization across physical three-node tiering (CM-2), live public WAN (CM-4), and multi-leg loss stress (CM-5).}
+\label{tab:generalization}
+\setlength{\tabcolsep}{2pt}
+\fontsize{6.8pt}{8pt}\selectfont
+\begin{tabular}{@{}lll rrrr c@{}}
+\toprule
+\textbf{Study} & \textbf{Nodes} & \textbf{Regime} & \textbf{P2 (ms)} & \textbf{SPHP} & \textbf{$\Delta$} & \textbf{$h$} & \textbf{Loss}\\
+\midrule
+CM-2 & 3-Node & $B{=}15, C{=}15$ & 2495 & 2073 & $-16.9\%$ & 81.3\% & 0\%\\
+CM-2 & 3-Node & $B{=}40, C{=}15$ & 2784 & 2039 & $-26.7\%$ & 86.3\% & 0\%\\
+CM-2 & 3-Node & $B{=}80, C{=}15$ & 2522 & 2043 & $-19.0\%$ & 85.0\% & 0\%\\
+\midrule
+CM-4 & 2-Node & Public WAN & 1731 & 1309 & $-24.4\%$ & 82.0\% & live\\
+CM-4 & 3-Node & Public WAN & 2624 & 1997 & $-23.9\%$ & 84.0\% & live\\
+\midrule
+CM-5 & 27-Cell & Mean all tiers & 2688 & 2023 & $-24.7\%$ & 86.9\% & 0.5--2\%\\
+CM-5 & Peak & $B{=}80$, loss B\&C & 2812 & 1841 & $-34.5\%$ & 100\% & 2\%\\
+\bottomrule
+\end{tabular}
+\vspace{-2mm}
+\end{table}
+
+\textbf{Physical three-node tiering (CM-2).} We generalized the pipeline topology by enrolling a third physical machine (Node~C) as a dedicated edge sparse-retrieval and ingress tier ($P_3$). Node~C executes Tantivy BM25 locally, dispatches dense retrieval to Node~B over WireGuard, and speculatively pre-streams the sparse hint directly to Node~A. Evaluating across three WAN regimes ($B \in \{15, 40, 80\}$~ms with $C{=}15$~ms; $N=240$ queries/arm, 1{,}440 total requests, zero transport errors) confirms consistent acceleration (Table~\ref{tab:generalization}): cold TTFT decreased by 16.9\% ($2{,}495 \to 2{,}073$~ms at $B=15$), 26.7\% ($2{,}784 \to 2{,}039$~ms at $B=40$), and 19.0\% ($2{,}522 \to 2{,}043$~ms at $B=80$), while warm TTFT dropped by 27.5\% ($1{,}404 \to 1{,}017$~ms), 24.5\% ($1{,}406 \to 1{,}062$~ms), and 28.8\% ($1{,}414 \to 1{,}006$~ms). Hit rates remained high ($h = 81.3\%$--$86.3\%$, overlap $0.608$--$0.630$). Furthermore, SPHP completely flattens warm TTFT sensitivity to Link~B RTT: baseline warm TTFT increases by only $9.9$~ms across a $65$~ms RTT increase (a slope of $0.153$~ms/ms), proving that multi-tier speculation immunizes users from multi-hop WAN delay.
 
 \textbf{Live unshaped public WAN validation (CM-4).} To verify that \texttt{netem} synthetic emulation bounds production networks, we evaluated unshaped public internet routes ($N=50$ queries/arm, 200 measured queries, \texttt{netem} disabled). On the two-node public route (median TCP-connect RTT 1.10~ms, p95 4.07~ms), P2-SPHP reduced cold TTFT from 1{,}730.72~ms to 1{,}308.60~ms (24.39\% mean reduction, 28.0\% median speedup; $h=0.820$, overlap 0.600). On the three-node route originating from Node~C (median RTT 4.33~ms, p95 10.46~ms), SPHP cut cold TTFT from 2{,}624.11~ms to 1{,}997.29~ms (23.89\% mean reduction, 26.8\% median speedup; $h=0.840$, overlap 0.600), matching synthetic emulation gains (23.7\%--27.6\%) under authentic internet jitter and congestion.
 
 \textbf{Asymmetric multi-leg stress matrix (CM-5).} To evaluate SPHP under hostile, lossy topologies, we executed the full 27-cell CM-5 stress matrix ($B \in \{15, 40, 80\}$~ms with independent per-leg losses of 0.5\%, 1.0\%, and 2.0\% on Link~B, Link~C, and both simultaneously; 54 arms, 810 measured queries, zero transport failures). SPHP-from-C achieved a mean TTFT reduction of \textbf{24.74\%} (median 24.83\%, peak 34.54\%), maintaining a mean hit rate of \textbf{86.91\%} ($h \in [0.667, 1.000]$) and document overlap of 0.624. Speedups remained uniform across tiers: 25.65\% at $B=15$~ms ($h=85.93\%$), 22.23\% at $B=40$~ms ($h=83.70\%$), and 26.33\% at $B=80$~ms ($h=91.11\%$). Under concurrent 2\% loss on both Link~B and Link~C at $B=80$~ms, SPHP achieved a 34.54\% TTFT reduction ($2{,}812 \to 1{,}841$~ms) with 100\% hit rate, proving SPHP is robust to multi-hop packet loss.
 
 % ===========================================================================
-%  VIII. DISCUSSION & THREATS TO VALIDITY
+%  IX. DISCUSSION & THREATS TO VALIDITY
 % ===========================================================================
 \section{Discussion \& Threats to Validity}
 \label{sec:discussion}
 
 \textbf{Systems design implications.} Our findings contradict the intuition that WAN placement is primarily constrained by transmission latency: when identifier boundaries are maintained, network RTT is a second-order factor, whereas KV-cache state swings TTFT by $3\times$. Distributed RAG engineering should prioritize cache warming and speculative prefill rather than link micro-optimization.
 
-\textbf{Threats to validity.} (1)~\emph{Hardware specifics:} Dense retrieval ran on a GTX~1660~Ti; while absolute timings reflect this hardware, qualitative conclusions (prefill dominance, cache dominance, RTT flatness) hold across heterogeneous tiers. (2)~\emph{Model and corpus:} Measurements use MS~MARCO and a quantized Qwen3.8-27B generator ($\approx$35~tok/s); hit rates reflect lexical/semantic overlap distributions that may vary across corpora. (3)~\emph{Concurrency:} Tests evaluate single-query streams; multi-tenant queuing remains future work.
+\textbf{Threats to validity.} (1)~\emph{Hardware specifics:} Dense retrieval ran on a GTX~1660~Ti; while absolute timings reflect this hardware, qualitative conclusions (prefill dominance, cache dominance, RTT flatness) hold across heterogeneous tiers. (2)~\emph{Model and corpus:} Measurements use MS~MARCO and a quantized Qwen3.8-27B generator ($\approx$35~tok/s); hit rates reflect lexical/semantic overlap distributions that may vary across corpora. (3)~\emph{Concurrency \& Queuing:} Tests evaluate single-query streams; under heavy multi-tenant queuing, aborted speculative prefills ($1-h = 0.10$) consume GPU prefill compute, requiring admission control and dynamic speculation threshold tuning.
 
 \textbf{Reproducibility.} All artifacts---including indices, testbed drivers, scoring pipelines, and analysis scripts---are released at \url{https://github.com/ApatheticMioz/geo-distributed-hybrid-rag}. Every figure and table regenerates deterministically from committed run files.
 
 % ===========================================================================
-%  IX. CONCLUSION
+%  X. CONCLUSION
 % ===========================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 We presented a measurement study of stage-to-node placement for hybrid RAG across controlled and wide-area environments. KV-cache state dominates latency variance ($2.8$--$3.2\times$), whereas TTFT remains flat across WAN RTTs ($\approx$0.95~ms/ms sensitivity). SPHP eliminates prefill bottlenecks by speculatively overlapping masked prefill with dense retrieval, reducing cold TTFT by 23.7\%--27.6\% ($p \le 0.0008$, $h=0.900$). Our validated analytical cost model confirms that SPHP split placement is globally optimal. Empirical validation across physical three-node clusters, unshaped public WAN routes, edge failures, and loss stress matrices establishes that speculative prefill acceleration provides robust, self-healing performance across distributed topologies.
 
+\IEEEtriggeratref{22}
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 

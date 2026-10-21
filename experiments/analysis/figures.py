@@ -288,82 +288,78 @@ def fig1_arch(model_warm: PlacementCostModel) -> Path:
 
 
 def _fig1_arch(model_warm: PlacementCostModel) -> Path:
-    fig, ax = plt.subplots(figsize=(FULL_W, 3.9))
+    fig, ax = plt.subplots(figsize=(FULL_W, 1.9))
     ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6.6)
+    ax.set_ylim(-0.05, 3.20)
     ax.axis("off")
 
     def box(x, y, w, h, title, items, fc, ec):
         p = FancyBboxPatch((x, y), w, h,
                            boxstyle="round,pad=0.0,rounding_size=0.12",
-                           linewidth=1.3, edgecolor=ec, facecolor=fc, zorder=2)
+                           linewidth=1.2, edgecolor=ec, facecolor=fc, zorder=2)
         ax.add_patch(p)
-        ax.text(x + w / 2, y + h - 0.16, title, ha="center", va="top",
-                fontsize=8.5, fontweight="bold", color=figstyle.INK, zorder=3)
-        top = y + h - 0.50
-        step = (h - 0.66) / max(len(items), 1)
+        ax.text(x + w / 2, y + h - 0.14, title, ha="center", va="top",
+                fontsize=8.2, fontweight="bold", color=figstyle.INK, zorder=3)
+        top = y + h - 0.44
+        step = (h - 0.56) / max(len(items), 1)
         for i, it in enumerate(items):
             ax.text(x + 0.12, top - i * step, "• " + it, ha="left", va="top",
-                    fontsize=8, color=figstyle.INK, zorder=3)
+                    fontsize=7.2, color=figstyle.INK, zorder=3)
 
     # Node/machine box fills are light tints of the categorical palette
-    # (figstyle.TINTS); strokes and arrow edges are neutral ink so the tint
-    # carries the node role and grayscale/CVD survival never rests on a
-    # saturated hue.  Role -> tint: Client -> aqua (user/entry side),
-    # Node B -> blue (edge gateway / retrieval), Node A -> orange
-    # (generation host).  The external Client box gets the softer
-    # INK_SECONDARY stroke; the two system nodes get the stronger INK.
-    box(0.2, 2.0, 1.7, 2.0, "Client",
+    box(0.12, 0.75, 1.45, 1.95, "Client",
         ["User query", "Streamed tokens"],
         figstyle.TINTS["aqua"], figstyle.INK_SECONDARY)
 
-    # Node B (Edge Gateway) — boxes span y 0.8..4.8; arrows route above/below.
-    box(3.0, 0.8, 2.9, 4.0, "Node B — Edge Gateway",
-        ["Tantivy BM25 sparse (8.84M)",
-         "BGE-M3 dense + Qdrant (GPU)",
-         "RRF fusion",
+    # Node B (Edge Gateway)
+    box(2.15, 0.55, 2.75, 2.45, "Node B — Edge Gateway",
+        ["Tantivy BM25 (8.84M)",
+         "BGE-M3 + Qdrant",
+         "Reciprocal Rank Fusion",
          f"t_sparse ≈ {model_warm.t_sparse_base_ms:.0f} ms (warm)",
          f"t_dense ≈ {model_warm.t_dense_base_ms:.0f} ms (warm)"],
         figstyle.TINTS["blue"], figstyle.INK)
 
     # Node A (Generation Host)
-    box(7.15, 0.8, 2.7, 4.0, "Node A — Generation",
-        ["Local corpus hydration",
+    box(7.10, 0.55, 2.78, 2.45, "Node A — Generation Host",
+        ["Corpus hydration (SQLite)",
          "SPHP speculative prefill",
          "vLLM Qwen3.8-27B (W4A16)",
          f"t_prefill ≈ {model_warm.t_prefill_base_ms:.0f} ms (warm)"],
         figstyle.TINTS["orange"], figstyle.INK)
 
-    # Arrows/edges are neutral chrome (figstyle.INK_SECONDARY, lw 1.0) and
-    # their labels share the same token, matching the fig6 idiom.
-    def arrow(x1, y1, x2, y2, label, ls="-", dy=0.0, rad=0.0,
-              label_dy=None, fs=8):
+    def arrow(x1, y1, x2, y2, ls="-", rad=0.0):
         a = FancyArrowPatch(
             (x1, y1), (x2, y2),
-            arrowstyle="-|>", mutation_scale=14,
+            arrowstyle="-|>", mutation_scale=13,
             linewidth=1.0, color=figstyle.INK_SECONDARY, linestyle=ls,
             zorder=4,
             connectionstyle=f"arc3,rad={rad}" if rad else "arc3,rad=0")
         ax.add_patch(a)
-        ly = (y1 + y2) / 2 + dy if label_dy is None else label_dy
-        ax.text((x1 + x2) / 2, ly, label, ha="center",
-                va="bottom", fontsize=fs, color=figstyle.INK_SECONDARY,
-                zorder=5)
 
-    # Query: client -> Node B (horizontal, through the free gap).
-    arrow(1.9, 3.0, 3.0, 3.0, "Query", dy=0.10)
+    # Query: client -> Node B
+    arrow(1.57, 1.75, 2.15, 1.75)
+    ax.text(1.86, 1.83, "Query", ha="center", va="bottom",
+            fontsize=7.5, color=figstyle.INK_SECONDARY, zorder=5)
 
-    # Retrieval context: Node B -> Node A, routed ABOVE both boxes.
-    arrow(4.4, 4.9, 7.6, 4.9,
-          "SparseHint / FusedContext  (gRPC stream · WireGuard)",
-          ls="--", label_dy=4.98)
+    # Retrieval context: Node B -> Node A across the WireGuard link
+    arrow(4.90, 1.65, 7.05, 1.65, ls="--")
+    ax.text(6.00, 1.95, "WireGuard WAN", ha="center", va="bottom",
+            fontsize=7.8, fontweight="bold", color=figstyle.INK, zorder=5)
+    ax.text(6.00, 1.72, "(0–80 ms RTT)", ha="center", va="bottom",
+            fontsize=6.8, color=figstyle.INK_SECONDARY, zorder=5)
+    ax.text(6.00, 1.48, "SparseHint (104 B)", ha="center", va="top",
+            fontsize=6.8, color=figstyle.INK_SECONDARY, zorder=5)
+    ax.text(6.00, 1.25, "FusedContext (144 B)", ha="center", va="top",
+            fontsize=6.8, color=figstyle.INK_SECONDARY, zorder=5)
+    ax.text(6.00, 1.02, "gRPC stream", ha="center", va="top",
+            fontsize=6.5, fontstyle="italic", color=figstyle.INK_SECONDARY, zorder=5)
 
     # Token stream: Node A -> client, routed BELOW the boxes.
-    arrow(8.4, 0.75, 1.9, 1.9, "Token stream (streamed back)",
-          ls=":", rad=-0.25, label_dy=0.02, fs=8)
+    arrow(8.50, 0.52, 0.85, 0.72, ls=":", rad=-0.16)
+    ax.text(4.68, 0.08, "Token stream (streamed back to client)",
+            ha="center", va="bottom", fontsize=7.2, color=figstyle.INK_SECONDARY, zorder=5)
 
-    ax.set_title("Geo-Distributed Hybrid RAG: System Architecture",
-                 loc="left", fontsize=8, color=figstyle.INK)
     return _save(fig, "fig1_arch.pdf")
 
 
@@ -537,8 +533,8 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
     ]
 
     fig, (ax_base, ax_sphp) = plt.subplots(
-        2, 1, figsize=(FULL_W, 4.0), sharex=True,
-        gridspec_kw={"hspace": 0.42},
+        2, 1, figsize=(FULL_W, 2.7), sharex=True,
+        gridspec_kw={"hspace": 0.35},
     )
 
     def draw_gantt(ax, bars, ttft, title, provisional_idx=None):
@@ -548,8 +544,6 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
             y = n - 1 - i
             names.append(label)
             if role == "wan":
-                # Transport chrome: muted-ink fill + stroke, no hatch, no
-                # slot color (WAN is not a data series).
                 fill, edge, hatch = figstyle.INK_MUTED, figstyle.INK_MUTED, None
             else:
                 slot_color = {"sparse": c_sparse,
@@ -557,9 +551,6 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
                               "prefill": c_prefill}[role]
                 fill, edge, hatch = figstyle.TINTS[_TINT[role]], slot_color, _HATCH[role]
             alpha = 0.55 if i == provisional_idx else 1.0
-            # The provisional prefill keeps its slot tint + hatch (so it stays
-            # readable as the same generation stage) at a reduced alpha to
-            # signal it is tentative, matching the pre-change treatment.
             ax.barh(y, dur, left=start, height=0.6, color=fill,
                     alpha=alpha, hatch=hatch, edgecolor=edge,
                     linewidth=1.0, zorder=3)
@@ -567,6 +558,7 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
                 ax.text(start + dur / 2.0, y, f"{label}  ({dur:.0f} ms)",
                         va="center", ha="center", fontsize=8,
                         color=figstyle.INK,
+                        bbox=dict(boxstyle="square,pad=0.15", fc="white", ec="none", alpha=0.85),
                         zorder=4)
             else:
                 ax.annotate(f"{label} ({dur:.1f} ms)", xy=(start + dur, y),
@@ -576,14 +568,11 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
                             arrowprops=dict(arrowstyle="-",
                                             color=figstyle.INK_SECONDARY,
                                             lw=0.8, shrinkA=0, shrinkB=0))
-        # TTFT completion marker: neutral chrome -- secondary-ink dashed
-        # vertical line (0.8-1.2 lw) and a primary-ink label, never a slot color.
+        # TTFT completion marker
         ax.axvline(ttft, color=figstyle.INK_SECONDARY, linestyle="--",
                    linewidth=1.0, zorder=2)
         ax.text(ttft, n - 0.10, f"TTFT={ttft:.0f} ms ",
                 va="bottom", ha="right", fontsize=8, color=figstyle.INK)
-        # Bars are drawn at y = n-1-i in draw order; reverse the tick labels
-        # to match, so each stage name sits beside its own bar.
         ax.set_yticks(range(n))
         ax.set_yticklabels(list(reversed(names)), fontsize=8)
         ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
@@ -600,16 +589,6 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
 
     ax_sphp.set_xlabel("Time (ms)")
 
-    # Measured deltas from the campaign (honest numbers, not the schematic's).
-    d = _sphp_deltas(campaign)
-    cold, warm = d["cold"], d["warm"]
-    fig.text(0.99, -0.045,
-             f"Measured TTFT delta vs. baseline (h = {model_warm.sphp_hit_rate:.2f} measured): "
-             f"cold {cold['rel_pct']:+.1f}% [95% CI {cold['ci'][0]:+.1f}, {cold['ci'][1]:+.1f}%], "
-             f"warm {warm['rel_pct']:+.1f}% [CI {warm['ci'][0]:+.1f}, {warm['ci'][1]:+.1f}%]",
-             ha="right", va="top", fontsize=8, color=figstyle.INK_SECONDARY,
-             style="italic")
-
     return _save(fig, "fig3_sphp_timeline.pdf")
 
 
@@ -617,8 +596,6 @@ def _fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) ->
 # Fig 4 -- TTFT composition per RTT tier (cold vs. warm)
 # ---------------------------------------------------------------------------
 def fig4_stage_breakdown(campaign: list[dict]) -> Path:
-    # figstyle applies rcParams globally; scope it to this figure and restore
-    # the prior state afterwards so the other paper figures are unaffected.
     saved_rc = dict(rcParams)
     figstyle.setup()
     try:
@@ -631,7 +608,7 @@ def _fig4_stage_breakdown(campaign: list[dict]) -> Path:
     tiers_all = sorted({float(r["rtt_ms"]) for r in campaign})
     tier_labels = [f"{int(t)}" for t in tiers_all]
 
-    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 3.0), sharey=False)
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 2.4), sharey=False)
     panels = [("cold", "(a) Cold prefix (repeat 0)"), ("warm", "(b) Warm (repeats 1+)")]
 
     for ax, (state, title) in zip(axes, panels):
@@ -705,7 +682,7 @@ def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
 
 
 def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
-    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 2.4))
 
     for ax, (state, title) in zip(axes, [("cold", "(a) Cold prefix (repeat 0)"),
                                          ("warm", "(b) Warm (repeats 1+)")]):
