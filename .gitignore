@@ -56,3 +56,5 @@ llama3-awq
 .evo/
 .pytest_cache/
 .claude/
+paper/archive*/
+paper/reference_papers/
