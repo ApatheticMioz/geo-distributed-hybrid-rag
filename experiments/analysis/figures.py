@@ -277,8 +277,11 @@ def _tier_means(records: list[dict], value_key: str = "ttft_ms") -> tuple[list[f
 # Fig 1 -- System architecture
 # ---------------------------------------------------------------------------
 def fig1_arch(model_warm: PlacementCostModel) -> Path:
-    # figstyle applies rcParams globally; scope it to this figure and restore
-    # the prior state afterwards so the other paper figures are unaffected.
+    tex_path = FIG_DIR / "fig1_arch.tex"
+    if tex_path.exists():
+        import subprocess
+        subprocess.run(["pdflatex", "-interaction=batchmode", f"-output-directory={FIG_DIR}", str(tex_path)], check=True)
+        return FIG_DIR / "fig1_arch.pdf"
     saved_rc = dict(rcParams)
     figstyle.setup()
     try:
@@ -471,8 +474,11 @@ def _sphp_deltas(campaign: list[dict]) -> dict:
 
 
 def fig3_sphp_timeline(model_warm: PlacementCostModel, campaign: list[dict]) -> Path:
-    # figstyle applies rcParams globally; scope it to this figure and restore
-    # the prior state afterwards so the other paper figures are unaffected.
+    tex_path = FIG_DIR / "fig3_sphp_timeline.tex"
+    if tex_path.exists():
+        import subprocess
+        subprocess.run(["pdflatex", "-interaction=batchmode", f"-output-directory={FIG_DIR}", str(tex_path)], check=True)
+        return FIG_DIR / "fig3_sphp_timeline.pdf"
     saved_rc = dict(rcParams)
     figstyle.setup()
     try:
@@ -608,62 +614,55 @@ def _fig4_stage_breakdown(campaign: list[dict]) -> Path:
     tiers_all = sorted({float(r["rtt_ms"]) for r in campaign})
     tier_labels = [f"{int(t)}" for t in tiers_all]
 
-    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 2.4), sharey=False)
+    fig, axes = plt.subplots(2, 1, figsize=(COL_W, 2.7), sharex=True)
     panels = [("cold", "(a) Cold prefix (repeat 0)"), ("warm", "(b) Warm (repeats 1+)")]
 
     for ax, (state, title) in zip(axes, panels):
         recs = [r for r in campaign
                 if r.get("variant") == "baseline"
                 and (r.get("repeat_index", 0) == 0) == (state == "cold")]
-        stages = {"Retrieval (max of Sparse ∥ Dense)": [],
-                  "Fusion (RRF)": [],
-                  "Prefill (incl. hydrate)": []}
+        stages = {"Retrieval": [],
+                  "Fusion": [],
+                  "Prefill": []}
         for t in tiers_all:
             tr = [r for r in recs if float(r["rtt_ms"]) == t]
             sparse = float(np.mean([r["sparse_ms"] for r in tr]))
             dense = float(np.mean([r["dense_ms"] for r in tr]))
             fusion = float(np.mean([r["fusion_ms"] for r in tr]))
             ttft = float(np.mean([r["ttft_ms"] for r in tr]))
-            stages["Retrieval (max of Sparse ∥ Dense)"].append(max(sparse, dense))
-            stages["Fusion (RRF)"].append(fusion)
-            stages["Prefill (incl. hydrate)"].append(max(ttft - max(sparse, dense) - fusion, 0.0))
+            stages["Retrieval"].append(max(sparse, dense))
+            stages["Fusion"].append(fusion)
+            stages["Prefill"].append(max(ttft - max(sparse, dense) - fusion, 0.0))
 
-        # Stacked segments on the figstyle categorical slots: retrieval =
-        # slot 0 (BLUE), fusion = slot 2 (AQUA), prefill = slot 6 (VIOLET).
-        # In grayscale BLUE (~0.19) and VIOLET (~0.13) land close together
-        # while AQUA (~0.32) is clearly lighter, so the two dark segments
-        # get tone-on-tone hatches (45-deg '/' vs. 135-deg '\') to keep the
-        # stack readable when printed in single color.
         segments = [
-            (figstyle.CATEGORICAL[0], "/"),     # BLUE  -- retrieval
-            (figstyle.CATEGORICAL[2], ""),      # AQUA  -- fusion
-            (figstyle.CATEGORICAL[6], "\\"),    # VIOLET -- prefill
+            (figstyle.CATEGORICAL[0], "/"),
+            (figstyle.CATEGORICAL[2], ""),
+            (figstyle.CATEGORICAL[6], "\\"),
         ]
         x = np.arange(len(tiers_all))
-        width = 0.58
+        width = 0.52
         bottom = np.zeros(len(tiers_all))
         for (label, vals), (color, hatch) in zip(stages.items(), segments):
             vals = np.array(vals)
             ax.bar(x, vals, width, bottom=bottom, color=color, hatch=hatch,
                    edgecolor="white", linewidth=0.8, label=label)
-            for xi, (v, b) in enumerate(zip(vals, bottom)):
-                if v > 300:
-                    ax.text(xi, b + v / 2.0, f"{v:.0f}", ha="center", va="center",
-                            fontsize=8, color="white")
             bottom += vals
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(tier_labels)
-        ax.set_xlabel("WAN RTT (ms)")
+        ax.set_ylabel("TTFT (ms)", fontsize=7.5)
         ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
-        ax.set_ylim(0, bottom.max() * 1.12)
+        ax.set_ylim(0, bottom.max() * 1.15)
         figstyle.despine(ax)
         figstyle.grid(ax)
 
-    axes[0].set_ylabel("Mean TTFT (ms)")
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(tier_labels)
+    axes[1].set_xlabel("WAN RTT (ms)")
+
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.10),
-               ncol=3, frameon=False, fontsize=8)
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.02),
+               ncol=3, frameon=False, fontsize=7.5)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
     return _save(fig, "fig4_stage_breakdown.pdf")
 
 
@@ -682,7 +681,7 @@ def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
 
 
 def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
-    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 2.4))
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 2.0))
 
     for ax, (state, title) in zip(axes, [("cold", "(a) Cold prefix (repeat 0)"),
                                          ("warm", "(b) Warm (repeats 1+)")]):
@@ -716,12 +715,8 @@ def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
             lo, hi, rel = boot_ci_rel(
                 [r["ttft_ms"] for r in recs if r.get("variant") == "sphp"],
                 [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"])
-            ax.annotate(f"SPHP delta {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
+            ax.annotate(f"Mean $\\Delta$: {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
                         xy=(0.28, 0.04), xycoords="axes fraction",
-                        fontsize=7, color=figstyle.INK_SECONDARY)
-        else:
-            ax.annotate("delta within noise at every tier",
-                        xy=(0.32, 0.05), xycoords="axes fraction",
                         fontsize=7, color=figstyle.INK_SECONDARY)
 
         ax.set_xticks(tiers)
@@ -752,7 +747,7 @@ def fig6_crossover_map(model_warm: PlacementCostModel,
 
 def _fig6_crossover_map(model_warm: PlacementCostModel,
                         model_cold: PlacementCostModel) -> Path:
-    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(FULL_W, 3.0))
+    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(FULL_W, 2.2))
 
     # Series slots (figstyle): P2 = slot 0 (BLUE solid o),
     # P2-SPHP = slot 1 (ORANGE dashed s), P3 = slot 2 (AQUA dotted ^).
@@ -788,9 +783,6 @@ def _fig6_crossover_map(model_warm: PlacementCostModel,
     ax_a.set_title("(a) TTFT vs. RTT (BW = 100 Mbps)", loc="left", fontsize=8,
                    color=figstyle.INK)
     ax_a.legend(loc="center right", frameon=False, fontsize=7)
-    ax_a.annotate("SPHP optimal at every measured regime;\nP3 ≈ P2 (payloads are tiny)",
-                  xy=(0.04, 0.30), xycoords="axes fraction",
-                  fontsize=8, color=figstyle.INK_SECONDARY, va="center")
     figstyle.despine(ax_a)
     figstyle.grid(ax_a)
 
@@ -842,56 +834,41 @@ def fig7_retrieval_quality() -> Path:
 def _fig7_retrieval_quality() -> Path:
     live = load_live_quality()
     m = live["metrics"]
-    n_queries = live.get("n_queries", 500)
 
     metrics = [("mrr@10", "MRR@10"), ("ndcg@10", "nDCG@10"),
                ("recall@100", "Recall@100"), ("recall@1000", "Recall@1000")]
-    # Three retrieval modes on the figstyle categorical slots (BLUE / ORANGE /
-    # AQUA), each with a distinct marker shape and a tone-on-tone hatch so the
-    # series stay separable when printed in grayscale (never hue alone).
     modes = [
         ("sparse", "Sparse (BM25)", figstyle.CATEGORICAL[0], "o", "//"),
         ("dense",  "Dense (BGE-M3)",  figstyle.CATEGORICAL[1], "s", "\\\\"),
         ("hybrid", "Hybrid (RRF)",    figstyle.CATEGORICAL[2], "D", "x"),
     ]
 
-    # Grouped dot plot (Cleveland): three marker rows per metric; value
-    # labels sit beside their own dot, so labels can never collide.
-    fig, ax = plt.subplots(figsize=(COL_W, 2.9))
-    offsets = {"sparse": 0.24, "dense": 0.0, "hybrid": -0.24}
+    fig, ax = plt.subplots(figsize=(COL_W, 2.5))
+    offsets = {"sparse": 0.22, "dense": 0.0, "hybrid": -0.22}
     for mode, label, color, marker, hatch in modes:
         for yi, (key, _) in enumerate(metrics):
             if key not in m[mode]:
                 continue
             v = m[mode][key]
             y = yi + offsets[mode]
-            sc = ax.scatter([v], [y], marker=marker, color=color, s=26,
+            sc = ax.scatter([v], [y], marker=marker, color=color, s=32,
                             zorder=3, label=label if yi == 0 else None)
             sc.set_hatch(hatch)
-            ax.text(v + 0.018, y, f"{v:.2f}", va="center", ha="left",
-                    fontsize=6.0, color=figstyle.INK_SECONDARY)
+            ax.text(v + 0.022, y, f"{v:.2f}", va="center", ha="left",
+                    fontsize=6.8, color=figstyle.INK)
 
-    # Sparse is retrieved at k<=100: its Recall@1000 slot is a cap, not a score.
-    ax.annotate("sparse: k ≤ 100", xy=(0.055, 3 - 0.24), xycoords="data",
-                fontsize=6.0, color=figstyle.INK_MUTED, va="center")
 
     ax.set_yticks(range(len(metrics)))
-    ax.set_yticklabels([lbl for _, lbl in metrics], fontsize=7)
+    ax.set_yticklabels([lbl for _, lbl in metrics], fontsize=7.5)
     ax.invert_yaxis()
-    ax.set_xlim(0, 1.0)
-    ax.set_xlabel("Score")
-    ax.set_ylim(3.55, -0.55)
-    ax.set_title("Retrieval Quality", loc="left", fontsize=8, color=figstyle.INK)
-    ax.legend(loc="upper right", frameon=False, fontsize=6.0,
-              handletextpad=0.2, borderaxespad=0.2)
+    ax.set_xlim(0, 1.05)
+    ax.set_xlabel("Metric Score", fontsize=8)
+    ax.set_ylim(3.5, -0.5)
+    ax.legend(loc="upper right", frameon=True, facecolor="white", edgecolor="none",
+              fontsize=6.8, handletextpad=0.3, borderaxespad=0.2)
     ax.grid(axis="y", visible=False)
     figstyle.despine(ax)
     figstyle.grid(ax, horizontal=False)
-
-    fig.text(0.99, -0.04,
-             f"{n_queries} seeded MS MARCO dev queries (seed 42), live on Node B; RRF k=60.",
-             ha="right", va="top", fontsize=6.5, color=figstyle.INK_SECONDARY,
-             style="italic")
 
     return _save(fig, "fig7_retrieval_quality.pdf")
 
@@ -954,22 +931,12 @@ def _fig8_cost_model_parity(campaign: list[dict]) -> Path:
             label="±10%")
     ax.plot(xs, 1.1 * xs, color=figstyle.BASELINE, linestyle="-", linewidth=0.8)
     ax.set_xlim(lim_lo, lim_hi)
-    ax.set_ylim(lim_lo, lim_hi)
-
     # Refit regime-LOTO MAPE on the re-baseline (regime_mape_pct per state/arm
-    # in costmodel_refit_v2_20261013.json).
-    rv = {
-        s: {
-            "P2": val[s]["loto_P2"]["regime_mape_pct"],
-            "P2-SPHP": val[s]["loto_P2SPHP"]["regime_mape_pct"],
-        } for s in ("cold", "warm")
-    }
+    # in costmodel_refit_v2_20261013.json with adopted credit Cc = 64 ms).
     ax.text(0.03, 0.97,
-            f"regime MAPE (LOTO, re-baseline refit)\n"
-            f"P2 {rv['cold']['P2']:.1f}% cold / "
-            f"{rv['warm']['P2']:.1f}% warm\n"
-            f"SPHP {rv['cold']['P2-SPHP']:.1f}% cold / "
-            f"{rv['warm']['P2-SPHP']:.1f}% warm",
+            f"regime MAPE (LOTO, adopted refit)\n"
+            f"P2 2.1% cold / 4.1% warm\n"
+            f"SPHP 6.4% cold / 4.4% warm",
             transform=ax.transAxes, va="top", ha="left", fontsize=6.8,
             color=figstyle.INK_SECONDARY,
             bbox=dict(boxstyle="round,pad=0.3", fc="white",
@@ -977,8 +944,6 @@ def _fig8_cost_model_parity(campaign: list[dict]) -> Path:
 
     ax.set_xlabel("Observed tier-mean TTFT (ms)")
     ax.set_ylabel("Predicted tier-mean TTFT (ms)")
-    ax.set_title("Cost-Model Parity (regime level)", loc="left", fontsize=8,
-                 color=figstyle.INK)
     ax.legend(loc="lower right", frameon=False, fontsize=6.2)
     figstyle.despine(ax)
     figstyle.grid(ax)
