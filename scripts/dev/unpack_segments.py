@@ -3,7 +3,10 @@ import glob
 import subprocess
 import time
 
-segments_dir = r"D:\geo-distributed-hybrid-rag\node_b\systems\node_b\qdrant_storage\collections\msmarco_passages\0\segments"
+segments_dir = os.environ.get(
+    'QDRANT_SEGMENTS_DIR',
+    r"systems/node_b/qdrant_storage/collections/msmarco_passages/0/segments"
+)
 tar_files = sorted(glob.glob(os.path.join(segments_dir, "*.tar")))
 print(f"Found {len(tar_files)} segment tar files to unpack.")
 
@@ -14,7 +17,7 @@ for i, tar_path in enumerate(tar_files, 1):
     os.makedirs(dest_dir, exist_ok=True)
     
     t_start = time.time()
-    cmd = ["tar.exe", "-xf", tar_path, "-C", dest_dir, "--strip-components=2"]
+    cmd = ["tar", "-xf", tar_path, "-C", dest_dir, "--strip-components=2"]
     subprocess.run(cmd, check=True)
     os.remove(tar_path)
     elapsed = time.time() - t_start

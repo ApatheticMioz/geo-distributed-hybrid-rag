@@ -140,21 +140,21 @@ Requires explicit per-link target flags (`--link-b` for Node B `10.8.0.2`,
 ```bash
 # 1. Apply independent per-link shaping:
 # Shape Link B only (15 ms RTT, 0% loss):
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-b 15 0
+sudo bash scripts/netem/apply.sh --link-b 15 0
 # Shape Link C only (40 ms RTT, 1% loss):
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-c 40 1
+sudo bash scripts/netem/apply.sh --link-c 40 1
 # Shape both links simultaneously:
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/apply.sh --link-b 15 0 --link-c 40 1
+sudo bash scripts/netem/apply.sh --link-b 15 0 --link-c 40 1
 
 # 2. Inspect active qdiscs, HTB classes, and filters:
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/show.sh
+sudo bash scripts/netem/show.sh
 
 # 3. Closed-loop validation (±30% gate):
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh --link-b 15
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/validate.sh --link-c 40
+sudo bash scripts/netem/validate.sh --link-b 15
+sudo bash scripts/netem/validate.sh --link-c 40
 
 # 4. Clear all netem and HTB state:
-wsl.exe -u root -e bash /home/apath/Work/PDC/Project/scripts/netem/clear.sh
+sudo bash scripts/netem/clear.sh
 ```
 
 `campaign.py` calls `apply.sh`/`clear.sh` itself per regime (skipped for the
@@ -171,13 +171,13 @@ shaped path active behind a crashed run.
 ```
             LAN 192.168.0.0/24
    C (10.8.0.3) ──public Internet / DDNS── A (10.8.0.1, hub) ──B (10.8.0.2)
-   WireGuardTunnel$wg0      203.0.113.1:51820     tunnel "wg"
+   WireGuardTunnel$wg0      <NODE_A_PUBLIC_ENDPOINT>:51820     tunnel "wg"
    AllowedIps 10.8.0.0/24   A endpoint 192.168.0.10:51820
                                      AllowedIps 10.8.0.0/24
 ```
 
 - **A (hub):** `WireGuardTunnel$wg_a` @ `10.8.0.1`, public endpoint
-  `203.0.113.1:51820` (DDNS). Single peers: B and C.
+  `<NODE_A_PUBLIC_ENDPOINT>:51820`. Single peers: B and C.
 - **B (spoke):** tunnel **`wg`** @ `10.8.0.2`, single peer A, endpoint A's
   **LAN** IP `192.168.0.10:51820` (A and B share the `192.168.0.0/24` LAN).
   B's `AllowedIps` **must** be `10.8.0.0/24` — the narrow `10.8.0.1/32`
@@ -274,8 +274,8 @@ timings. `--retrieval-only` skips Node A generation (quality runs).
 ```bash
 python3 experiments/bench/run_eval.py \
     --gateway http://10.8.0.2:8000 \
-    --queries /home/apath/Work/PDC/data/msmarco/queries.dev.tsv \
-    --qrels   /home/apath/Work/PDC/data/msmarco/qrels.dev.small.tsv \
+    --queries data/msmarco/queries.dev.tsv \
+    --qrels   data/msmarco/qrels.dev.small.tsv \
     --mode hybrid --limit 500 --seed 42 --top-k 100 --rrf-k 60 \
     --retrieval-only \
     --out /tmp/live_hybrid_500.jsonl
@@ -289,9 +289,9 @@ JSONL with the proven scorer (`eval/compute_metrics.py`) and merges provenance
 ```bash
 python3 experiments/eval/make_quality_report.py \
     --run /tmp/live_hybrid_500.jsonl \
-    --qrels /home/apath/Work/PDC/data/msmarco/qrels.dev.small.tsv \
+    --qrels data/msmarco/qrels.dev.small.tsv \
     --gateway http://10.8.0.2:8000 \
-    --queries-file /home/apath/Work/PDC/data/msmarco/queries.dev.tsv \
+    --queries-file data/msmarco/queries.dev.tsv \
     --seed 42 --limit 500 --top-k 100 --rrf-k 60 \
     --out experiments/analysis/results/live_retrieval_quality.json
 ```
@@ -304,8 +304,8 @@ gateway to expose `answer_full` on `/query/benchmark`.
 ```bash
 python3 experiments/eval/answer_compare.py \
     --gateway http://10.8.0.2:8000 \
-    --queries /home/apath/Work/PDC/data/msmarco/queries.dev.tsv \
-    --qrels   /home/apath/Work/PDC/data/msmarco/qrels.dev.small.tsv \
+    --queries data/msmarco/queries.dev.tsv \
+    --qrels   data/msmarco/qrels.dev.small.tsv \
     --limit 200 --seed 42 --top-k 10 \
     --out /tmp/answers_sphp.jsonl \
     --report experiments/analysis/results/answer_comparison.json
@@ -355,27 +355,26 @@ The script always clears netem in a `finally` block, even on failure.
 Development can occur on Node A, Node B, or Node C. Commits are coordinated
 through remote Git (`origin/feat/three-node-study`).
 
-**From Node A (PC) or Node B (Laptop):**
+**From Node A (PC) or Node B (Gateway):**
 Push to remote, then trigger remote pull on target nodes via SSH:
 ```bash
 # Push active branch
-git push origin feat/three-node-study
+git push origin <branch>
 
-# Remotely sync Node B (from A):
-ssh laptop "git -C 'D:\geo-distributed-hybrid-rag\node_b' pull origin feat/three-node-study"
+# Remotely sync Node B:
+ssh node-b "git -C /path/to/repo pull origin <branch>"
 
-# Remotely sync Node A (from B):
-ssh pc "wsl.exe -d Ubuntu -e bash -c 'cd /home/apath/Work/PDC/Project && git pull origin feat/three-node-study'"
+# Remotely sync Node A:
+ssh node-a "git -C /path/to/repo pull origin <branch>"
 
-# Remotely sync Node C (from A or B):
-ssh node-c "git -C 'C:\geo-distributed-hybrid-rag\node_c' pull origin feat/three-node-study"
+# Remotely sync Node C:
+ssh node-c "git -C /path/to/repo pull origin <branch>"
 ```
 
-**From Node C (Friend's Laptop):**
-Node C does not have SSH access into Node A or Node B. The developer on Node C
-works locally, commits and pushes to `origin`, and pulls updates directly:
-```powershell
-git pull origin feat/three-node-study
+**From Node C (Edge Ingress):**
+Work locally, commit and push to `origin`, or pull updates directly:
+```bash
+git pull origin <branch>
 ```
 
 **Service restarts (only if relevant code changed):**

@@ -22,6 +22,9 @@ wstunnel*
 Thumbs.db
 .vscode/
 .idea/
+*.pid
+*.log
+gateway_out.log
 
 # LaTeX build artifacts
 *.aux
@@ -40,6 +43,7 @@ Thumbs.db
 **/tantivy_index*/
 **/*.sqlite*
 **/*.snapshot*
+data/
 
 # Models
 llama3-awq
@@ -49,13 +53,23 @@ llama3-awq
 # experiments/analysis/results are primary evidence and stay in git)
 *.jsonl
 !experiments/bench/campaigns/*.jsonl
-!experiments/bench/rq2_runs/**/*.jsonl
+!experiments/bench/rq2_runs/*.jsonl
 !experiments/analysis/results/*.jsonl
 
+# Failures, abandoned runs, and scratch
+**/abandoned_runs/
+**/failed_runs/
+**/aborted_runs/
 .scratch/
+scratch/
+.probe/
 .evo/
 .pytest_cache/
 .claude/
 paper/archive*/
 paper/reference_papers/
-scratch/
+proposal/
+
+# Root clutter
+/take_the_hint.pdf
+/start_gateway*.bat

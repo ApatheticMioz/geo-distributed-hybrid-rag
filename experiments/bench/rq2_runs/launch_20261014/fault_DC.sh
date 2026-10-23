@@ -2,7 +2,7 @@
 # CM-3 D-C fault (async, detached): kill C gateway, restart after 45s (outage must exceed the 30s request timeout so in-flight requests genuinely ERROR; same rationale as fault_DB.sh)
 # (ENABLE precondition per NODE_ACCESS SS3). ControlPath=none: bypass ssh mux.
 setsid nohup bash -c '
-  SSH_CMD="ssh -o BatchMode=yes -o ConnectTimeout=8 -o ControlPath=none -i ~/.ssh/id_ed25519 -F ~/.ssh/config friend-wg"
+  SSH_CMD="${SSH_CMD:-ssh -o BatchMode=yes -o ConnectTimeout=8 -o ControlPath=none node-c-wg}"
   {
     echo "start $(date -Ins)"
     $SSH_CMD "schtasks /End /TN pdc_gateway_c"

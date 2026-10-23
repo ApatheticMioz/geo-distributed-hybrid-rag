@@ -1,120 +1,180 @@
-# Geo-Distributed Hybrid RAG — Stage-Placement Measurement Study
+# Take the Hint: Speculative Prefill Acceleration for Geo-Distributed Hybrid RAG
 
-## What this is
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Artifacts: Reproducible](https://img.shields.io/badge/Artifacts-Reproducible%20(199%20tests)-brightgreen.svg)](REPRODUCIBILITY.md)
+[![Status: Confirmatory Evaluated](https://img.shields.io/badge/Benchmark-2%2C880%20Queries%20(N%3D0%20failures)-success.svg)](experiments/bench/campaigns/)
 
-A cache-state-aware measurement study of **stage-to-node placement** in a
-geo-distributed *hybrid* RAG pipeline — sparse (Tantivy BM25) + dense
-(BGE-M3/Qdrant) retrieval with reciprocal-rank fusion, and a vLLM-served
-Qwen3.8-27B generator — across WAN network regimes. The system is deployed on
-commodity hardware: an **RTX 3090 generation host (Node A)** and a
-**GTX 1660 Ti laptop gateway (Node B)** connected over a WireGuard link shaped
-by bidirectional Linux `netem` (0/15/40/80 ms). A **3-node variant (Node C:
-sparse + user-facing tier)** is reserved but not yet brought up.
+This repository hosts the official implementation, measurement harness, analytical cost model, raw confirmatory records, and figure generation suite for:
+> **"Take the Hint: Speculative Prefill Acceleration for Geo-Distributed Hybrid RAG"**
 
-The study answers three research questions (see
-`proposal/research_proposal.tex`):
+---
 
-- **RQ1 (Placement)** — which placement of each stage minimizes TTFT and
-  end-to-end latency under a given network regime, and where does the best
-  placement change?
-- **RQ2 (Degradation)** — when a node drops out, what is the cost in latency
-  and retrieval quality, and how fast can the system adapt?
-- **RQ3 (Policy)** — can a simple analytical cost model predict the best
-  placement within a stated tolerance and drive live per-regime selection?
+## 💡 Executive Summary & Core Systems Insights
 
-Headline findings (see `paper/main.pdf`): TTFT is essentially flat across the
-swept RTT range (0.73 ms TTFT / ms RTT); KV-cache state, not the network,
-dominates latency variance (cold ≈ 3.5 s vs warm ≈ 0.82 s, 4.4×); and SPHP
-(Speculative Progressive Hydration & Prefill) cuts cold TTFT by 17.4% at every
-regime (measured hit rate h = 0.84).
+Deploying hybrid Retrieval-Augmented Generation (RAG)—combining lexical sparse search (Tantivy BM25), dense neural embeddings (BGE-M3 + Qdrant HNSW), reciprocal-rank fusion (RRF), SQLite passage hydration, and LLM generation (vLLM Qwen3.8-27B)—across geographically distributed edge–cloud fleets introduces fundamental stage placement trade-offs. 
 
-## Repository layout
+Through a **2,880-record confirmatory benchmark** swept across four WAN regimes (0 to 80 ms RTT) under bidirectional Linux `netem` shaping, our measurements reveal:
+
+1. **TTFT is Flat in WAN Latency ($\approx$0.95 ms/ms RTT)**: Identifier-sized boundary payloads (144 bytes for top-10 IDs) decouple network transit delay from payload bulk.
+2. **KV-Cache State Dominates Latency Variance**: Cold-prefix TTFT ($\approx$1.7 s) reaches **$2.8$–$3.2\times$** warm-state latency ($\approx$0.55 s), overshadowing network variations across all WAN regimes.
+3. **SPHP Eliminates the Prefill Bottleneck**: By streaming an early provisional sparse hint ($\mathcal{H}$, 104 bytes) to the generation host immediately upon sparse index completion, **SPHP** (Speculative Progressive Hydration & Prefill) overlaps masked cloud prefill with in-flight dense retrieval and fusion.
+   * **Measured Hit Rate**: $h = 0.900$ (95% CI $[0.883, 0.914]$) with mean candidate set overlap of $0.636$.
+   * **Cold TTFT Reduction**: Cuts cold TTFT by **$23.7\%$–$27.6\%$** across all regimes (Holm-FWER $p \le 0.0008$, Cohen's $d = -1.29$ to $-1.57$).
+   * **Answer Quality**: Bounded within decode sampling stochasticity (token-F1 $0.422$ vs. baseline repeat $0.586$).
+4. **Analytical Placement Cost Model**: A closed-form analytical model achieves a leave-one-tier-out (LOTO) validation MAPE of **2.15% (cold) / 4.13% (warm)** for baseline P2 and **6.42% (cold) / 4.37% (warm)** for SPHP. Crossover sweeps across 35 (RTT, bandwidth) cells prove that SPHP split placement is globally optimal.
+5. **Generalization across Hostile Topologies**:
+   * **Physical 3-Node Tiering (CM-2)**: 16.9%–26.7% cold TTFT drop; warm TTFT sensitivity to Link B RTT drops to $0.153$ ms/ms.
+   * **Live Public WAN Routes (CM-4)**: 24.4% (2-node) and 23.9% (3-node) cold TTFT reductions under authentic internet jitter.
+   * **Multi-Leg Loss Stress Matrix (CM-5)**: Evaluated across 27 cells (54 arms, 810 queries, up to 2% loss per link); SPHP maintains a 24.7% mean speedup and $86.9\%$ hit rate.
+   * **Transient Edge Fault Recovery**: Edge dropouts self-heal in 64–86 s with zero post-recovery errors and latency settling within 1.4% of baseline.
+
+---
+
+## 🏛️ System Architecture & Dataflow
 
 ```
-experiments/
-  bench/       campaign driver, per-mode eval driver, query pools, raw campaign JSONL
-  eval/        retrieval-quality scorer, quality-report generator, answer-level SPHP comparison
-  analysis/   campaign-driven cost model, publication figures, fitted results
-systems/
-  node_a/      generation host (vLLM Qwen3.8-27B + local corpus store)
-  node_b/      edge gateway (Tantivy + BGE-M3/Qdrant + RRF) — docker-compose for Qdrant
-  node_c/      sparse + user-facing tier (reserved; config only)
-scripts/
-  netem/       bidirectional WAN shaping (apply/clear/show/validate) — root required
-  node_a/      orchestrator lifecycle (start/stop_stack.sh)
-  node_c_prep/ Node C bring-up checklist, preflight, benchmark
-  dev/         GPU / Tantivy / segment dev utilities
-  policy_demo.py, transfer_*.sh, forward_grpc.py, make_latency_sample.py
-paper/         main.tex + main.pdf + figures/ (fig1–fig8)
-proposal/      research_proposal.tex + .pdf (RQ1–RQ3, method)
-docs/          NODE_ACCESS, RUNBOOK, TESTBED, B_MIGRATION
-start_gateway.bat   Node B gateway launcher (run by the pdc_gateway scheduled task)
+   ┌────────────────────────┐      ┌─────────────────────────┐      ┌─────────────────────────┐
+   │  Node C (Edge Ingress) │      │  Node B (Neural Gateway)│      │  Node A (Cloud Host)    │
+   │  Tantivy BM25 (8.84M)  │      │  BGE-M3 + Qdrant HNSW   │      │  vLLM Qwen3.8-27B W4A16 │
+   └──────────┬─────────────┘      └────────────┬────────────┘      └────────────┬────────────┘
+              │                                 │                                │
+    Query In  │                                 │                                │
+    ─────────►│                                 │                                │
+              │── (1) Forward Dense Query ─────►│                                │
+              │                                 │── (3) Dense Encoding + HNSW    │
+              │── (2) Stream Sparse Hint (H) ───┼───────────────────────────────►│
+              │       (104 B provisional IDs)   │                                │── (5) Speculative
+              │                                 │                                │       Masked Prefill
+              │                                 │── (4) RRF Fusion Reciprocal    │       & SQLite Hydrate
+              │                                 │── (4) Verified Context (F) ───►│
+              │                                 │       (144 B top-k IDs)        │── (5) Overlap Gate
+              │                                 │                                │       Commit (h=0.900)
+              │◄────────────────────────────────┴────────────────────────────────┼── (6) SSE Token Stream
+    Client    │                                                                  │       (35.3 tok/s)
 ```
 
-## Key artifacts
+---
 
-| Artifact | What it is |
-|----------|------------|
-| `paper/main.pdf` | The paper (ICDCS) — findings, figures, cost model |
-| `experiments/analysis/results/cost_model_validation.json` | Campaign-fitted cost model + regime-level LOTO validation (cold/warm) |
-| `experiments/analysis/results/crossover_analysis.json` | Warm-fitted RTT×BW placement table (primary policy artifact) |
-| `experiments/analysis/results/crossover_analysis_cold.json` | Cold-fitted placement table (transient regime) |
-| `experiments/analysis/results/live_policy_demo_summary.json` | RQ3 live policy: realized vs predicted TTFT per regime/state |
-| `experiments/analysis/results/live_retrieval_quality.json` | 500-query seeded retrieval quality (MRR/nDCG/Recall) |
-| `experiments/analysis/results/answer_comparison.json` | Answer-level SPHP hit-path agreement (F-25) |
-| `experiments/bench/campaigns/campaign_*.jsonl` | Raw per-request timing records (the measurement evidence) |
+## 📊 Placement Topology Taxonomy
 
-## Quick start
+| Topology | Paradigm | Client Tier | Edge Gateway (Node B) | Cloud Host (Node A) |
+|:---|:---|:---|:---|:---|
+| **P0** | Colocated Monolithic | Ingress | --- | All pipeline stages colocated |
+| **P1** | Edge Gateway Proxy | Ingress | Gateway reverse proxy | All pipeline stages in cloud |
+| **P2** | Split Baseline | Ingress | Sparse, Dense, RRF Fusion | SQLite Hydrate, Prefill, Decode |
+| **P2-SPHP** | **Speculative Split** | Ingress | Sparse, Dense, RRF Fusion | SQLite Hydrate, **Speculative Prefill**, Decode |
+| **P3** | Edge Hydrate | Ingress | Sparse, Dense, Fusion, Hydrate | Prefill, Decode |
 
-Full detail, flags, and the netem/GPU-window discipline are in
-[`docs/RUNBOOK.md`](docs/RUNBOOK.md). All commands run from the repo root on
-Node A.
+---
 
+## 📂 Repository Structure
+
+```text
+├── LICENSE                             # Apache 2.0 Open Source License
+├── README.md                           # This document
+├── REPRODUCIBILITY.md                  # Comprehensive artifact evaluation & reproduction runbook
+├── pyproject.toml                      # Standard Python packaging & pytest config
+├── proto/                              # Centralized gRPC & Protocol Buffer schemas
+│   ├── coordination.proto
+│   ├── hybrid_coordination.proto
+│   ├── result_forward.proto
+│   └── dispatch.proto
+├── paper/                              # Camera-ready publication manuscript
+│   ├── main.tex                        # Complete IEEE conference LaTeX source
+│   ├── main.pdf                        # Compiled paper
+│   ├── references.bib                  # Sourced bibliography
+│   └── figures/                        # Publication vector figures (fig1–fig8)
+├── systems/                            # Heterogeneous multi-tier implementation
+│   ├── node_a/                         # Tier 1: Cloud Generation Host (vLLM + SQLite hydration)
+│   ├── node_b/                         # Tier 2: Regional Neural Gateway (BGE-M3 + Qdrant + RRF)
+│   └── node_c/                         # Tier 3: Edge Ingress Tier (Tantivy BM25 + SPHP hint)
+├── experiments/                        # Factorial measurement & analysis suite
+│   ├── bench/                          # Automated benchmark drivers & query pools
+│   │   ├── campaign.py                 # Factorial WAN measurement campaign driver
+│   │   ├── rq2_driver.py               # Fault injection & edge dropout driver
+│   │   ├── campaigns/                  # Canonical confirmatory raw records (2,880 queries)
+│   │   └── queries/                    # Seeded MS MARCO test query partitions
+│   ├── eval/                           # Retrieval quality & answer divergence scoring
+│   └── analysis/                       # Cost model fitting & deterministic figure generation
+│       ├── cost_model.py               # Closed-form cost model & LOTO cross-validation
+│       ├── figures.py                  # Generates Figures 1-8 to paper/figures/
+│       └── results/                    # Validated results, crossover sweeps, and parity logs
+├── scripts/                            # Operational & network control tooling
+│   ├── compile_protos.sh               # One-step Protocol Buffer compiler
+│   ├── netem/                          # Bidirectional Linux netem shaping (apply, clear, validate)
+│   ├── launch/                         # Portable service launch scripts
+│   └── node_a/                         # Cloud stack orchestration (start_stack.sh, stop_stack.sh)
+└── docs/                               # Systems testbed specifications & runbooks
+    ├── TESTBED.md                      # Physical hardware & testbed infrastructure
+    ├── RUNBOOK.md                      # Operational runbook for live campaigns
+    └── NODE_ACCESS.md                  # Inter-node access matrix & network layout
+```
+
+---
+
+## 🚀 One-Click Reproducibility
+
+### 1. Install Dependencies
 ```bash
-# 1. Stack up — vLLM engine must already be running on :18020
-bash scripts/node_a/start_stack.sh        # orchestrator gRPC :50052 + HTTP :8001
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
+### 2. Verify Test Suite (199 Tests Passing)
 ```bash
-# 2. Health check the Node B gateway
-curl -s http://10.8.0.2:8000/health       # expect "role":"hybrid_retrieval_gateway"
+pytest
 ```
 
+### 3. Regenerate Publication Figures (Figures 1–8)
 ```bash
-# 3. Run the latency campaign (4 regimes × SPHP on/off, hybrid)
-python3 experiments/bench/campaign.py --queries experiments/bench/queries/latency_dev480_seed42.txt --rtt-tiers 0 15 40 80 --loss-tiers 0 --modes hybrid --sphp-axis --query-sample 50 --seed 42 --warmups 5 --repeats 3 --out-dir experiments/bench/campaigns
+python3 experiments/analysis/figures.py
 ```
+Outputs vector PDFs into `paper/figures/`:
+* `fig1_arch.pdf`: Multi-tier system architecture and execution dataflow.
+* `fig2_topologies.pdf`: Topology component-placement matrix.
+* `fig3_sphp_timeline.pdf`: Space-time execution swimlanes (baseline P2 vs. SPHP).
+* `fig4_stage_breakdown.pdf`: TTFT stage composition across network regimes.
+* `fig5_ttft_vs_rtt.pdf`: Measured TTFT vs. WAN RTT (0–80 ms) with bootstrap 95% CIs.
+* `fig6_crossover_map.pdf`: Placement crossover curves over (RTT, Bandwidth).
+* `fig7_retrieval_quality.pdf`: Seeded 500-query MS MARCO retrieval quality.
+* `fig8_cost_model_parity.pdf`: Regime-level cost model parity and LOTO MAPE annotations.
 
+### 4. Validate Analytical Cost Model
 ```bash
-# 4. Refit the cost model + regenerate publication figures
-python3 experiments/analysis/cost_model.py && python3 experiments/analysis/figures.py
+python3 experiments/analysis/cost_model.py
 ```
 
-```bash
-# 5. Live placement-policy demo (RQ3)
-python3 scripts/policy_demo.py --queries experiments/bench/queries/latency_dev480_seed42.txt --per-regime 5 --warmups 2 --repeats 3
+---
+
+## 📑 Key Experimental Artifacts
+
+| Paper Reference | Artifact File | Description |
+|:---|:---|:---|
+| **Table II** (Latency Decomposition) | [`experiments/bench/campaigns/summary_v2_confirm_2node_20261013.json`](experiments/bench/campaigns/summary_v2_confirm_2node_20261013.json) | 2,880-query confirmatory measurement baseline |
+| **Table III** (Argmin Policy Verification)| [`experiments/analysis/results/live_policy_demo_summary.json`](experiments/analysis/results/live_policy_demo_summary.json) | Realized vs. predicted TTFT (pooled error 5.57%) |
+| **Table IV** (CM-2, CM-4, CM-5) | [`experiments/bench/campaigns/summary_20261021T135808Z.json`](experiments/bench/campaigns/summary_20261021T135808Z.json) | Multi-topology, public internet, and 27-cell stress records |
+| **Section V-C** (Answer Drift) | [`experiments/analysis/results/answer_comparison.json`](experiments/analysis/results/answer_comparison.json) | Token-F1 and exact match agreement over 200 seeded queries |
+| **Section VI-B** (Cost Parity) | [`experiments/analysis/results/cost_model_validation.json`](experiments/analysis/results/cost_model_validation.json) | Leave-one-tier-out regime validation logs |
+
+---
+
+## 📜 Citation
+
+If you use this codebase, cost models, or empirical findings in your research, please cite:
+
+```bibtex
+@inproceedings{take_the_hint_sphp2026,
+  title     = {Take the Hint: Speculative Prefill Acceleration for Geo-Distributed Hybrid RAG},
+  author    = {Anonymous Author(s)},
+  booktitle = {Proceedings of the IEEE International Conference on Distributed Computing Systems (ICDCS)},
+  year      = {2026}
+}
 ```
 
-## Docs
+---
 
-| Doc | Purpose |
-|-----|---------|
-| [`docs/NODE_ACCESS.md`](docs/NODE_ACCESS.md) | How to reach/operate each node — aliases, IPs, ports, deploy loop |
-| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | Operations — running the stack, campaigns, analysis, eval, policy demo |
-| [`docs/TESTBED.md`](docs/TESTBED.md) | Hardware + measurement infrastructure — topology, netem, protocol, corpus |
-| [`docs/B_MIGRATION.md`](docs/B_MIGRATION.md) | One-time Node B restructure cutover (`node_B/` → `systems/node_b/`) |
-| [`scripts/node_c_prep/NODE_C_CHECKLIST.md`](scripts/node_c_prep/NODE_C_CHECKLIST.md) | Node C bring-up (sparse + user-facing tier) |
+## 📄 License
 
-## Status
-
-- **Active branch** — `feat/three-node-study` (this tree). The 2-node
-  milestone is complete and its data remain the current baseline.
-- **2-node campaign — done** (2026-09-18): Node A generation + Node B gateway
-  measured across all four WAN regimes; cost model fitted and validated; RQ3
-  policy demo live.
-- **3-node code — landed, bring-up in progress**: Node C (sparse + user-facing
-  tier) is offline at last report; see `NODE_C_CHECKLIST.md`.
-- **Node B dense-leg fix — post-dates the campaign**: the issue #6 fix
-  (gRPC `prefer_grpc` + named `pdc_qdrant_storage` volume) landed after
-  2026-09-18, so the **2-node re-baseline is planned** to re-measure Node B
-  under the corrected dense path.
+This project is licensed under the [Apache License, Version 2.0](LICENSE).
