@@ -722,11 +722,14 @@ def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
         ax.set_xticks(tiers)
         ax.set_xlabel("WAN RTT (ms)")
         ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
-        ax.legend(loc="upper right", frameon=False)
         figstyle.despine(ax)
         figstyle.grid(ax)
 
     axes[0].set_ylabel("TTFT (ms)")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.03),
+               ncol=2, frameon=False, fontsize=8)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     return _save(fig, "fig5_ttft_vs_rtt.pdf")
 
 

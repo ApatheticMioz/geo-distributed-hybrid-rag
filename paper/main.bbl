@@ -50,16 +50,16 @@ S.~Robertson and S.~Walker, ``Some simple effective approximations to the
   of the 17th Annual International {ACM} {SIGIR} Conference on Research and
   Development in Information Retrieval}, 1994, pp. 232--241.
 
-\bibitem{karpukhin2020dpr}
-V.~Karpukhin \emph{et~al.}, ``Dense passage retrieval for open-domain question
-  answering,'' in \emph{Proceedings of the 2020 Conference on Empirical Methods
-  in Natural Language Processing (EMNLP)}, 2020, pp. 6769--6781.
-
 \bibitem{chen2024bge}
 J.~Chen, S.~Xiao, P.~Zhang, K.~Luo, D.~Lian, and Z.~Liu, ``{M3}-embedding:
   Multi-linguality, multi-functionality, multi-granularity text embeddings
   through self-knowledge distillation,'' in \emph{Findings of the Association
   for Computational Linguistics: ACL 2024}, 2024, pp. 2318--2335.
+
+\bibitem{karpukhin2020dpr}
+V.~Karpukhin \emph{et~al.}, ``Dense passage retrieval for open-domain question
+  answering,'' in \emph{Proceedings of the 2020 Conference on Empirical Methods
+  in Natural Language Processing (EMNLP)}, 2020, pp. 6769--6781.
 
 \bibitem{cormack2009rrf}
 G.~V. Cormack, C.~L.~A. Clarke, and S.~B{\"u}ttcher, ``Reciprocal rank fusion
@@ -110,6 +110,20 @@ K.~B. Aruna, V.~Kaliraj, I.~Sudha, and V.~Sureka, ``Janus: Joint prefill/decode
   {LLM} serving,'' \emph{EAI Endorsed Transactions on the Internet of Things},
   2025.
 
+\bibitem{qin2025mooncake}
+R.~Qin, Z.~Li, W.~He, J.~Cui, F.~Ren, M.~Zhang, Y.~Wu, W.~Zheng, and X.~Xu,
+  ``Mooncake: Trading more storage for less computation --- a {KVCache}-centric
+  architecture for serving {LLM} chatbot,'' in \emph{Proceedings of the 23rd
+  {USENIX} Conference on File and Storage Technologies (FAST)}, 2025, pp.
+  155--170, best Paper.
+
+\bibitem{mei2025helix}
+Y.~Mei, Y.~Zhuang, X.~Miao, J.~Yang, Z.~Jia, and R.~Vinayak, ``Helix: Serving
+  large language models over heterogeneous {GPU}s and network via max-flow,''
+  in \emph{Proceedings of the 30th {ACM} International Conference on
+  Architectural Support for Programming Languages and Operating Systems
+  (ASPLOS)}, 2025, pp. 586--602.
+
 \bibitem{bajaj2018msmarco}
 Y.~Bajaj, N.~Craswell, M.~Mitra, and M.~Chen, ``{MS MARCO}: A human-annotated
   open-domain dataset for machine reading comprehension,'' in \emph{Proceedings
@@ -147,20 +161,6 @@ R.~Fu, S.~Li, Y.~Xu, T.~Wu, Z.~Ma, and J.~Shi, ``Omnia: Efficient {RAG} serving
   International Symposium on High-Performance Parallel and Distributed
   Computing (HPDC '26)}, 2026.
 
-\bibitem{qin2025mooncake}
-R.~Qin, Z.~Li, W.~He, J.~Cui, F.~Ren, M.~Zhang, Y.~Wu, W.~Zheng, and X.~Xu,
-  ``Mooncake: Trading more storage for less computation --- a {KVCache}-centric
-  architecture for serving {LLM} chatbot,'' in \emph{Proceedings of the 23rd
-  {USENIX} Conference on File and Storage Technologies (FAST)}, 2025, pp.
-  155--170, best Paper.
-
-\bibitem{mei2025helix}
-Y.~Mei, Y.~Zhuang, X.~Miao, J.~Yang, Z.~Jia, and R.~Vinayak, ``Helix: Serving
-  large language models over heterogeneous {GPU}s and network via max-flow,''
-  in \emph{Proceedings of the 30th {ACM} International Conference on
-  Architectural Support for Programming Languages and Operating Systems
-  (ASPLOS)}, 2025, pp. 586--602.
-
 \bibitem{donenfeld2017wireguard}
 J.~A. Donenfeld, ``{WireGuard}: Next generation kernel network tunnel,'' in
   \emph{Proceedings of the Network and Distributed System Security Symposium
@@ -178,7 +178,7 @@ W.~Cheng, W.~Zhang, H.~Shen, Y.~Cai, X.~He, K.~Lv, and Y.~Liu, ``Optimize
 
 \bibitem{netem2024}
 {iproute2 project}, ``{netem}(8): Network emulator ({tc} qdisc),'' iproute2
-  manual page, 2024,
+  manual page, 2024, [Online]. Available:
   \url{https://man7.org/linux/man-pages/man8/tc-netem.8.html}.
 
 \end{thebibliography}

@@ -165,10 +165,9 @@ python3 experiments/analysis/cost_model.py
 If you use this codebase, cost models, or empirical findings in your research, please cite:
 
 ```bibtex
-@inproceedings{take_the_hint_sphp2026,
+@article{ali2026takethehint,
   title     = {Take the Hint: Speculative Prefill Acceleration for Geo-Distributed Hybrid RAG},
-  author    = {Anonymous Author(s)},
-  booktitle = {Proceedings of the IEEE International Conference on Distributed Computing Systems (ICDCS)},
+  author    = {Ali, Muhammad Abdullah and Aamir, Muhammad Abdullah and Majeed, Adil},
   year      = {2026}
 }
 ```

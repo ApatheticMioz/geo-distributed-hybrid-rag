@@ -68,6 +68,8 @@ scratch/
 .claude/
 paper/archive*/
 paper/reference_papers/
+paper/*preview*.png
+paper/*review*.png
 proposal/
 
 # Root clutter
