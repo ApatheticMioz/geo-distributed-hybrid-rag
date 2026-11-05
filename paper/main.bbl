@@ -108,7 +108,7 @@ Y.~Zhong, S.~Liu, J.~Chen, J.~Hu, Y.~Zhu, X.~Liu, X.~Jin, and H.~Zhang,
 K.~B. Aruna, V.~Kaliraj, I.~Sudha, and V.~Sureka, ``Janus: Joint prefill/decode
   disaggregation with {KV}-cache-aware multi-cloud routing for edge-adjacent
   {LLM} serving,'' \emph{EAI Endorsed Transactions on the Internet of Things},
-  2025.
+  2026.
 
 \bibitem{qin2025mooncake}
 R.~Qin, Z.~Li, W.~He, J.~Cui, F.~Ren, M.~Zhang, Y.~Wu, W.~Zheng, and X.~Xu,
@@ -125,14 +125,14 @@ Y.~Mei, Y.~Zhuang, X.~Miao, J.~Yang, Z.~Jia, and R.~Vinayak, ``Helix: Serving
   (ASPLOS)}, 2025, pp. 586--602.
 
 \bibitem{bajaj2018msmarco}
-Y.~Bajaj, N.~Craswell, M.~Mitra, and M.~Chen, ``{MS MARCO}: A human-annotated
-  open-domain dataset for machine reading comprehension,'' in \emph{Proceedings
-  of the 2018 Conference on Empirical Methods in Natural Language Processing
-  (EMNLP)}, 2018, pp. 663--668.
+P.~Bajaj, D.~Campos, N.~Craswell, L.~Deng, J.~Gao, X.~Liu, R.~Majumder,
+  A.~McNamara, B.~Mitra, T.~Nguyen, M.~Rosenberg, X.~Song, A.~Stoica,
+  S.~Tiwary, and T.~Wang, ``{MS MARCO}: A human generated machine reading
+  comprehension dataset,'' 2016, v3 2018.
 
 \bibitem{shen2024ragtradeoffs}
-Y.~Shen, M.~Umar, S.~Maeng, J.~Suh, and I.~Gupta, ``Towards understanding
-  systems trade-offs in {RAG} model inference,'' 2024.
+M.~Shen, M.~Umar, K.~Maeng, G.~E. Suh, and U.~Gupta, ``Towards understanding
+  systems trade-offs in retrieval-augmented generation model inference,'' 2024.
 
 \bibitem{leviathan2023speculative}
 Y.~Leviathan, M.~Kalman, and Y.~Matias, ``Fast inference from transformers via
@@ -166,12 +166,14 @@ J.~A. Donenfeld, ``{WireGuard}: Next generation kernel network tunnel,'' in
   \emph{Proceedings of the Network and Distributed System Security Symposium
   (NDSS)}, 2017.
 
-\bibitem{qwen3technicalreport}
-{Qwen Team}, ``Qwen3 technical report,'' \emph{arXiv preprint
-  arXiv:2505.09388}, 2025.
+\bibitem{qwen38hf2026}
+{Qwen Team}, ``Qwen3.8-27b (hugging face model card),''
+  \url{https://huggingface.co/Qwen/Qwen3.8-27B}, 2026, qwen3.8-27B release;
+  W4A16 AutoRound-quantized checkpoint
+  \url{https://huggingface.co/born2bewild/Qwen3.8-27B-W4A16-AutoRound-fast}.
 
 \bibitem{autoround2024}
-W.~Cheng, W.~Zhang, H.~Shen, Y.~Cai, X.~He, K.~Lv, and Y.~Liu, ``Optimize
+W.~Cheng, W.~Zhang, H.~Shen, Y.~Cai, X.~Y. He, K.~Lv, and Y.~Liu, ``Optimize
   weight rounding via signed gradient descent for the quantization of {LLM}s,''
   in \emph{Findings of the Association for Computational Linguistics: {EMNLP}
   2024}, 2024, autoRound / SignRound; INT4 (W4A16) via compressed-tensors.

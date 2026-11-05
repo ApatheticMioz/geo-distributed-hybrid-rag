@@ -800,6 +800,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "decode_tok_per_sec": round(model.decode_tok_per_sec, 2),
             "sphp_hit_rate_measured": round(model.sphp_hit_rate, 4),
             "t_sphp_miss_penalty_ms": round(model.t_sphp_miss_penalty_ms, 1),
+            "sphp_hit_credit_ms": 64.0 if state == "cold" else 0.0,
         }
         loto_p2 = regime_loto_validation(p2_recs, sphp_state, topology="P2")
         loto_sphp = regime_loto_validation(p2_recs, sphp_state, topology="P2-SPHP")

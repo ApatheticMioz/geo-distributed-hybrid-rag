@@ -135,7 +135,7 @@ Our physical testbed couples heterogeneous machines across wide-area networks ov
 \begin{itemize}
     \item \textit{Edge Ingress Tier (Node~C)}: Hosted on an Intel Core i5 workstation (16\,GB RAM). Node~C terminates client HTTP connections, parses queries, executes Tantivy BM25 sparse lexical search over the 8.84M-passage MS~MARCO index \cite{bajaj2018msmarco}, and streams response tokens back to users via Server-Sent Events (SSE).
     \item \textit{Regional Neural Gateway (Node~B)}: Hosted on an Intel Core i7-10750H machine equipped with an NVIDIA GTX~1660~Ti GPU (6\,GB VRAM) and 32\,GB RAM. Node~B computes 1024-dimensional BGE-M3 dense embeddings \cite{chen2024bge}, queries an HNSW vector index in Qdrant, and executes reciprocal-rank fusion ($k=60$) \cite{cormack2009rrf}.
-    \item \textit{Central Cloud Host (Node~A)}: Featuring an AMD Ryzen 7 7700 processor and an NVIDIA GeForce RTX~3090 GPU (24\,GB VRAM). Node~A serves the Qwen3.8-27B generator \cite{qwen3technicalreport} under vLLM \cite{kwon2023vllm} with AutoRound W4A16 quantization \cite{autoround2024}. Node~A maintains an indexed SQLite passage store for $O(1)$ hydration, evaluates candidate overlap at the verification barrier, and executes prefill and decoding.
+    \item \textit{Central Cloud Host (Node~A)}: Featuring an AMD Ryzen 7 7700 processor and an NVIDIA GeForce RTX~3090 GPU (24\,GB VRAM). Node~A serves the Qwen3.8-27B generator \cite{qwen38hf2026} under vLLM \cite{kwon2023vllm} with AutoRound W4A16 quantization \cite{autoround2024}. Node~A maintains an indexed SQLite passage store for $O(1)$ hydration, evaluates candidate overlap at the verification barrier, and executes prefill and decoding.
 \end{itemize}
 
 \begin{table}[t]
@@ -240,9 +240,9 @@ SPHP pipelines retrieval and generation across the three-tier hierarchy (Figure~
 \begin{enumerate}
     \item \textit{Provisional Hint Dispatch}: Upon completing BM25 search at time $\Tsparse$, Node~C immediately streams a provisional hint consisting of top-5 sparse passage identifiers ($\mathcal{H}$, $104$~bytes) over Link~C to Node~A.
     \item \textit{Speculative Prefill}: While BGE-M3 dense encoding and HNSW search proceed concurrently on Node~B, Node~A hydrates provisional passages from its local SQLite store and initiates speculative masked prefill $\hat{P}$ in VRAM. Candidate tokens generated during this window remain buffered internally and are strictly masked from the client SSE stream.
-    \item \textit{Verification Barrier}: When the verified ranking ($\mathcal{F}$, $144$~bytes for top-10 IDs) arrives from Node~B at time $t_f = \Tdense + \Tfusion + \Twan$, Node~A evaluates candidate agreement:
+    \item \textit{Verification Barrier}: When the verified ranking ($\mathcal{F}$, $144$~bytes for top-10 IDs) arrives from Node~B at time $t_f = \Tdense + \Tfusion + \Twan$, Node~A compares the provisional hint against the top-$k_h$ fused prefix $\mathcal{F}_{1:k_h}$ ($k_h = 5$):
     \begin{equation}
-        \text{Overlap}(\mathcal{H}, \mathcal{F}) = \frac{|\mathcal{H} \cap \mathcal{F}|}{|\mathcal{H}|}.
+        \text{Overlap}(\mathcal{H}, \mathcal{F}) = \frac{|\mathcal{H} \cap \mathcal{F}_{1:k_h}|}{|\mathcal{H}|}.
     \end{equation}
 \end{enumerate}
 If $\text{Overlap}(\mathcal{H}, \mathcal{F}) \ge \theta$ with $\theta = 0.5$, speculation hits: $\hat{P}$ is committed, the provisional KV-cache is preserved, and autoregressive decoding commences without stall. On a speculation miss, $\hat{P}$ is discarded, paying an abort penalty $\Tmiss$ ($124.5$~ms warm, $1{,}076.6$~ms cold), and full prefill executes over the verified ranking $\mathcal{F}$.
@@ -275,8 +275,8 @@ Payload sizes are $p_{\mathrm{id}} = 144$~B (top-10 IDs), $p_{\mathrm{hint}} = 1
 while the speculative SPHP placement cost is modeled as:
 \begin{equation}
 \begin{split}
-\Tttft^{(2,\mathrm{SPHP})} &= h \max(t_f, t_p) \\
-&\quad + (1-h)(\Tttft^{(2)} + \Tmiss) - C_{\mathrm{c}},
+\Tttft^{(2,\mathrm{SPHP})} &= h \bigl(\max(t_f, t_p) - C_{\mathrm{c}}\bigr) \\
+&\quad + (1-h)(\Tttft^{(2)} + \Tmiss),
 \end{split}
 \label{eq:sphp_cost}
 \end{equation}
@@ -334,9 +334,9 @@ We executed the 27-cell CM-5 stress matrix ($B \in \{15, 40, 80\}$~ms with indep
 We assessed fault tolerance by injecting 45~s service terminations into active 365-request streaming sequences. In the two-node edge failure scenario (killing Node~B), exactly two requests exceeded the 30~s timeout before service restored with a Time-to-Recovery (TTR) of 86.5~s (including process re-initialization and memory warming). Post-recovery latency settled within 1.4\% of baseline (median 1.86~s vs.\ 1.83~s) with zero errors across the remaining 295 requests. In the three-node failure scenario (terminating Node~C), edge failover yielded a TTR of 64.27~s, resuming execution with zero errors at identical latency (p50 2.07~s pre- and post-fault).
 
 % ===========================================================================
-%  VIII. DISCUSSION & THREATS TO VALIDITY
+%  VIII. DISCUSSION
 % ===========================================================================
-\section{Discussion \& Threats to Validity}
+\section{Discussion}
 \label{sec:discussion}
 
 \subsection{Systems Design Implications}
