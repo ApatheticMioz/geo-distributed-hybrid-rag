@@ -15,8 +15,8 @@ Contents
 * ``DIVERGING`` -- a blue<->red diverging ramp with a neutral gray midpoint,
   for signed quantities (delta, error, correlation).
 * ``TINTS`` -- light tints of the categorical slots (blue / orange / aqua),
-  for filled boxes / node fills in diagram figures (e.g. ``fig1_arch``).
-  Fills carry the color; strokes and arrows use the ink tokens.
+  for small chip fills only (e.g. the KV-cache chips in ``fig1_arch``).
+  Diagram boxes themselves stay white with ink strokes.
 * ``STATUS_GOOD``/``STATUS_WARNING``/``STATUS_SERIOUS``/``STATUS_CRITICAL``
   -- genuine status semantics only (health badges, error-rate callouts).
   NEVER as series colors; status hues live outside the categorical slots.
@@ -24,6 +24,29 @@ Contents
   ``BASELINE``, ``SURFACE``) -- text, ticks, gridlines, and spine chrome.
 * :func:`setup` -- apply the rcParams that all figures rely on.
 * :func:`despine`, :func:`grid`, :func:`series_style` -- small helpers.
+
+Diagram semantics (paper figures)
+---------------------------------
+The master scheme is ink-first: white ``SURFACE`` boxes, thin near-black
+ink strokes and text; hue appears only on small semantic elements. This
+matches the top-venue convention (verified against Mooncake FAST'25,
+Splitwise ISCA'24, DistServe OSDI'24) and avoids the pale-pastel look
+that reads as machine-generated.
+
+* ``BLUE``  -- query / retrieval / context dataflows, and the baseline
+  arm of any comparison.
+* ``ORANGE`` -- the speculative (SPHP) fast path: hint arrows,
+  speculative-prefill stages, delta / gain callouts.
+* ``TINTS`` -- storage-state chips only (KV-cache chips), never whole
+  boxes, never series fills.
+* Everything else -- lanes, boxes, axes, labels -- is ink chrome
+  (``INK`` / ``INK_MUTED`` / ``GRID``) on ``SURFACE``; idle and stall
+  regions use the warm neutral ``#F0EFEC``.
+
+TikZ diagrams cannot import this module, so ``paper/figures/*.tex``
+hard-code the same hex values (``2A78D6`` / ``EB6834`` / ``0B0B0B`` /
+``52514E`` / ``898781`` / ``F0EFEC``). Keep the two in sync; this
+section is the contract.
 
 Series encoding
 ---------------
