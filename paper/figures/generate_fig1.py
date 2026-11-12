@@ -1,7 +1,18 @@
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.patches import FancyBboxPatch, Rectangle
 import os
+
+# ---------------------------------------------------------------------------
+# Layout discipline: every text artist is measured against its box and
+# shrunk until it fits with PAD_X clearance on each side. Container titles
+# hang from the top border at a fixed TITLE_GAP so glyph-to-border spacing
+# is deterministic instead of hand-tuned.
+# ---------------------------------------------------------------------------
+PAD_X     = 0.045   # in: horizontal clearance between text and its box border
+TITLE_GAP = 0.055   # in: vertical clearance from container top border to title glyph top
 
 def generate_publication_fig1():
     # Exact IEEE full textwidth dimensions
@@ -36,23 +47,54 @@ def generate_publication_fig1():
     # Verification Accent (Forest Green)
     GREEN_DARK    = "#15803D"   # Green-800
 
+    # --- measured text helpers ------------------------------------------------
+    fig.canvas.draw()
+    _renderer = fig.canvas.get_renderer()
+    _inv = ax.transData.inverted()
+
+    def _width_in(artist):
+        bb = artist.get_window_extent(renderer=_renderer)
+        p0 = _inv.transform((bb.x0, bb.y0))
+        p1 = _inv.transform((bb.x1, bb.y1))
+        return abs(p1[0] - p0[0])
+
+    def fit_size(s, max_w, size, **kw):
+        """Largest font size <= ``size`` at which text ``s`` fits ``max_w``."""
+        probe = ax.text(0, -10, s, fontsize=size, **kw)
+        while _width_in(probe) > max_w and size > 4.0:
+            size -= 0.2
+            probe.set_fontsize(size)
+        probe.remove()
+        return size
+
+    def draw_text(x, y, s, max_w, size, **kw):
+        """Draw text shrunk so its width fits ``max_w`` with side clearance."""
+        size = fit_size(s, max_w, size, **kw)
+        return ax.text(x, y, s, fontsize=size, **kw)
+
+    def draw_container_title(cx, top, s, max_w, size, ha='center', x=None, **kw):
+        """Title hanging TITLE_GAP below a container's top border."""
+        return draw_text(cx if ha == 'center' else x, top - TITLE_GAP, s,
+                         max_w, size, ha=ha, va='top', **kw)
+
     # Helper: draw clean rounded component card
     def draw_card(x, y, w, h, title="", subtitle="", fcolor=WHITE, bcolor=CARD_BORDER,
-                  tcolor=SLATE_DARK, scolor=SLATE_MID, lw=0.8, r=0.03, z=3):
+                  tcolor=SLATE_DARK, scolor=SLATE_MID, lw=0.8, r=0.03, z=3, tsize=None):
         box = FancyBboxPatch(
             (x, y), w, h,
             boxstyle=f"round,pad=0.01,rounding_size={r}",
             facecolor=fcolor, edgecolor=bcolor, linewidth=lw, zorder=z
         )
         ax.add_patch(box)
+        inner_w = w - 2 * PAD_X
         if title and subtitle:
-            ax.text(x + w/2, y + h*0.66, title, ha='center', va='center',
-                    fontsize=6.8, fontweight='bold', color=tcolor, zorder=z+1)
-            ax.text(x + w/2, y + h*0.30, subtitle, ha='center', va='center',
-                    fontsize=5.6, color=scolor, zorder=z+1)
+            draw_text(x + w/2, y + h*0.66, title, inner_w, tsize or 6.8, ha='center', va='center',
+                      fontweight='bold', color=tcolor, zorder=z+1)
+            draw_text(x + w/2, y + h*0.30, subtitle, inner_w, 5.6, ha='center', va='center',
+                      color=scolor, zorder=z+1)
         elif title:
-            ax.text(x + w/2, y + h*0.50, title, ha='center', va='center',
-                    fontsize=6.8, fontweight='bold', color=tcolor, zorder=z+1)
+            draw_text(x + w/2, y + h*0.50, title, inner_w, tsize or 6.8, ha='center', va='center',
+                      fontweight='bold', color=tcolor, zorder=z+1)
 
     # -------------------------------------------------------------------------
     # 1. PHYSICAL TIERS (CONTAINER CHASSIS)
@@ -65,8 +107,8 @@ def generate_publication_fig1():
         facecolor=BG_LIGHT, edgecolor=SLATE_BORDER, linewidth=1.0, zorder=2
     )
     ax.add_patch(tier_c)
-    ax.text(0.12 + 1.65/2, 2.56, "Remote Edge (Node C)", ha='center', va='center',
-            fontsize=8.0, fontweight='bold', color=SLATE_DARK, zorder=3)
+    draw_container_title(0.12 + 1.65/2, 2.70, "Remote Edge (Node C)",
+                         1.65 - 2*PAD_X, 8.0, fontweight='bold', color=SLATE_DARK, zorder=3)
 
     # Outer Container: Co-located Cluster (Node B & Node A in Same Room LAN)
     # x in [3.35, 7.04], width = 3.69 in, y in [0.40, 2.70], height = 2.30 in
@@ -76,8 +118,8 @@ def generate_publication_fig1():
         facecolor="#FAFAFA", edgecolor=SLATE_BORDER, linewidth=0.9, zorder=1
     )
     ax.add_patch(cluster_box)
-    ax.text(3.35 + 3.69/2, 2.56, "Co-located Cluster (Local Gigabit LAN, <1 ms)",
-            ha='center', va='center', fontsize=7.8, fontweight='bold', color=SLATE_DARK, zorder=3)
+    draw_container_title(3.35 + 3.69/2, 2.70, "Co-located Cluster (Local Gigabit LAN, <1 ms)",
+                         3.69 - 2*PAD_X, 7.8, fontweight='bold', color=SLATE_DARK, zorder=3)
 
     # Tier 2: Neural Retrieval Tier (Node B) - Inside Cluster (Top)
     # x in [3.43, 6.96], width = 3.53 in, y in [1.68, 2.44], height = 0.76 in
@@ -87,19 +129,22 @@ def generate_publication_fig1():
         facecolor=BLUE_FILL, edgecolor=BLUE_BORDER, linewidth=0.8, linestyle=":", zorder=2
     )
     ax.add_patch(tier_b)
-    ax.text(3.52, 2.32, "Neural Retrieval Tier (Node B)", ha='left', va='center',
-            fontsize=7.2, fontweight='bold', color=BLUE_DARK, zorder=3)
+    draw_container_title(0, 2.44, "Neural Retrieval Tier (Node B)",
+                         3.53 - 2*PAD_X, 7.2, ha='left', x=3.43 + PAD_X,
+                         fontweight='bold', color=BLUE_DARK, zorder=3)
 
     # Tier 3: LLM Generation Tier (Node A) - Inside Cluster (Bottom)
-    # x in [3.43, 6.96], width = 3.53 in, y in [0.46, 1.22], height = 0.76 in
+    # Top raised to 1.28 so the title band clears the stage cards below.
+    # x in [3.43, 6.96], width = 3.53 in, y in [0.46, 1.28], height = 0.82 in
     tier_a = FancyBboxPatch(
-        (3.43, 0.46), 3.53, 0.76,
+        (3.43, 0.46), 3.53, 0.82,
         boxstyle="round,pad=0.015,rounding_size=0.04",
         facecolor=WHITE, edgecolor=SLATE_BORDER, linewidth=0.8, linestyle=":", zorder=2
     )
     ax.add_patch(tier_a)
-    ax.text(3.52, 1.13, "LLM Generation Tier (Node A)", ha='left', va='center',
-            fontsize=7.2, fontweight='bold', color=SLATE_DARK, zorder=3)
+    draw_container_title(0, 1.28, "LLM Generation Tier (Node A)",
+                         3.53 - 2*PAD_X, 7.2, ha='left', x=3.43 + PAD_X,
+                         fontweight='bold', color=SLATE_DARK, zorder=3)
 
     # -------------------------------------------------------------------------
     # 2. INTERNAL COMPONENTS
@@ -122,16 +167,19 @@ def generate_publication_fig1():
                 arrowprops=dict(arrowstyle="-|>", mutation_scale=8, linewidth=0.8, color=SLATE_DARK, zorder=5))
 
     # --- Node B Components (3 Pipelined Stages) ---
-    # Cards at y = 1.74, height = 0.46 in.
+    # Cards at y = 1.74, height = 0.46 in. Titles share one harmonized size
+    # so a shrunk label never sits next to a full-size neighbor.
+    b_titles = [("Dense Encoder", 1.00), ("Vector Search", 1.00), ("Rank Fusion", 1.10)]
+    b_tsize = min(fit_size(t, w - 2*PAD_X, 6.8, fontweight='bold') for t, w in b_titles)
     # Stage B1: Dense Encoder
     draw_card(3.48, 1.74, 1.00, 0.46, "Dense Encoder", "BGE-M3 (1024-d)",
-              fcolor=WHITE, bcolor=BLUE_BORDER, tcolor=BLUE_DARK, scolor=SLATE_MID)
+              fcolor=WHITE, bcolor=BLUE_BORDER, tcolor=BLUE_DARK, scolor=SLATE_MID, tsize=b_tsize)
     # Stage B2: Vector Search
     draw_card(4.62, 1.74, 1.00, 0.46, "Vector Search", "Qdrant HNSW",
-              fcolor=WHITE, bcolor=BLUE_BORDER, tcolor=BLUE_DARK, scolor=SLATE_MID)
+              fcolor=WHITE, bcolor=BLUE_BORDER, tcolor=BLUE_DARK, scolor=SLATE_MID, tsize=b_tsize)
     # Stage B3: Rank Fusion (x in [5.76, 6.86], width = 1.10 in)
     draw_card(5.76, 1.74, 1.10, 0.46, "Rank Fusion", "RRF ($k=60$)",
-              fcolor=WHITE, bcolor=BLUE_BORDER, tcolor=BLUE_DARK, scolor=SLATE_MID)
+              fcolor=WHITE, bcolor=BLUE_BORDER, tcolor=BLUE_DARK, scolor=SLATE_MID, tsize=b_tsize)
 
     # Arrows between Node B stages
     ax.annotate("", xy=(4.62, 1.97), xytext=(4.48, 1.97),
@@ -141,16 +189,17 @@ def generate_publication_fig1():
 
     # --- Node A Components (3 Stages) ---
     # Cards at y = 0.50, height = 0.56 in.
-    # Stage A1: Speculative Prefill (x in [3.48, 4.88], width = 1.40 in)
-    w_prefill = 1.40
+    # Stage A1: Speculative Prefill (x in [3.48, 4.92], width = 1.44 in)
+    w_prefill = 1.44
     draw_card(3.48, 0.50, w_prefill, 0.56, title="", subtitle="",
               fcolor=RUST_FILL, bcolor=RUST_BORDER, lw=1.0)
-    ax.text(3.48 + w_prefill/2, 0.94, "Hydrate + Spec. Prefill", ha='center', va='center',
-            fontsize=6.2, fontweight='bold', color=RUST_DARK, zorder=5)
+    draw_text(3.48 + w_prefill/2, 0.94, "Hydrate + Spec. Prefill",
+              w_prefill - 2*PAD_X, 6.2, ha='center', va='center',
+              fontweight='bold', color=RUST_DARK, zorder=5)
 
     # Segmented KV Cache Memory Array inside Stage A1
     kv_x = 3.56
-    kv_w = w_prefill - 0.16  # 1.24 in
+    kv_w = w_prefill - 0.16
     kv_y = 0.74
     kv_h = 0.16
     n_blocks = 5
@@ -167,31 +216,32 @@ def generate_publication_fig1():
                                facecolor=fc, edgecolor=ec, linewidth=0.6, zorder=5))
         ax.text(bx + bw/2 - 0.01, kv_y, txt, ha='center', va='center',
                 fontsize=5.8, fontweight='bold', color=tc, zorder=6)
-    ax.text(3.48 + w_prefill/2, 0.57, "Resident KV Cache", ha='center', va='center',
-            fontsize=5.4, color=RUST_DARK, zorder=5)
+    draw_text(3.48 + w_prefill/2, 0.57, "Resident KV Cache",
+              w_prefill - 2*PAD_X, 5.4, ha='center', va='center', color=RUST_DARK, zorder=5)
 
     # Stage A2: Verification Barrier (x in [5.04, 6.04], width = 1.00 in)
     draw_card(5.04, 0.50, 1.00, 0.56, title="", subtitle="",
               fcolor=WHITE, bcolor=SLATE_DARK, lw=0.9)
-    ax.text(5.04 + 0.50, 0.94, "Verification", ha='center', va='center',
-            fontsize=6.8, fontweight='bold', color=SLATE_DARK, zorder=5)
-    ax.text(5.04 + 0.50, 0.74, r"$\mathcal{H} \cap \mathcal{F} \geq \theta$", ha='center', va='center',
-            fontsize=6.5, fontweight='bold', color=SLATE_DARK, zorder=5)
-    ax.text(5.04 + 0.50, 0.57, r"$h \approx 0.90$", ha='center', va='center',
-            fontsize=5.4, fontweight='bold', color=GREEN_DARK, zorder=5)
+    draw_text(5.04 + 0.50, 0.94, "Verification", 1.00 - 2*PAD_X, 6.8,
+              ha='center', va='center', fontweight='bold', color=SLATE_DARK, zorder=5)
+    draw_text(5.04 + 0.50, 0.74, r"$\mathcal{H} \cap \mathcal{F} \geq \theta$",
+              1.00 - 2*PAD_X, 6.5, ha='center', va='center',
+              fontweight='bold', color=SLATE_DARK, zorder=5)
+    draw_text(5.04 + 0.50, 0.57, r"$h \approx 0.90$", 1.00 - 2*PAD_X, 5.4,
+              ha='center', va='center', fontweight='bold', color=GREEN_DARK, zorder=5)
 
     # Stage A3: Decode Engine (x in [6.18, 6.96], width = 0.78 in)
     draw_card(6.18, 0.50, 0.78, 0.56, title="", subtitle="",
               fcolor=WHITE, bcolor=SLATE_DARK, lw=0.9)
-    ax.text(6.18 + 0.39, 0.94, "Decode", ha='center', va='center',
-            fontsize=6.8, fontweight='bold', color=SLATE_DARK, zorder=5)
-    ax.text(6.18 + 0.39, 0.74, "Qwen3.8-27B", ha='center', va='center',
-            fontsize=5.8, color=SLATE_MID, zorder=5)
-    ax.text(6.18 + 0.39, 0.57, "35.3 tok/s", ha='center', va='center',
-            fontsize=5.4, color=SLATE_MUTED, zorder=5)
+    draw_text(6.18 + 0.39, 0.94, "Decode", 0.78 - 2*PAD_X, 6.8,
+              ha='center', va='center', fontweight='bold', color=SLATE_DARK, zorder=5)
+    draw_text(6.18 + 0.39, 0.74, "Qwen3.8-27B", 0.78 - 2*PAD_X, 5.8,
+              ha='center', va='center', color=SLATE_MID, zorder=5)
+    draw_text(6.18 + 0.39, 0.57, "35.3 tok/s", 0.78 - 2*PAD_X, 5.4,
+              ha='center', va='center', color=SLATE_MUTED, zorder=5)
 
     # Intra-Node A arrows
-    ax.annotate("", xy=(5.04, 0.74), xytext=(4.88, 0.74),
+    ax.annotate("", xy=(5.04, 0.74), xytext=(4.92, 0.74),
                 arrowprops=dict(arrowstyle="-|>", mutation_scale=8, linewidth=0.9, color=RUST_BORDER, zorder=5))
     ax.annotate("", xy=(6.18, 0.74), xytext=(6.04, 0.74),
                 arrowprops=dict(arrowstyle="-|>", mutation_scale=8, linewidth=0.8, color=SLATE_DARK, zorder=5))
@@ -224,7 +274,7 @@ def generate_publication_fig1():
     # Continuous blue vertical arrow from (5.90, 1.74) to (5.90, 1.06) (zorder=4)
     ax.annotate("", xy=(5.90, 1.06), xytext=(5.90, 1.74),
                 arrowprops=dict(arrowstyle="-|>", mutation_scale=8, linewidth=1.1, color=BLUE_DARK, zorder=4))
-    # Pill badge (zorder=6) centered at (5.90, 1.40) in the wide open 0.46-in gap
+    # Pill badge (zorder=6) centered at (5.90, 1.40) in the tier gap
     ax.text(5.90, 1.40, "Context $\\mathcal{F}$ (144 B · Link B)",
             ha='center', va='center', fontsize=5.6, fontweight='bold', color=BLUE_DARK, zorder=6,
             bbox=dict(facecolor=WHITE, edgecolor=BLUE_BORDER, boxstyle='round,pad=0.20', lw=0.7))
