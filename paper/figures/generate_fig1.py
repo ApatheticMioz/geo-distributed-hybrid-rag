@@ -145,8 +145,8 @@ def generate_publication_fig1():
     w_prefill = 1.40
     draw_card(3.48, 0.50, w_prefill, 0.56, title="", subtitle="",
               fcolor=RUST_FILL, bcolor=RUST_BORDER, lw=1.0)
-    ax.text(3.48 + w_prefill/2, 0.94, "Speculative Prefill", ha='center', va='center',
-            fontsize=6.8, fontweight='bold', color=RUST_DARK, zorder=5)
+    ax.text(3.48 + w_prefill/2, 0.94, "Hydrate + Spec. Prefill", ha='center', va='center',
+            fontsize=6.2, fontweight='bold', color=RUST_DARK, zorder=5)
 
     # Segmented KV Cache Memory Array inside Stage A1
     kv_x = 3.56
@@ -177,7 +177,7 @@ def generate_publication_fig1():
             fontsize=6.8, fontweight='bold', color=SLATE_DARK, zorder=5)
     ax.text(5.04 + 0.50, 0.74, r"$\mathcal{H} \cap \mathcal{F} \geq \theta$", ha='center', va='center',
             fontsize=6.5, fontweight='bold', color=SLATE_DARK, zorder=5)
-    ax.text(5.04 + 0.50, 0.57, "Hit Rate ~90%", ha='center', va='center',
+    ax.text(5.04 + 0.50, 0.57, r"$h \approx 0.90$", ha='center', va='center',
             fontsize=5.4, fontweight='bold', color=GREEN_DARK, zorder=5)
 
     # Stage A3: Decode Engine (x in [6.18, 6.96], width = 0.78 in)
@@ -185,7 +185,7 @@ def generate_publication_fig1():
               fcolor=WHITE, bcolor=SLATE_DARK, lw=0.9)
     ax.text(6.18 + 0.39, 0.94, "Decode", ha='center', va='center',
             fontsize=6.8, fontweight='bold', color=SLATE_DARK, zorder=5)
-    ax.text(6.18 + 0.39, 0.74, "Qwen-27B", ha='center', va='center',
+    ax.text(6.18 + 0.39, 0.74, "Qwen3.8-27B", ha='center', va='center',
             fontsize=5.8, color=SLATE_MID, zorder=5)
     ax.text(6.18 + 0.39, 0.57, "35.3 tok/s", ha='center', va='center',
             fontsize=5.4, color=SLATE_MUTED, zorder=5)

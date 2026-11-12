@@ -36,20 +36,24 @@ Node C must be a peer on the same WireGuard mesh as Nodes A and B.
    sudo dnf install -y wireguard-tools
    ```
 2. **Create the Node C peer config** `/etc/wireguard/wg0.conf`. The `Address`
-   **must** be `10.8.0.3/24` to match the campaign topology:
+   **must** be `10.8.0.3/24` to match the campaign topology. Node C has a
+   **single peer: Node A (10.8.0.1), the WireGuard hub** — the topology is
+   hub-and-spoke, NOT full mesh; Node B (10.8.0.2) is reachable only as a
+   relayed hop through A, so it must NOT be a separate peer (see
+   `docs/RUNBOOK.md` §"WireGuard hub-relay bring-up", verified live
+   2026-10-12). `AllowedIPs` must be the wide `10.8.0.0/24` so relayed C↔B
+   traffic is accepted:
    ```ini
    [Interface]
    Address = 10.8.0.3/24
    DNS     = 1.1.1.1
    PrivateKey = <NODE_C_PRIVATE_KEY>
 
-   [Peer]  # Node A
+   [Peer]  # Node A (hub) — single peer; B reachable via A relay
    PublicKey  = <NODE_A_PUBLIC_KEY>
-   AllowedIPs = 10.8.0.1/32
-
-   [Peer]  # Node B
-   PublicKey  = <NODE_B_PUBLIC_KEY>
-   AllowedIPs = 10.8.0.2/32
+   AllowedIPs = 10.8.0.0/24
+   Endpoint   = <NODE_A_PUBLIC_ENDPOINT>:51820
+   PersistentKeepalive = 25
    ```
 3. **Bring the interface up:**
    ```bash

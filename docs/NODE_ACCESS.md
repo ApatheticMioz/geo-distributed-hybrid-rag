@@ -12,7 +12,7 @@ The testbed connects three physical tiers across emulated or real wide-area netw
 |:---|:---|:---|:---|:---|
 | **Node A (Cloud Host)** | Local | `ssh node-b` / `ssh node-b-wg` | `ssh node-c` / `ssh node-c-wg` | Full push / pull |
 | **Node B (Regional Gateway)** | `ssh node-a` / `ssh node-a-wg` | Local | `ssh node-c` / `ssh node-c-wg` | Full push / pull |
-| **Node C (Edge Ingress)** | Transit via B | Transit via B | Local | Full push / pull |
+| **Node C (Edge Ingress)** | Direct (peer) | Transit via A | Local | Full push / pull |
 
 ### Node Endpoints at a Glance
 

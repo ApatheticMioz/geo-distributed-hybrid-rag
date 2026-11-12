@@ -42,7 +42,7 @@ S.~Borgeaud, A.~Mensch, J.~Hoffmann, T.~Cai, E.~Rutherford, K.~Millican,
 
 \bibitem{gao2024ragsurvey}
 Y.~Gao \emph{et~al.}, ``Retrieval-augmented generation for large language
-  models: A survey,'' 2024.
+  models: A survey,'' 2024, arXiv:2312.10997.
 
 \bibitem{robertson1994bm25}
 S.~Robertson and S.~Walker, ``Some simple effective approximations to the
@@ -128,11 +128,12 @@ Y.~Mei, Y.~Zhuang, X.~Miao, J.~Yang, Z.~Jia, and R.~Vinayak, ``Helix: Serving
 P.~Bajaj, D.~Campos, N.~Craswell, L.~Deng, J.~Gao, X.~Liu, R.~Majumder,
   A.~McNamara, B.~Mitra, T.~Nguyen, M.~Rosenberg, X.~Song, A.~Stoica,
   S.~Tiwary, and T.~Wang, ``{MS MARCO}: A human generated machine reading
-  comprehension dataset,'' 2016, v3 2018.
+  comprehension dataset,'' 2016, arXiv:1611.09268, v3 2018.
 
 \bibitem{shen2024ragtradeoffs}
 M.~Shen, M.~Umar, K.~Maeng, G.~E. Suh, and U.~Gupta, ``Towards understanding
-  systems trade-offs in retrieval-augmented generation model inference,'' 2024.
+  systems trade-offs in retrieval-augmented generation model inference,'' 2024,
+  arXiv:2412.11854.
 
 \bibitem{leviathan2023speculative}
 Y.~Leviathan, M.~Kalman, and Y.~Matias, ``Fast inference from transformers via
@@ -143,11 +144,11 @@ Y.~Leviathan, M.~Kalman, and Y.~Matias, ``Fast inference from transformers via
 \bibitem{chen2023speculative}
 C.~Chen, S.~Borgeaud, G.~Irving, J.-B. Lespiau, L.~Sifre, and J.-J. Cappe,
   ``Accelerating large language model decoding with speculative sampling,''
-  2023.
+  2023, arXiv:2302.01318.
 
 \bibitem{lyu2026speculation}
 Y.~Lyu, B.~Irukulapati, and J.~P. Champati, ``Speculation at a distance: Where
-  edge--cloud speculative decoding actually pays off,'' 2026.
+  edge--cloud speculative decoding actually pays off,'' 2026, arXiv:2606.25091.
 
 \bibitem{speculativerag2025}
 Z.~Wang, Z.~Wang, L.~Le, H.~S. Zheng, S.~Mishra, V.~Perot, Y.~Zhang,
