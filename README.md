@@ -131,8 +131,11 @@ pytest
 ```bash
 python3 experiments/analysis/figures.py
 ```
-Outputs vector PDFs into `paper/figures/`:
-* `fig1_arch.pdf`: Multi-tier system architecture and execution dataflow.
+Renders vector PDFs into `paper/figures/`. Figures 2–8 are driven by the
+campaign records; Figure 1 is the hand-tuned architecture diagram regenerated
+by its canonical generator (`paper/figures/generate_fig1.py`) which the
+pipeline invokes so a single command rebuilds every figure:
+* `fig1_arch.pdf`: Multi-tier system architecture and execution dataflow (via `paper/figures/generate_fig1.py`).
 * `fig2_topologies.pdf`: Topology component-placement matrix.
 * `fig3_sphp_timeline.pdf`: Space-time execution swimlanes (baseline P2 vs. SPHP).
 * `fig4_stage_breakdown.pdf`: TTFT stage composition across network regimes.

@@ -36,6 +36,8 @@ gateway_out.log
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+# Workspace-local TeX build cache (hermetic fmt/dumps; machine-specific)
+paper/.txmtmp/
 
 # Large Datasets and Vector Stores
 **/qdrant_storage/

@@ -5,20 +5,25 @@
 \usepackage{xcolor}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,patterns}
 
-% Professional Academic Color Palette (IEEE Systems Style)
-\definecolor{edgeshade}{HTML}{2B6CB0}
-\definecolor{cloudshade}{HTML}{C05621}
-\definecolor{wanshade}{HTML}{64748B}
+% Strict 2-Color Systems Color Palette (Unified with Figure 1)
+\definecolor{edgeshade}{HTML}{1D4ED8}    % Steel Blue
+\definecolor{cloudshade}{HTML}{1E293B}   % Slate
+\definecolor{wanshade}{HTML}{64748B}     % Muted Slate
 
-\definecolor{sparsefill}{HTML}{CCFBF1}
-\definecolor{sparsestroke}{HTML}{0D9488}
+\definecolor{sparsefill}{HTML}{EFF6FF}
+\definecolor{sparsestroke}{HTML}{1D4ED8}
 \definecolor{densefill}{HTML}{DBEAFE}
-\definecolor{densestroke}{HTML}{2563EB}
+\definecolor{densestroke}{HTML}{1D4ED8}
 
-\definecolor{prefillfill}{HTML}{FFEDD5}
-\definecolor{prefillstroke}{HTML}{EA580C}
-\definecolor{specprefillfill}{HTML}{D1FAE5}
-\definecolor{specprefillstroke}{HTML}{059669}
+\definecolor{prefillfill}{HTML}{EFF6FF}
+\definecolor{prefillstroke}{HTML}{1D4ED8}
+\definecolor{specprefillfill}{HTML}{FFF7ED}
+\definecolor{specprefillstroke}{HTML}{C2410C}
+
+\definecolor{rrfcolor}{HTML}{1E293B}     % Slate
+\definecolor{barriercolor}{HTML}{1E293B} % Slate
+\definecolor{baselinemarker}{HTML}{1E293B}
+\definecolor{deltacolor}{HTML}{C2410C}   % Terracotta
 
 \definecolor{stallfill}{HTML}{F8FAFC}
 \definecolor{stallstroke}{HTML}{94A3B8}
@@ -49,9 +54,9 @@
 \draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 4.6) rectangle (580, 5.5); % Node A
 
 % Track labels (left)
-\node[anchor=east, font=\scriptsize\bfseries, text=edgeshade] at (-8, 7.25) {Node B (Edge)};
-\node[anchor=east, font=\scriptsize\bfseries, text=wanshade]  at (-8, 6.15) {WAN Link};
-\node[anchor=east, font=\scriptsize\bfseries, text=cloudshade] at (-8, 5.05) {Node A (Cloud)};
+\node[anchor=east, font=\scriptsize\bfseries, text=edgeshade] at (-8, 7.25) {Node B (Retrieval)};
+\node[anchor=east, font=\scriptsize\bfseries, text=wanshade]  at (-8, 6.15) {Link B (WAN)};
+\node[anchor=east, font=\scriptsize\bfseries, text=cloudshade] at (-8, 5.05) {Node A (Generation)};
 
 % Grid lines
 \foreach \t in {0, 100, 200, 300, 400, 500, 558} {
@@ -68,12 +73,12 @@
 \node[font=\tiny\bfseries, text=densestroke] at (57.0, 7.05) {BGE-M3 (114 ms)};
 
 % RRF Fusion: 114.0 to 116.0 ms
-\draw[fill=purple!80, draw=purple!95, line width=0.6pt] (114.0, 6.85) rectangle (116.0, 7.65);
-\node[anchor=south, font=\tiny\bfseries, text=purple!90] at (115.0, 7.65) {RRF};
+\draw[fill=rrfcolor, draw=rrfcolor, line width=0.6pt] (114.0, 6.85) rectangle (116.0, 7.65);
+\node[anchor=south, font=\tiny\bfseries, text=rrfcolor] at (115.0, 7.65) {RRF};
 
 % --- Stalled on Node A ---
-\draw[barblock, draw=stallstroke, fill=stallfill!80, dashed] (0, 4.65) rectangle (134.0, 5.45);
-\node[font=\scriptsize\itshape, text=stallstroke!90!black] at (67.0, 5.05) {Idle (waiting for context)};
+\draw[barblock, draw=stallstroke, fill=stallfill, pattern=north east lines, pattern color=gray!35] (0, 4.65) rectangle (134.0, 5.45);
+\node[font=\scriptsize\itshape, text=stallstroke!90!black, fill=white, inner sep=1pt] at (67.0, 5.05) {Idle (waiting for context)};
 
 % --- WAN Transfer: 114.0 to 134.0 ms ---
 \draw[->, line width=1.1pt, draw=edgeshade] (114.0, 6.85) -- (134.0, 5.45);
@@ -85,8 +90,8 @@
     {Hydration + Prefill ($P$)};
 
 % --- Baseline TTFT Marker ---
-\draw[line width=1.1pt, draw=red!80!black, dashed] (558.0, 4.3) -- (558.0, 8.0);
-\node[anchor=south, font=\footnotesize\bfseries, text=red!80!black, fill=white, inner sep=1.5pt] at (558.0, 8.0) 
+\draw[line width=1.1pt, draw=baselinemarker, dashed] (558.0, 4.3) -- (558.0, 8.0);
+\node[anchor=south, font=\footnotesize\bfseries, text=baselinemarker, fill=white, inner sep=1.5pt] at (558.0, 8.0) 
     {Baseline $\mathrm{TTFT} = 558\,\text{ms}$};
 
 % Timeline Axis (Panel a)
@@ -95,8 +100,8 @@
     \draw[line width=0.7pt, draw=gray!60] (\t, 4.4) -- (\t, 4.28);
     \node[anchor=north, font=\scriptsize, text=textmuted] at (\t, 4.28) {\t};
 }
-\draw[line width=0.9pt, draw=red!80!black] (558.0, 4.4) -- (558.0, 4.25);
-\node[anchor=north, font=\scriptsize\bfseries, text=red!80!black] at (558.0, 4.25) {558};
+\draw[line width=0.9pt, draw=baselinemarker] (558.0, 4.4) -- (558.0, 4.25);
+\node[anchor=north, font=\scriptsize\bfseries, text=baselinemarker] at (558.0, 4.25) {558};
 
 
 % ===========================================================================
@@ -111,9 +116,9 @@
 \draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, -0.1) rectangle (580, 0.8); % Node A
 
 % Track labels (left)
-\node[anchor=east, font=\scriptsize\bfseries, text=edgeshade] at (-8, 2.55) {Node B (Edge)};
-\node[anchor=east, font=\scriptsize\bfseries, text=wanshade]  at (-8, 1.45) {WAN Link};
-\node[anchor=east, font=\scriptsize\bfseries, text=cloudshade] at (-8, 0.35) {Node A (Cloud)};
+\node[anchor=east, font=\scriptsize\bfseries, text=edgeshade] at (-8, 2.55) {Node B (Retrieval)};
+\node[anchor=east, font=\scriptsize\bfseries, text=wanshade]  at (-8, 1.45) {Link B (WAN)};
+\node[anchor=east, font=\scriptsize\bfseries, text=cloudshade] at (-8, 0.35) {Node A (Generation)};
 
 % Grid lines
 \foreach \t in {0, 100, 200, 300, 400, 500, 523, 558} {
@@ -130,7 +135,7 @@
 \node[font=\tiny\bfseries, text=densestroke] at (57.0, 2.35) {BGE-M3 (114 ms)};
 
 % RRF Fusion: 114.0 to 116.0 ms
-\draw[fill=purple!80, draw=purple!95, line width=0.6pt] (114.0, 2.15) rectangle (116.0, 2.95);
+\draw[fill=rrfcolor, draw=rrfcolor, line width=0.6pt] (114.0, 2.15) rectangle (116.0, 2.95);
 
 % --- FLOW 1: Speculative Hint Stream @ 79.2 ms ---
 \draw[->, dashed, line width=1.2pt, draw=specprefillstroke] (79.2, 2.6) -- (99.2, 0.75);
@@ -141,8 +146,8 @@
 \node[font=\tiny\bfseries, text=edgeshade] at (172.0, 1.45) {Fused Context $\mathcal{F}$};
 
 % --- Node A Idle: 0 to 99.2 ms ---
-\draw[barblock, draw=stallstroke, fill=stallfill!80, dashed] (0, -0.05) rectangle (99.2, 0.75);
-\node[font=\tiny\itshape, text=stallstroke!90!black] at (49.6, 0.35) {Idle};
+\draw[barblock, draw=stallstroke, fill=stallfill, pattern=north east lines, pattern color=gray!35] (0, -0.05) rectangle (99.2, 0.75);
+\node[font=\tiny\itshape, text=stallstroke!90!black, fill=white, inner sep=0.8pt] at (49.6, 0.35) {Idle};
 
 % --- Speculative Prefill on Node A: 99.2 to 522.8 ms ---
 \draw[barblock, draw=specprefillstroke, fill=specprefillfill] (99.2, -0.05) rectangle (522.8, 0.75);
@@ -150,8 +155,8 @@
     {Speculative Prefill ($\hat{P}$)};
 
 % Verification Gate barrier at 134.0 ms
-\draw[line width=1.3pt, draw=purple!85!black] (134.0, -0.05) -- (134.0, 0.75);
-\node[anchor=south, font=\tiny\bfseries, text=purple!95!black, fill=white, inner sep=1pt] at (134.0, 0.78) 
+\draw[line width=1.3pt, draw=barriercolor] (134.0, -0.05) -- (134.0, 0.75);
+\node[anchor=south, font=\tiny\bfseries, text=barriercolor, fill=white, inner sep=1pt] at (134.0, 0.78) 
     {Barrier: $|\mathcal{H} \cap \mathcal{F}| \ge \theta$};
 \node[anchor=south west, font=\tiny\bfseries, text=specprefillstroke] at (135.0, 0.15) 
     {Hit $\to$ Commit};
@@ -162,10 +167,10 @@
     {SPHP $\mathrm{TTFT} = 523\,\text{ms}$};
 
 % Baseline reference line
-\draw[line width=0.8pt, draw=red!60!black, dotted] (558.0, -0.4) -- (558.0, 3.3);
+\draw[line width=0.8pt, draw=baselinemarker, dotted] (558.0, -0.4) -- (558.0, 3.3);
 
 % Latency Delta Bracket: 522.8 to 558.0 ms
-\draw[<->, line width=1.0pt, draw=red!80!black] (522.8, 1.45) -- node[above, font=\scriptsize\bfseries, text=red!80!black] {$\Delta = 35\,\text{ms}$} (558.0, 1.45);
+\draw[<->, line width=1.0pt, draw=deltacolor] (522.8, 1.45) -- node[above, font=\scriptsize\bfseries, text=deltacolor] {$\Delta = 35\,\text{ms}$} (558.0, 1.45);
 
 % Timeline Axis (Panel b)
 \draw[line width=0.8pt, draw=gray!60] (0, -0.3) -- (580, -0.3);

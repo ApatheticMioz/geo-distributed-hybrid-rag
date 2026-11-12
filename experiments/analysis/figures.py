@@ -4,9 +4,11 @@ Publication-grade vector figures for the ICDCS paper.
 
 Generates IEEE-styled vector PDFs into ``paper/figures/``:
 
-  * fig1_arch.pdf             -- System architecture: Client / Node B (Edge
-                                  Gateway) / Node A (Cloud) with data-flow arrows
-                                  and warm steady-state timing annotations.
+  * fig1_arch.pdf             -- System architecture diagram. Hand-tuned static
+                                   design owned by paper/figures/generate_fig1.py
+                                   (the canonical Figure 1 generator); this
+                                   pipeline only regenerates it so a single
+                                   entry point rebuilds every figure.
   * fig2_topologies.pdf       -- Placement topology taxonomy (P0, P1, P2,
                                   P2-SPHP, P3) as a component-placement matrix.
   * fig3_sphp_timeline.pdf    -- Measured-mechanism timeline: SPHP speculative
@@ -60,7 +62,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib.ticker import NullFormatter
-from matplotlib.patches import Patch, FancyBboxPatch, FancyArrowPatch
+from matplotlib.patches import FancyBboxPatch
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -277,93 +279,18 @@ def _tier_means(records: list[dict], value_key: str = "ttft_ms") -> tuple[list[f
 # Fig 1 -- System architecture
 # ---------------------------------------------------------------------------
 def fig1_arch(model_warm: PlacementCostModel) -> Path:
-    tex_path = FIG_DIR / "fig1_arch.tex"
-    if tex_path.exists():
-        import subprocess
-        subprocess.run(["pdflatex", "-interaction=batchmode", f"-output-directory={FIG_DIR}", str(tex_path)], check=True)
-        return FIG_DIR / "fig1_arch.pdf"
-    saved_rc = dict(rcParams)
-    figstyle.setup()
-    try:
-        return _fig1_arch(model_warm)
-    finally:
-        rcParams.update(saved_rc)
-
-
-def _fig1_arch(model_warm: PlacementCostModel) -> Path:
-    fig, ax = plt.subplots(figsize=(FULL_W, 1.9))
-    ax.set_xlim(0, 10)
-    ax.set_ylim(-0.05, 3.20)
-    ax.axis("off")
-
-    def box(x, y, w, h, title, items, fc, ec):
-        p = FancyBboxPatch((x, y), w, h,
-                           boxstyle="round,pad=0.0,rounding_size=0.12",
-                           linewidth=1.2, edgecolor=ec, facecolor=fc, zorder=2)
-        ax.add_patch(p)
-        ax.text(x + w / 2, y + h - 0.14, title, ha="center", va="top",
-                fontsize=8.2, fontweight="bold", color=figstyle.INK, zorder=3)
-        top = y + h - 0.44
-        step = (h - 0.56) / max(len(items), 1)
-        for i, it in enumerate(items):
-            ax.text(x + 0.12, top - i * step, "• " + it, ha="left", va="top",
-                    fontsize=7.2, color=figstyle.INK, zorder=3)
-
-    # Node/machine box fills are light tints of the categorical palette
-    box(0.12, 0.75, 1.45, 1.95, "Client",
-        ["User query", "Streamed tokens"],
-        figstyle.TINTS["aqua"], figstyle.INK_SECONDARY)
-
-    # Node B (Edge Gateway)
-    box(2.15, 0.55, 2.75, 2.45, "Node B — Edge Gateway",
-        ["Tantivy BM25 (8.84M)",
-         "BGE-M3 + Qdrant",
-         "Reciprocal Rank Fusion",
-         f"t_sparse ≈ {model_warm.t_sparse_base_ms:.0f} ms (warm)",
-         f"t_dense ≈ {model_warm.t_dense_base_ms:.0f} ms (warm)"],
-        figstyle.TINTS["blue"], figstyle.INK)
-
-    # Node A (Generation Host)
-    box(7.10, 0.55, 2.78, 2.45, "Node A — Generation Host",
-        ["Corpus hydration (SQLite)",
-         "SPHP speculative prefill",
-         "vLLM Qwen3.8-27B (W4A16)",
-         f"t_prefill ≈ {model_warm.t_prefill_base_ms:.0f} ms (warm)"],
-        figstyle.TINTS["orange"], figstyle.INK)
-
-    def arrow(x1, y1, x2, y2, ls="-", rad=0.0):
-        a = FancyArrowPatch(
-            (x1, y1), (x2, y2),
-            arrowstyle="-|>", mutation_scale=13,
-            linewidth=1.0, color=figstyle.INK_SECONDARY, linestyle=ls,
-            zorder=4,
-            connectionstyle=f"arc3,rad={rad}" if rad else "arc3,rad=0")
-        ax.add_patch(a)
-
-    # Query: client -> Node B
-    arrow(1.57, 1.75, 2.15, 1.75)
-    ax.text(1.86, 1.83, "Query", ha="center", va="bottom",
-            fontsize=7.5, color=figstyle.INK_SECONDARY, zorder=5)
-
-    # Retrieval context: Node B -> Node A across the WireGuard link
-    arrow(4.90, 1.65, 7.05, 1.65, ls="--")
-    ax.text(6.00, 1.95, "WireGuard WAN", ha="center", va="bottom",
-            fontsize=7.8, fontweight="bold", color=figstyle.INK, zorder=5)
-    ax.text(6.00, 1.72, "(0–80 ms RTT)", ha="center", va="bottom",
-            fontsize=6.8, color=figstyle.INK_SECONDARY, zorder=5)
-    ax.text(6.00, 1.48, "SparseHint (104 B)", ha="center", va="top",
-            fontsize=6.8, color=figstyle.INK_SECONDARY, zorder=5)
-    ax.text(6.00, 1.25, "FusedContext (144 B)", ha="center", va="top",
-            fontsize=6.8, color=figstyle.INK_SECONDARY, zorder=5)
-    ax.text(6.00, 1.02, "gRPC stream", ha="center", va="top",
-            fontsize=6.5, fontstyle="italic", color=figstyle.INK_SECONDARY, zorder=5)
-
-    # Token stream: Node A -> client, routed BELOW the boxes.
-    arrow(8.50, 0.52, 0.85, 0.72, ls=":", rad=-0.16)
-    ax.text(4.68, 0.08, "Token stream (streamed back to client)",
-            ha="center", va="bottom", fontsize=7.2, color=figstyle.INK_SECONDARY, zorder=5)
-
-    return _save(fig, "fig1_arch.pdf")
+    # Figure 1 is a hand-tuned static diagram owned by
+    # paper/figures/generate_fig1.py (self-contained; it writes fig1_arch.pdf
+    # next to itself).  This pipeline only delegates to the generator so a
+    # single entry point rebuilds every figure; the fitted model is unused by
+    # design (the diagram carries fixed design constants, not fitted data).
+    del model_warm
+    generator = FIG_DIR / "generate_fig1.py"
+    if not generator.exists():
+        raise FileNotFoundError(f"Figure 1 generator missing: {generator}")
+    import subprocess
+    subprocess.run([sys.executable, str(generator)], check=True)
+    return FIG_DIR / "fig1_arch.pdf"
 
 
 # ---------------------------------------------------------------------------
