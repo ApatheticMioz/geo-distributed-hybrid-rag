@@ -214,8 +214,8 @@ where $N$ is emitted tokens and timestamps are in milliseconds, $t_{\mathrm{firs
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.78\textwidth]{figures/fig3_sphp_timeline.pdf}
-\caption{Space-time execution swimlanes for baseline P2 vs.\ P2-SPHP at 40~ms WAN RTT over 100~Mbps in the warm steady-state. The baseline serializes retrieval and WAN transit, idling the generation GPU for 134~ms. SPHP overlaps 424~ms of masked transformer prefill on Node~A with in-flight dense retrieval on Node~B, cutting warm TTFT from 558 to 523~ms.}
+\includegraphics[width=0.72\textwidth]{figures/fig3_sphp_timeline.pdf}
+\caption{Space-time execution swimlanes for baseline P2 and P2-SPHP in the warm steady-state, with Link~B at $40$\,ms RTT and Link~C at $15$\,ms RTT over $100$\,Mbps. The baseline idles Node~A for $136$\,ms until the fused context arrives. SPHP streams the provisional hint over Link~C upon completing sparse traversal and overlaps $424$\,ms of masked transformer prefill on Node~A with in-flight dense retrieval on Node~B, cutting hit-path warm TTFT from $559.6$ to $510.3$\,ms.}
 \label{fig:sphp}
 \vspace{-2mm}
 \end{figure*}
