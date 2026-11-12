@@ -88,14 +88,14 @@ Deploying hybrid RAG across geo-distributed edge--cloud fleets exposes a fundame
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.88\textwidth]{figures/fig1_arch.pdf}
-  \caption{SPHP architecture and speculative pipelining across distributed tiers. Edge node C dispatches an early hint $\mathcal{H}$ of $104$\,B to overlap GPU prefill on generation node A with neural retrieval on retrieval node B. Nodes A and B are co-located on a local LAN; Link~B is netem-swept over $0$--$80$\,ms to characterize multi-tier disaggregation.}
+  \caption{SPHP architecture and speculative pipelining across distributed tiers. Edge node C dispatches an early hint $\mathcal{H}$ of $104$\,B to overlap GPU prefill on generation node A with neural retrieval on retrieval node B. Nodes A and B are co-located on a local LAN; Link~B is netem-swept over $0$--$80$\,ms.}
   \label{fig:arch}
   \vspace{-3mm}
 \end{figure*}
 
 Through physical multi-tier testbed measurements over the 8.84M-passage MS~MARCO benchmark \cite{bajaj2018msmarco}, we uncover two governing systems properties:
 \begin{enumerate}
-    \item \textit{Decoupling of WAN Delay from Payload Bulk}: When wide-area boundaries transmit compact document identifiers of $104$--$144$~bytes rather than hydrated text of $\approx$6~KB, time-to-first-token (TTFT) increases by only $\approx$0.95~ms per millisecond of round-trip time (RTT). The network transit delay is effectively linear and predictable.
+    \item \textit{Decoupling of WAN Delay from Payload Bulk}: When wide-area boundaries transmit compact document identifiers of $104$--$144$~bytes rather than hydrated text of $\approx$6~KB, time-to-first-token (TTFT) increases by only $\approx$0.95~ms per millisecond of round-trip time (RTT).
     \item \textit{KV-Cache State Dominates Latency Variance}: In contrast to network delay, KV-cache state dominates TTFT variance. Cold-prefix TTFT reaches $2.8$--$3.2\times$ warm steady-state latency, at $1{,}656$--$1{,}720$~ms cold against $510$--$588$~ms warm, largely driven by transformer prefill and GPU page-table allocation. Serializing dense neural retrieval before GPU prefill leaves generation GPUs idle while awaiting candidate sets.
 \end{enumerate}
 
@@ -192,7 +192,7 @@ Table~\ref{tab:latency} details per-stage latencies across cache states and netw
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\columnwidth]{figures/fig5_ttft_vs_rtt.pdf}
-\caption{Measured TTFT vs.\ WAN RTT across network regimes, with error bars denoting bootstrap 95\% confidence intervals. (a)~Cold-prefix state: SPHP consistently accelerates TTFT by 23.7\%--27.6\%. (b)~Warm steady-state: curves exhibit a linear RTT slope of $\approx$0.95~ms/ms, confirming payload decoupling.}
+\caption{Measured TTFT vs.\ WAN RTT across network regimes, with error bars denoting bootstrap 95\% confidence intervals. (a)~Cold-prefix state. (b)~Warm steady-state.}
 \label{fig:ttft}
 \vspace{-2mm}
 \end{figure}
@@ -223,7 +223,7 @@ where $N$ is emitted tokens and timestamps are in milliseconds, $t_{\mathrm{firs
 \subsection{Protocol Mechanics}
 SPHP pipelines retrieval and generation across the three-tier hierarchy, as Figure~\ref{fig:sphp} illustrates. Rather than serializing dense retrieval and fusion prior to execution on Node~A, SPHP exploits the temporal head start of edge sparse traversal through an asynchronous protocol. Upon completing BM25 search at time $\Tsparse$, Node~C immediately streams a provisional hint $\mathcal{H}$ of $104$~bytes, carrying the top-5 sparse passage identifiers, over Link~C to Node~A, while BGE-M3 dense encoding and HNSW search proceed concurrently on Node~B over the full query payload forwarded at ingress.
 
-While dense retrieval is in flight on Node~B, Node~A hydrates provisional passages from its local SQLite store and initiates speculative masked prefill $\hat{P}$ in VRAM. Candidate tokens generated during this window remain buffered internally and are strictly masked from the client SSE stream, so no unverified content reaches the user. Across evaluated regimes, SPHP reduces cold TTFT by 23.7\%--27.6\%, with per-regime reductions of 24.1\%, 27.6\%, 23.7\%, and 25.5\% at 0, 15, 40, and 80~ms RTT. All four one-sided permutation tests clear the Holm-FWER significance threshold, with $p \le 0.0008$ and Cohen's $d$ from $-1.29$ to $-1.57$; in absolute terms at 0~ms RTT, mean cold TTFT drops from $1{,}656.8$~ms to $1{,}258.4$~ms, a $398.4$~ms reduction.
+While dense retrieval is in flight on Node~B, Node~A hydrates provisional passages from its local SQLite store and initiates speculative masked prefill $\hat{P}$ in VRAM. Candidate tokens generated during this window remain buffered internally and are strictly masked from the client SSE stream. Across evaluated regimes, SPHP reduces cold TTFT by 23.7\%--27.6\%, with per-regime reductions of 24.1\%, 27.6\%, 23.7\%, and 25.5\% at 0, 15, 40, and 80~ms RTT. All four one-sided permutation tests clear the Holm-FWER significance threshold, with $p \le 0.0008$ and Cohen's $d$ from $-1.29$ to $-1.57$; in absolute terms at 0~ms RTT, mean cold TTFT drops from $1{,}656.8$~ms to $1{,}258.4$~ms, a $398.4$~ms reduction.
 
 When the verified ranking $\mathcal{F}$ of $144$~bytes, carrying the top-10 identifiers, arrives from Node~B at time $t_f = \Tdense + \Tfusion + \Twan$, Node~A compares the provisional hint against the top-$k_h$ fused prefix $\mathcal{F}_{1:k_h}$ with $k_h = 5$:
 \begin{equation}
