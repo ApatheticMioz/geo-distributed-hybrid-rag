@@ -130,7 +130,7 @@ Partitioning neural network execution between edge and cloud has been studied fo
 \label{sec:characterization}
 
 \subsection{Physical Testbed Architecture}
-Our physical testbed couples three heterogeneous machines across wide-area networks over WireGuard tunnels \cite{donenfeld2017wireguard} (Figure~\ref{fig:arch}):
+Our physical testbed couples three heterogeneous machines across wide-area networks over WireGuard tunnels \cite{donenfeld2017wireguard}; Figure~\ref{fig:arch} summarizes the deployment:
 \begin{itemize}
     \item \textit{Node~C (Edge Ingress)}: Hosted on a 12th-generation Intel Core laptop (16\,GB RAM) situated at a remote edge site connected over a wide-area link (Link~C, $15$\,ms RTT). Node~C terminates client HTTP connections, parses queries, executes Tantivy BM25 sparse lexical search over the 8.84M-passage MS~MARCO index \cite{bajaj2018msmarco}, and streams response tokens back to users via Server-Sent Events (SSE).
     \item \textit{Node~B (Neural Retrieval)}: Hosted on an Intel Core i7-10750H laptop equipped with an NVIDIA GTX~1660~Ti GPU (6\,GB VRAM) and 24\,GB RAM. Node~B computes 1024-dimensional BGE-M3 dense embeddings \cite{chen2024bge}, queries an HNSW vector index in Qdrant, and executes reciprocal-rank fusion ($k=60$) \cite{cormack2009rrf}.
