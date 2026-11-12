@@ -5,30 +5,31 @@
 \usepackage{xcolor}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,patterns}
 
-% Strict 2-Color Systems Color Palette (Unified with Figure 1)
-\definecolor{edgeshade}{HTML}{1D4ED8}    % Steel Blue
-\definecolor{cloudshade}{HTML}{1E293B}   % Slate
-\definecolor{wanshade}{HTML}{64748B}     % Muted Slate
+% Ink-first palette, unified with Figure 1 (experiments/analysis/figstyle.py):
+% ink chrome, blue retrieval/context flows, orange speculative fast path.
+\definecolor{edgeshade}{HTML}{2A78D6}    % BLUE   (figstyle slot 1)
+\definecolor{cloudshade}{HTML}{0B0B0B}   % INK
+\definecolor{wanshade}{HTML}{898781}     % INK_MUTED
 
-\definecolor{sparsefill}{HTML}{EFF6FF}
-\definecolor{sparsestroke}{HTML}{1D4ED8}
-\definecolor{densefill}{HTML}{DBEAFE}
-\definecolor{densestroke}{HTML}{1D4ED8}
+\definecolor{sparsefill}{HTML}{FFFFFF}
+\definecolor{sparsestroke}{HTML}{2A78D6}
+\definecolor{densefill}{HTML}{FFFFFF}
+\definecolor{densestroke}{HTML}{2A78D6}
 
-\definecolor{prefillfill}{HTML}{EFF6FF}
-\definecolor{prefillstroke}{HTML}{1D4ED8}
-\definecolor{specprefillfill}{HTML}{FFF7ED}
-\definecolor{specprefillstroke}{HTML}{C2410C}
+\definecolor{prefillfill}{HTML}{FFFFFF}
+\definecolor{prefillstroke}{HTML}{2A78D6}
+\definecolor{specprefillfill}{HTML}{FFFFFF}
+\definecolor{specprefillstroke}{HTML}{EB6834}   % ORANGE (figstyle slot 2)
 
-\definecolor{rrfcolor}{HTML}{1E293B}     % Slate
-\definecolor{barriercolor}{HTML}{1E293B} % Slate
-\definecolor{baselinemarker}{HTML}{1E293B}
-\definecolor{deltacolor}{HTML}{C2410C}   % Terracotta
+\definecolor{rrfcolor}{HTML}{0B0B0B}     % INK
+\definecolor{barriercolor}{HTML}{0B0B0B} % INK
+\definecolor{baselinemarker}{HTML}{0B0B0B}
+\definecolor{deltacolor}{HTML}{EB6834}   % ORANGE (SPHP gain)
 
-\definecolor{stallfill}{HTML}{F8FAFC}
-\definecolor{stallstroke}{HTML}{94A3B8}
-\definecolor{textdark}{HTML}{0F172A}
-\definecolor{textmuted}{HTML}{475569}
+\definecolor{stallfill}{HTML}{F0EFEC}    % warm neutral gray (figstyle family)
+\definecolor{stallstroke}{HTML}{898781}
+\definecolor{textdark}{HTML}{0B0B0B}
+\definecolor{textmuted}{HTML}{52514E}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -45,8 +46,8 @@
 % ===========================================================================
 % PANEL (a): BASELINE P2 (SERIALIZED)
 % ===========================================================================
-\node[anchor=west, font=\bfseries\normalsize, text=textdark] at (0, 8.1) 
-    {(a) Baseline P2 --- Serialized Execution ($RTT = 40\,\text{ms}$, $BW = 100\,\text{Mbps}$)};
+\node[anchor=west, font=\bfseries\normalsize, text=textdark] at (0, 8.1)
+    {(a) Baseline P2: Serialized Execution ($RTT = 40\,\text{ms}$, $BW = 100\,\text{Mbps}$)};
 
 % Track backgrounds
 \draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 6.8) rectangle (580, 7.7); % Node B
@@ -107,8 +108,8 @@
 % ===========================================================================
 % PANEL (b): P2-SPHP (SPECULATIVE PREFILL OVERLAP)
 % ===========================================================================
-\node[anchor=west, font=\bfseries\normalsize, text=textdark] at (0, 3.4) 
-    {(b) P2-SPHP --- Provisional Prefill Overlaps Dense Retrieval ($RTT = 40\,\text{ms}$, $BW = 100\,\text{Mbps}$)};
+\node[anchor=west, font=\bfseries\normalsize, text=textdark] at (0, 3.4)
+    {(b) P2-SPHP: Provisional Prefill Overlaps Dense Retrieval ($RTT = 40\,\text{ms}$, $BW = 100\,\text{Mbps}$)};
 
 % Track backgrounds
 \draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 2.1) rectangle (580, 3.0); % Node B
@@ -170,7 +171,7 @@
 \draw[line width=0.8pt, draw=baselinemarker, dotted] (558.0, -0.4) -- (558.0, 3.3);
 
 % Latency Delta Bracket: 522.8 to 558.0 ms
-\draw[<->, line width=1.0pt, draw=deltacolor] (522.8, 1.45) -- node[above, font=\scriptsize\bfseries, text=deltacolor] {$\Delta = 35\,\text{ms}$} (558.0, 1.45);
+\draw[<->, line width=1.0pt, draw=deltacolor] (522.8, 1.45) -- node[above, font=\scriptsize\bfseries, text=deltacolor, fill=white, inner sep=1pt] {$\Delta = 35\,\text{ms}$} (558.0, 1.45);
 
 % Timeline Axis (Panel b)
 \draw[line width=0.8pt, draw=gray!60] (0, -0.3) -- (580, -0.3);
@@ -181,8 +182,8 @@
 \draw[line width=0.9pt, draw=specprefillstroke] (522.8, -0.3) -- (522.8, -0.45);
 \node[anchor=north, font=\scriptsize\bfseries, text=specprefillstroke] at (522.8, -0.45) {523};
 
-\draw[line width=0.9pt, draw=red!80!black] (558.0, -0.3) -- (558.0, -0.45);
-\node[anchor=north, font=\scriptsize\bfseries, text=red!80!black] at (558.0, -0.45) {558};
+\draw[line width=0.9pt, draw=baselinemarker] (558.0, -0.3) -- (558.0, -0.45);
+\node[anchor=north, font=\scriptsize\bfseries, text=textdark] at (558.0, -0.45) {558};
 
 \node[anchor=north, font=\footnotesize\bfseries, text=textdark] at (290, -0.85) {Execution Timeline (ms)};
 
