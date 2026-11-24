@@ -6,171 +6,212 @@
 \usepackage{xcolor}
 \usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds}
 
-% Disciplined two-tone palette (CVD-safe, high contrast, ink-first academic style)
-\definecolor{ink}{HTML}{0B0B0B}
-\definecolor{inkSecondary}{HTML}{4A5568}
-\definecolor{inkMuted}{HTML}{718096}
-\definecolor{inkBaseline}{HTML}{CBD5E1}
-\definecolor{chassisBg}{HTML}{F8FAFC}
-\definecolor{cardBg}{HTML}{FFFFFF}
+% Disciplined high-contrast academic palette (CVD-safe, IEEE compliant)
+\definecolor{inkDark}{HTML}{0F172A}
+\definecolor{inkBody}{HTML}{334155}
+\definecolor{inkMuted}{HTML}{64748B}
+\definecolor{lineBorder}{HTML}{CBD5E1}
+\definecolor{cardWhite}{HTML}{FFFFFF}
 
-% Blue series (Standard retrieval & query flow)
-\definecolor{blueStroke}{HTML}{1F5FA8}
-\definecolor{blueFill}{HTML}{F0F6FC}
+% Machine Enclosures
+\definecolor{edgeChassis}{HTML}{F8FAFC}
+\definecolor{edgeHdrBg}{HTML}{E2E8F0}
+\definecolor{edgeHdrText}{HTML}{1E293B}
 
-% Orange series (Speculative fast path)
-\definecolor{orangeStroke}{HTML}{D9531E}
-\definecolor{orangeFill}{HTML}{FFF7ED}
+\definecolor{nodeBChassis}{HTML}{F8FAFC}
+\definecolor{nodeBHdrBg}{HTML}{DBEAFE}
+\definecolor{nodeBHdrText}{HTML}{1E40AF}
+\definecolor{nodeBStroke}{HTML}{3B82F6}
+
+\definecolor{nodeAChassis}{HTML}{F8FAFC}
+\definecolor{nodeAHdrBg}{HTML}{FEF3C7}
+\definecolor{nodeAHdrText}{HTML}{92400E}
+\definecolor{nodeAStroke}{HTML}{D97706}
+
+% Dataflow
+\definecolor{blueFlow}{HTML}{1D4ED8}
+\definecolor{blueFlowBg}{HTML}{EFF6FF}
+\definecolor{orangeFast}{HTML}{C2410C}
+\definecolor{orangeFastBg}{HTML}{FFF7ED}
 
 \pgfkeys{
-  /tikz/boxBase/.style={draw,rounded corners=2pt,line width=0.6pt,inner sep=2.5pt,align=center},
-  /tikz/card/.style={boxBase,fill=cardBg,draw=inkSecondary},
-  /tikz/cardOrange/.style={boxBase,fill=orangeFill,draw=orangeStroke,line width=0.8pt},
-  /tikz/cardBlue/.style={boxBase,fill=blueFill,draw=blueStroke,line width=0.8pt},
-  /tikz/pill/.style={fill=cardBg,draw=inkMuted,line width=0.45pt,rounded corners=1.5pt,
-    inner sep=1.8pt,align=center,font=\fontsize{6.0}{7.2}\selectfont},
-  /tikz/pillBlue/.style={fill=cardBg,draw=blueStroke,line width=0.60pt,rounded corners=1.5pt,
-    inner sep=1.8pt,align=center,font=\fontsize{6.0}{7.2}\selectfont\bfseries,text=blueStroke},
-  /tikz/pillOrange/.style={fill=cardBg,draw=orangeStroke,line width=0.65pt,rounded corners=1.5pt,
-    inner sep=1.8pt,align=center,font=\fontsize{6.0}{7.2}\selectfont\bfseries,text=orangeStroke},
-  /tikz/chassis/.style={draw=inkBaseline,fill=chassisBg,rounded corners=3pt,line width=0.65pt},
-  /tikz/subchassis/.style={draw=inkBaseline!90,fill=cardBg,rounded corners=2.5pt,line width=0.55pt,dashed},
+  /tikz/boxCard/.style={
+    draw=lineBorder,fill=cardWhite,rounded corners=2pt,
+    line width=0.65pt,inner sep=3.0pt,align=center
+  },
+  /tikz/cardOrange/.style={
+    draw=orangeFast,fill=orangeFastBg,rounded corners=2pt,
+    line width=0.85pt,inner sep=3.0pt,align=center
+  },
+  /tikz/cardBlue/.style={
+    draw=blueFlow,fill=blueFlowBg,rounded corners=2pt,
+    line width=0.75pt,inner sep=3.0pt,align=center
+  },
+  /tikz/pill/.style={
+    fill=cardWhite,draw=lineBorder,line width=0.5pt,rounded corners=2pt,
+    inner sep=2.0pt,align=center,font=\fontsize{5.8}{7.0}\selectfont
+  },
+  /tikz/pillBlue/.style={
+    fill=cardWhite,draw=blueFlow,line width=0.65pt,rounded corners=2pt,
+    inner sep=2.0pt,align=center,font=\fontsize{5.8}{7.0}\selectfont\bfseries,text=blueFlow
+  },
+  /tikz/pillOrange/.style={
+    fill=cardWhite,draw=orangeFast,line width=0.75pt,rounded corners=2pt,
+    inner sep=2.0pt,align=center,font=\fontsize{5.8}{7.0}\selectfont\bfseries,text=orangeFast
+  }
 }
 
 \begin{document}
 \begin{tikzpicture}[x=1cm,y=1cm,>=Stealth]
 
-% Canvas bounding box: exact IEEE textwidth ~18.18 cm x 7.30 cm
-\path[use as bounding box] (0,0) rectangle (18.18, 7.30);
+% Canvas bounding box: exact IEEE textwidth 18.18 cm
+\path[use as bounding box] (-0.10, -0.35) rectangle (18.28, 7.35);
 
-% ================= 1. PHYSICAL CONTAINERS =================
-% Tier C: Remote Edge Tier (Node C)
-\draw[chassis] (0.15, 0.70) rectangle (4.65, 7.15);
-\node[font=\fontsize{7.5}{9.0}\selectfont\bfseries,text=ink] at (2.40, 6.85) {EDGE TIER (NODE C)};
-\node[font=\fontsize{6.0}{7.2}\selectfont,text=inkMuted] at (2.40, 6.58) {Client Ingress \& Lexical Search};
-\draw[inkBaseline,line width=0.4pt] (0.35, 6.42) -- (4.45, 6.42);
+% ===========================================================================
+% 1. THREE PHYSICAL MACHINES (CLEAN, DISTINCT ENCLOSURES)
+% ===========================================================================
 
-% LAN Cluster Chassis (Nodes A & B)
-\draw[chassis] (7.55, 0.70) rectangle (18.05, 7.15);
-\node[font=\fontsize{7.5}{9.0}\selectfont\bfseries,text=ink] at (12.80, 6.85) {LOCAL CLUSTER / DATACENTER (LAN)};
-\node[font=\fontsize{6.0}{7.2}\selectfont,text=inkMuted] at (12.80, 6.58) {Shaped Link B: $0$--$80\,\mathrm{ms}$ RTT, $100\,\mathrm{Mbps}$};
-\draw[inkBaseline,line width=0.4pt] (7.75, 6.42) -- (17.85, 6.42);
+% --- MACHINE 1: EDGE GATEWAY (NODE C) ---
+\draw[draw=lineBorder,fill=edgeChassis,rounded corners=3pt,line width=0.8pt]
+  (0.10, 0.65) rectangle (4.65, 7.15);
+\draw[draw=none,fill=edgeHdrBg,rounded corners=2pt] (0.22, 6.40) rectangle (4.53, 7.03);
+\node[font=\fontsize{7.0}{8.2}\selectfont\bfseries,text=edgeHdrText] at (2.37, 6.78) {Edge Gateway (Node C)};
+\node[font=\fontsize{5.4}{6.6}\selectfont,text=inkMuted] at (2.37, 6.55) {Intel Core i7 $\cdot$ 16\,GB RAM $\cdot$ Remote Site};
 
-% Sub-chassis: Node B (Neural Retrieval Tier)
-\draw[subchassis] (7.75, 3.90) rectangle (17.85, 6.25);
-\node[font=\fontsize{6.8}{8.0}\selectfont\bfseries,text=ink,anchor=west] at (7.95, 6.02) {Neural Retrieval Tier (Node B)};
+% --- MACHINE 2: NEURAL RETRIEVAL HOST (NODE B) ---
+\draw[draw=nodeBStroke,fill=nodeBChassis,rounded corners=3pt,line width=0.85pt]
+  (7.60, 4.30) rectangle (18.05, 7.15);
+\draw[draw=none,fill=nodeBHdrBg,rounded corners=2pt] (7.72, 6.40) rectangle (17.93, 7.03);
+\node[font=\fontsize{7.0}{8.2}\selectfont\bfseries,text=nodeBHdrText] at (12.82, 6.78) {Physical Server: Neural Retrieval Host (Node B)};
+\node[font=\fontsize{5.4}{6.6}\selectfont,text=inkMuted] at (12.82, 6.55) {Intel Core i7-10750H $\cdot$ GTX 1660 Ti (6\,GB) $\cdot$ 24\,GB RAM $\cdot$ LAN Cluster};
 
-% Sub-chassis: Node A (Generation Tier)
-\draw[subchassis] (7.75, 0.90) rectangle (17.85, 3.45);
-\node[font=\fontsize{6.8}{8.0}\selectfont\bfseries,text=ink,anchor=west] at (7.95, 3.22) {LLM Generation Tier (Node A)};
+% --- MACHINE 3: LLM GENERATION HOST (NODE A) ---
+% Physically separated by 0.70cm gap from Node B
+\draw[draw=nodeAStroke,fill=nodeAChassis,rounded corners=3pt,line width=0.85pt]
+  (7.60, 0.65) rectangle (18.05, 3.60);
+% Header positioned on the left/center (x=7.72 to 14.20) so the top-right entry area for Context F is completely free
+\draw[draw=none,fill=nodeAHdrBg,rounded corners=2pt] (7.72, 2.90) rectangle (14.20, 3.48);
+\node[font=\fontsize{7.0}{8.2}\selectfont\bfseries,text=nodeAHdrText] at (10.96, 3.25) {Physical Server: LLM Generation Host (Node A)};
+\node[font=\fontsize{5.4}{6.6}\selectfont,text=inkMuted] at (10.96, 3.04) {AMD Ryzen 7 7700 $\cdot$ RTX 3090 (24\,GB) $\cdot$ 32\,GB RAM $\cdot$ LAN Cluster};
 
-% WAN Corridor Label
-\node[font=\fontsize{6.5}{7.8}\selectfont\bfseries,text=inkMuted] at (6.10, 6.85) {WAN LINK C};
-\node[font=\fontsize{5.5}{6.6}\selectfont,text=inkMuted] at (6.10, 6.58) {Public WAN};
+% --- PHYSICAL LAN LINK IN THE GAP ---
+\draw[draw=lineBorder,dashed,line width=0.6pt] (7.60, 3.95) -- (18.05, 3.95);
+\node[font=\fontsize{5.4}{6.4}\selectfont\bfseries,text=inkMuted,fill=cardWhite,inner sep=1.5pt]
+  at (11.50, 3.95) {Datacenter Gigabit LAN Link AB ($<1\,\mathrm{ms}$ Physical RTT $\cdot$ netem $0$--$80\,\mathrm{ms}$)};
 
-% ================= 2. INTERNAL COMPONENTS =================
-% --- Node C Components ---
-\node[card,minimum width=3.90cm,minimum height=1.05cm] (c_ingress) at (2.40, 5.50) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Client Ingress}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont HTTP Gateway / Query $q$}
+% ===========================================================================
+% 2. INTERNAL COMPONENTS
+% ===========================================================================
+
+% --- Inside Node C ---
+\node[boxCard,minimum width=3.90cm,minimum height=1.00cm] (c_ingress) at (2.37, 5.35) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Client Ingress Gateway}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont HTTP SSE Endpoint $\cdot$ Query Parse ($q$)}
 };
 
-\node[card,minimum width=3.90cm,minimum height=1.15cm] (c_bm25) at (2.40, 3.75) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Sparse Search (BM25)}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont Tantivy Lexical Index ($8.84\,\mathrm{M}$ docs)}\\[1pt]
-  {\fontsize{5.5}{6.5}\selectfont\itshape Generates Top-$5$ Hint $\mathcal{H}$}
+\node[boxCard,minimum width=3.90cm,minimum height=1.10cm] (c_bm25) at (2.37, 3.55) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Sparse Lexical Search}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont Tantivy BM25 Index ($8.84\,\mathrm{M}$ Passages)}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont\bfseries Dispatches Top-$5$ Sparse Hint $\mathcal{H}$}
 };
 
-\node[card,minimum width=3.90cm,minimum height=0.95cm] (c_sink) at (2.40, 1.65) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Response Sink}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont SSE Token Stream Delivery}
+\node[boxCard,minimum width=3.90cm,minimum height=0.90cm] (c_sink) at (2.37, 1.40) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Response Sink}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont Continuous SSE Token Stream to Client}
 };
 
-% Intra-Node C arrow: Ingress -> BM25
-\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.7pt,inkMuted]
+\draw[-{Stealth[length=1.5mm,width=1.1mm]},line width=0.65pt,inkMuted]
   (c_ingress.south) -- (c_bm25.north);
 
-% --- Node B Components (3 Pipeline Stages) ---
-\node[card,minimum width=2.85cm,minimum height=1.15cm] (b_dense) at (9.45, 4.85) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Dense Encoder}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont BGE-Large ($1024$-dim)}\\[1pt]
-  {\fontsize{5.4}{6.4}\selectfont ONNX / TensorRT}
+% --- Inside Node B ---
+\node[boxCard,minimum width=2.90cm,minimum height=1.15cm] (b_dense) at (9.45, 5.25) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Dense Encoder}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont BGE-M3 ($1024$-dim Embeddings)}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont PyTorch / ONNX FP16}
 };
 
-\node[card,minimum width=2.85cm,minimum height=1.15cm] (b_vector) at (12.80, 4.85) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Vector Search}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont Qdrant HNSW Index}\\[1pt]
-  {\fontsize{5.4}{6.4}\selectfont $8.84\,\mathrm{M}$ Vectors ($36.4\,\mathrm{GB}$)}
+\node[boxCard,minimum width=2.90cm,minimum height=1.15cm] (b_vector) at (12.82, 5.25) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Vector Search Engine}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont Qdrant HNSW Vector Index}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont $8.84\,\mathrm{M}$ Vectors ($36.4\,\mathrm{GB}$ RAM)}
 };
 
-\node[card,minimum width=2.85cm,minimum height=1.15cm] (b_rrf) at (16.15, 4.85) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Rank Fusion (RRF)}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont Reciprocal Rank ($k=60$)}\\[1pt]
-  {\fontsize{5.4}{6.4}\selectfont Top-$10$ Verified Context $\mathcal{F}$}
+\node[boxCard,minimum width=2.85cm,minimum height=1.15cm] (b_rrf) at (16.20, 5.25) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Rank Fusion (RRF)}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont Reciprocal Rank Fusion ($k=60$)}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont Verified Top-$10$ Candidate Set $\mathcal{F}$}
 };
 
-% Intra-Node B arrows
-\draw[-{Stealth[length=1.7mm,width=1.3mm]},line width=0.75pt,blueStroke]
+\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.70pt,blueFlow]
   (b_dense.east) -- (b_vector.west);
-\draw[-{Stealth[length=1.7mm,width=1.3mm]},line width=0.75pt,blueStroke]
+\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.70pt,blueFlow]
   (b_vector.east) -- (b_rrf.west);
 
-% --- Node A Components (Speculative Pipeline) ---
-\node[card,minimum width=2.10cm,minimum height=1.20cm] (a_hydrate) at (9.05, 1.95) {
-  {\fontsize{6.8}{8.0}\selectfont\bfseries Passage Store}\\[1.5pt]
-  {\fontsize{5.6}{6.6}\selectfont SQLite KV Store}\\[1pt]
+% --- Inside Node A ---
+\node[boxCard,minimum width=2.15cm,minimum height=1.25cm] (a_hydrate) at (8.95, 1.65) {
+  {\fontsize{6.6}{7.8}\selectfont\bfseries Passage Store}\\[1.5pt]
+  {\fontsize{5.5}{6.5}\selectfont SQLite KV Store}\\[1pt]
   {\fontsize{5.2}{6.2}\selectfont $O(1)$ Hydration}
 };
 
-\node[cardOrange,minimum width=2.70cm,minimum height=1.20cm] (a_prefill) at (11.85, 1.95) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Speculative Prefill}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont vLLM KV-Cache Prefill}\\[1pt]
-  {\fontsize{5.4}{6.4}\selectfont\bfseries [Fast Path on Hint $\mathcal{H}$]}
+\node[cardOrange,minimum width=2.65cm,minimum height=1.25cm] (a_prefill) at (11.75, 1.65) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Speculative Prefill}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont vLLM KV-Cache Prefill}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont\bfseries [Fast Path on Hint $\mathcal{H}$]}
 };
 
-\node[card,minimum width=2.70cm,minimum height=1.20cm] (a_verify) at (14.85, 1.95) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Verification Barrier}\\[1.5pt]
-  {\fontsize{6.2}{7.4}\selectfont $\mathcal{H} \cap \mathcal{F} \ge \theta$}\\[1pt]
-  {\fontsize{5.4}{6.4}\selectfont Spec. Hit Rate $h \approx 0.90$}
+\node[boxCard,minimum width=2.45cm,minimum height=1.25cm] (a_verify) at (14.65, 1.65) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries Verification Barrier}\\[1.5pt]
+  {\fontsize{6.0}{7.2}\selectfont $\operatorname{Overlap}(\mathcal{H}, \mathcal{F}) \ge \theta$}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont Spec. Hit Rate $h \approx 0.90$}
 };
 
-\node[card,minimum width=1.70cm,minimum height=1.20cm] (a_decode) at (17.00, 1.95) {
-  {\fontsize{7.0}{8.2}\selectfont\bfseries Decode}\\[1.5pt]
-  {\fontsize{5.8}{6.8}\selectfont Qwen 27B}\\[1pt]
-  {\fontsize{5.4}{6.4}\selectfont $35.3\,\mathrm{tok/s}$}
+\node[boxCard,minimum width=1.70cm,minimum height=1.25cm] (a_decode) at (17.15, 1.65) {
+  {\fontsize{6.8}{8.0}\selectfont\bfseries LLM Decode}\\[1.5pt]
+  {\fontsize{5.6}{6.6}\selectfont Qwen 27B W4A16}\\[1pt]
+  {\fontsize{5.2}{6.2}\selectfont $35.3\,\mathrm{tok/s}$}
 };
 
-% Intra-Node A arrows
-\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.7pt,inkMuted]
+% Intra-Node A connections
+\draw[-{Stealth[length=1.5mm,width=1.1mm]},line width=0.65pt,inkMuted]
   (a_hydrate.east) -- (a_prefill.west);
-\draw[-{Stealth[length=1.7mm,width=1.3mm]},line width=0.8pt,orangeStroke]
+
+\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.75pt,orangeFast]
   (a_prefill.east) -- (a_verify.west);
-\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.7pt,ink]
-  (a_verify.east) -- (a_decode.west);
-\node[font=\fontsize{5.2}{6.2}\selectfont\bfseries,text=ink] at (16.20, 2.15) {Commit};
 
-% ================= 3. INTER-TIER DATAFLOW =================
-% Highway 1: User Query q (Node C Ingress -> Node B Dense Encoder)
-\draw[-{Stealth[length=2.0mm,width=1.5mm]},line width=0.85pt,blueStroke]
+% Arrow between Verification Barrier and Decode with Commit cleanly above (0.75cm gap)
+\draw[-{Stealth[length=1.6mm,width=1.2mm]},line width=0.75pt,inkDark]
+  (a_verify.east) -- (a_decode.west)
+  node[midway,above=2.5pt,font=\fontsize{5.5}{6.5}\selectfont\bfseries,text=inkDark] {Commit};
+
+% ===========================================================================
+% 3. INTER-SERVER DATAFLOW HIGHWAYS
+% ===========================================================================
+
+% WAN Network Corridor
+\node[font=\fontsize{6.5}{7.8}\selectfont\bfseries,text=inkMuted] at (6.12, 6.95) {WIDE AREA NETWORK};
+\node[font=\fontsize{5.4}{6.4}\selectfont,text=inkMuted] at (6.12, 6.72) {WireGuard VPN ($15\,\mathrm{ms}$ RTT)};
+
+% Flow 1: Query q
+\draw[-{Stealth[length=1.8mm,width=1.3mm]},line width=0.85pt,blueFlow]
   (c_ingress.east) -- (b_dense.west);
-\node[pillBlue] at (6.10, 5.50) {Query $q$ (Link C)};
+\node[pillBlue] at (6.12, 5.35) {Query $q$ (WAN Link C)};
 
-% Highway 2: SPHP Early Hint (Node C BM25 -> Node A Passage Hydration / Prefill)
-% Smooth routed fast path
-\draw[-{Stealth[length=2.2mm,width=1.6mm]},line width=1.1pt,orangeStroke,dashed]
-  (c_bm25.east) -- ++(0.70, 0) -- ($(a_hydrate.west |- 0, 1.95) + (-0.25, 0)$) -- (a_hydrate.west);
-\node[pillOrange] at (5.75, 2.85) {Early Hint $\mathcal{H}$ ($104\,\mathrm{B}$)\\[1pt]\fontsize{5.2}{6.2}\selectfont[Speculative Fast Path]};
+% Flow 2: Early Hint H (104 B)
+\draw[-{Stealth[length=2.0mm,width=1.5mm]},line width=0.95pt,orangeFast,dash pattern=on 4pt off 2pt]
+  (c_bm25.east) -- ++(1.10, 0) |- (a_hydrate.west);
+\node[pillOrange] at (5.75, 2.70) {Early Hint $\mathcal{H}$ ($104\,\mathrm{B}$)\\[1pt]\fontsize{5.0}{6.0}\selectfont[Fast Path over Link C]};
 
-% Highway 3: Verified Context F (Node B RRF -> Node A Verification Barrier)
-% Vertical arrow across Link B
-\draw[-{Stealth[length=2.0mm,width=1.5mm]},line width=0.90pt,blueStroke]
-  (b_rrf.south) -- ++(0, -0.65) -| (a_verify.north);
-\node[pillBlue] at (16.15, 3.55) {Context $\mathcal{F}$ ($144\,\mathrm{B}$ $\cdot$ Link B)};
+% Flow 3: Verified Context F (144 B) from Node B RRF straight down into Node A Verification Barrier
+% Direct vertical line from b_rrf.south to a_verify.north across the LAN link - perfectly aligned, zero header crossing
+\draw[-{Stealth[length=1.8mm,width=1.3mm]},line width=0.85pt,blueFlow]
+  (b_rrf.south -| a_verify.north) -- (a_verify.north);
+\node[pillBlue] at (14.65, 3.95) {Verified Context $\mathcal{F}$ ($144\,\mathrm{B}$ $\cdot$ Link AB)};
 
-% Highway 4: Continuous SSE Token Stream Return (Node A Decode -> Node C Response Sink)
-\draw[-{Stealth[length=1.8mm,width=1.3mm]},line width=0.75pt,inkMuted,dashed]
-  (a_decode.south) -- ++(0, -0.75) -| (c_sink.east);
-\node[pill] at (10.85, 0.40) {Continuous Token Stream Return ($35.3\,\mathrm{tok/s}$)};
+% Flow 4: Token stream delivery from Node A Decode -> Node C Response Sink
+\draw[-{Stealth[length=1.7mm,width=1.2mm]},line width=0.70pt,inkMuted,dash pattern=on 3pt off 2pt]
+  (a_decode.south) -- ++(0, -0.65) -| (c_sink.east);
+\node[pill] at (11.00, 0.25) {Continuous Token Stream Return ($35.3\,\mathrm{tok/s}$ line rate via SSE)};
 
 \end{tikzpicture}
 \end{document}

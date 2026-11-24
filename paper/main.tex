@@ -9,6 +9,16 @@
 \usepackage{balance}
 
 % --- Typography & Spacing for Strict 6-Page IEEE Conference Format ---
+% Float placement controls
+\setcounter{topnumber}{4}
+\setcounter{totalnumber}{6}
+\setcounter{dbltopnumber}{2}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\dblfloatpagefraction}{0.85}
+
 \setlength{\textfloatsep}{5pt plus 1pt minus 1pt}
 \setlength{\floatsep}{4pt plus 1pt minus 1pt}
 \setlength{\dbltextfloatsep}{5pt plus 1pt minus 1pt}
@@ -37,10 +47,10 @@
 \setlength{\belowdisplayshortskip}{0pt plus 1pt}
 
 % Balanced bibliography formatting
-\def\IEEEbibitemsep{-0.7pt}
+\def\IEEEbibitemsep{-0.8pt}
 \def\BIBdecl{%
-  \fontsize{7.0pt}{7.8pt}\selectfont
-  \setlength{\itemsep}{-0.7pt plus 0.1pt}%
+  \fontsize{6.8pt}{7.6pt}\selectfont
+  \setlength{\itemsep}{-0.9pt plus 0.1pt}%
   \setlength{\parsep}{0pt}%
 }
 
@@ -87,8 +97,8 @@ Deploying hybrid RAG across geo-distributed edge--cloud fleets exposes a fundame
 
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=0.88\textwidth]{figures/fig1_arch.pdf}
-  \caption{SPHP architecture and speculative pipelining across distributed tiers. Edge node C dispatches an early hint $\mathcal{H}$ of $104$\,B to overlap GPU prefill on generation node A with neural retrieval on retrieval node B. Nodes A and B are co-located on a local LAN; Link~B is netem-swept over $0$--$80$\,ms.}
+  \includegraphics[width=\textwidth]{figures/fig1_arch.pdf}
+  \caption{SPHP architecture and speculative pipelining across three heterogeneous physical servers. Edge gateway Node~C dispatches an early provisional hint $\mathcal{H}$ ($104$\,B) over WAN Link~C to overlap GPU prompt prefill on generation host Node~A with dense neural retrieval on retrieval host Node~B. Physical servers Node~A and Node~B reside within a datacenter LAN cluster (Link~AB, netem-swept over $0$--$80$\,ms RTT).}
   \label{fig:arch}
   \vspace{-3mm}
 \end{figure*}
@@ -142,8 +152,8 @@ Nodes~A and~B are physically co-located in the same room on a local Gigabit LAN 
 \centering
 \caption{Placement topology taxonomy (P0--P3). Pipeline stages partitioned across remote edge ingress (Node~C), retrieval host (Node~B), and generation host (Node~A).}
 \label{tab:topologies}
-\setlength{\tabcolsep}{2.0pt}
-\fontsize{6.5pt}{7.8pt}\selectfont
+\setlength{\tabcolsep}{1.5pt}
+\fontsize{6.0pt}{7.2pt}\selectfont
 \begin{tabularx}{\columnwidth}{@{}l l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X@{}}
 \toprule
 Topol. & Paradigm & Edge (Node~C) & Retrieval (Node~B) & Generation (Node~A) \\
@@ -166,8 +176,9 @@ We define candidate placement topologies based on where wide-area boundaries bis
 \centering
 \caption{Baseline per-stage latency and TTFT on the two-node consolidated control by network regime and cache state, with 120 queries per cell over 3 repeats. TPS is median autoregressive decode throughput.}
 \label{tab:latency}
-\setlength{\tabcolsep}{2.0pt}
-\fontsize{6.5pt}{7.8pt}\selectfont
+\setlength{\tabcolsep}{1.2pt}
+\renewcommand{\arraystretch}{0.92}
+\fontsize{5.8pt}{6.8pt}\selectfont
 \begin{tabular}{@{}ll rrrrrrr@{}}
 \toprule
 & & Sprs & Dnse & \multicolumn{3}{c}{TTFT (ms)} & Total & TPS\\
@@ -187,15 +198,15 @@ RTT & State & (ms) & (ms) & mean & p50 & p95 & (ms) & (tok/s)\\
 \vspace{-2mm}
 \end{table}
 
-Table~\ref{tab:latency} details per-stage latencies across cache states and network tiers. In the warm steady-state, sparse lexical search completes in 68--89~ms, whereas dense neural search requires 111--118~ms, exhibiting a consistent $1.3$--$1.6\times$ asymmetry. In the cold-prefix state, sparse search requires 576--640~ms, dominated by OS page faults across the 8.84M inverted index, while dense encoding and index traversal require 1{,}029--1{,}130~ms, an $\approx$1.8$\times$ ratio. Crucially, the parallel retrieval barrier $\max(\Tsparse, \Tdense)$ consumes only 111--118~ms of the warm TTFT budget of $510$--$588$~ms. The \emph{prefill residual}, encompassing passage hydration, tokenization, transformer context prefill, and engine queueing, demands 392--464~ms in the warm state. Consequently, optimizing network transit cannot yield substantial savings; latency acceleration must target overlapping the prefill residual.
-
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.98\columnwidth]{figures/fig5_ttft_vs_rtt.pdf}
-\caption{Measured TTFT vs.\ WAN RTT across network regimes, with error bars denoting bootstrap 95\% confidence intervals. (a)~Cold-prefix state. (b)~Warm steady-state.}
+\includegraphics[width=\columnwidth]{figures/fig5_ttft_vs_rtt.pdf}
+\caption{Measured TTFT vs.\ WAN RTT across network regimes with bootstrap 95\% confidence intervals. (a)~Cold-prefix state (repeat 0), showing consistent 16.9\%--26.7\% latency reductions from overlapped prefill. (b)~Warm steady-state (repeats 1+), showing near-zero sensitivity to Link~B delay ($\le 0.153$\,ms/ms slope) due to compact identifier payloads.}
 \label{fig:ttft}
 \vspace{-2mm}
 \end{figure}
+
+Table~\ref{tab:latency} details per-stage latencies across cache states and network tiers. In the warm steady-state, sparse lexical search completes in 68--89~ms, whereas dense neural search requires 111--118~ms, exhibiting a consistent $1.3$--$1.6\times$ asymmetry. In the cold-prefix state, sparse search requires 576--640~ms, dominated by OS page faults across the 8.84M inverted index, while dense encoding and index traversal require 1{,}029--1{,}130~ms, an $\approx$1.8$\times$ ratio. Crucially, the parallel retrieval barrier $\max(\Tsparse, \Tdense)$ consumes only 111--118~ms of the warm TTFT budget of $510$--$588$~ms. The \emph{prefill residual}, encompassing passage hydration, tokenization, transformer context prefill, and engine queueing, demands 392--464~ms in the warm state. Consequently, optimizing network transit cannot yield substantial savings; latency acceleration must target overlapping the prefill residual.
 
 The latency disparity between cache states in Table~\ref{tab:latency} overshadows network variations. Cold TTFT ($1{,}656.8$--$1{,}720.0$~ms) is $2.8$--$3.2\times$ warm TTFT ($510.0$--$587.6$~ms) across all evaluated tiers. Across the full 0 to 80~ms RTT sweep, warm TTFT increases by only 77.6~ms at a slope of $\approx$0.95~ms/ms, precisely reflecting a single WAN crossing for identifier payloads, while cold TTFT remains statistically flat across network tiers, as shown in Figure~\ref{fig:ttft}.
 
@@ -214,11 +225,13 @@ where $N$ is emitted tokens and timestamps are in milliseconds, $t_{\mathrm{firs
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.72\textwidth]{figures/fig3_sphp_timeline.pdf}
-\caption{Space-time execution swimlanes for baseline P2 and P2-SPHP in the warm steady-state, with Link~B at $40$\,ms RTT and Link~C at $15$\,ms RTT over $100$\,Mbps. The baseline idles Node~A for $136$\,ms until the fused context arrives. SPHP streams the provisional hint over Link~C upon completing sparse traversal and overlaps $424$\,ms of masked transformer prefill on Node~A with in-flight dense retrieval on Node~B, cutting hit-path warm TTFT from $559.6$ to $510.3$\,ms.}
+\includegraphics[width=\textwidth]{figures/fig3_sphp_timeline.pdf}
+\caption{Space-time execution swimlanes for baseline P2 and P2-SPHP in the warm steady-state, with Link~B at $40$\,ms RTT and Link~C at $15$\,ms RTT over $100$\,Mbps. SPHP streams the provisional hint over Link~C upon completing sparse traversal and overlaps masked transformer prefill on Node~A with in-flight dense retrieval on Node~B, cutting hit-path warm TTFT from $559.6$ to $510.3$\,ms.}
 \label{fig:sphp}
 \vspace{-2mm}
 \end{figure*}
+
+
 
 \subsection{Protocol Mechanics}
 SPHP pipelines retrieval and generation across the three-tier hierarchy, as Figure~\ref{fig:sphp} illustrates. Rather than serializing dense retrieval and fusion prior to execution on Node~A, SPHP exploits the temporal head start of edge sparse traversal through an asynchronous protocol. Upon completing BM25 search at time $\Tsparse$, Node~C immediately streams a provisional hint $\mathcal{H}$ of $104$~bytes, carrying the top-5 sparse passage identifiers, over Link~C to Node~A, while BGE-M3 dense encoding and HNSW search proceed concurrently on Node~B over the full query payload forwarded at ingress.
@@ -256,7 +269,7 @@ where $t_s = \Tsparse + \Twan(p_{\mathrm{hint}}) + \Thydrate$, $t_p = t_s + \Tpr
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/fig8_cost_model_parity.pdf}
+\includegraphics[width=0.82\columnwidth]{figures/fig8_cost_model_parity.pdf}
 \caption{Analytical cost model parity against empirical testbed measurements across cold and warm cache configurations, with $\pm 10\%$ error bounds and leave-one-tier-out MAPE of 2.1\% cold and 4.1\% warm.}
 \label{fig:cost_parity}
 \end{figure}
@@ -273,8 +286,9 @@ Stage latency parameters are empirically fitted from baseline medians across que
 \centering
 \caption{Empirical robustness and multi-topology performance across physical three-node tiering (CM-2), unshaped public WAN (CM-4), multi-leg packet loss sweeps, and 27-cell stress matrix (CM-5).}
 \label{tab:generalization}
-\setlength{\tabcolsep}{2.0pt}
-\fontsize{6.5pt}{7.8pt}\selectfont
+\setlength{\tabcolsep}{1.5pt}
+\renewcommand{\arraystretch}{0.92}
+\fontsize{5.8pt}{6.8pt}\selectfont
 \begin{tabular}{@{}lll rrrr c@{}}
 \toprule
 Study & Nodes & Regime & P2 (ms) & SPHP (ms) & $\Delta$ & $h$ & Loss\\

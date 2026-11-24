@@ -1,210 +1,207 @@
-\documentclass[tikz,border=6pt]{standalone}
+\documentclass[tikz,border=2pt]{standalone}
 \usepackage{amsmath,amssymb}
 \usepackage[scaled=0.92]{helvet}
 \renewcommand{\familydefault}{\sfdefault}
 \usepackage{xcolor}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,patterns}
 
-% Ink-first palette, unified with Figure 1 (experiments/analysis/figstyle.py):
-% ink chrome, blue retrieval/context flows, orange speculative fast path.
-\definecolor{edgeshade}{HTML}{2A78D6}    % BLUE   (figstyle slot 1)
-\definecolor{cloudshade}{HTML}{0B0B0B}   % INK
-\definecolor{wanshade}{HTML}{898781}     % INK_MUTED
+% Ink-first academic palette
+\definecolor{textdark}{HTML}{0F172A}
+\definecolor{textmuted}{HTML}{64748B}
+\definecolor{linegray}{HTML}{E2E8F0}
+\definecolor{stallfill}{HTML}{F1F5F9}
+\definecolor{stallstroke}{HTML}{94A3B8}
 
-\definecolor{sparsefill}{HTML}{FFFFFF}
-\definecolor{sparsestroke}{HTML}{2A78D6}
-\definecolor{densefill}{HTML}{FFFFFF}
-\definecolor{densestroke}{HTML}{2A78D6}
-
-\definecolor{prefillfill}{HTML}{FFFFFF}
-\definecolor{prefillstroke}{HTML}{2A78D6}
-\definecolor{specprefillfill}{HTML}{FFFFFF}
-\definecolor{specprefillstroke}{HTML}{EB6834}   % ORANGE (figstyle slot 2)
-
-\definecolor{rrfcolor}{HTML}{0B0B0B}     % INK
-\definecolor{barriercolor}{HTML}{0B0B0B} % INK
-\definecolor{baselinemarker}{HTML}{0B0B0B}
-\definecolor{deltacolor}{HTML}{EB6834}   % ORANGE (SPHP gain)
-
-\definecolor{stallfill}{HTML}{F0EFEC}    % warm neutral gray (figstyle family)
-\definecolor{stallstroke}{HTML}{898781}
-\definecolor{textdark}{HTML}{0B0B0B}
-\definecolor{textmuted}{HTML}{52514E}
+\definecolor{edgeshade}{HTML}{1D4ED8}    % BLUE
+\definecolor{specorange}{HTML}{C2410C}   % ORANGE
+\definecolor{wanshade}{HTML}{64748B}
 
 \begin{document}
 \begin{tikzpicture}[
-    font=\small,
+    x=1.0cm, y=1.0cm,
     >=Stealth,
-    x=0.033cm, y=1.0cm,
     barblock/.style={
-        rounded corners=2.5pt,
-        line width=0.85pt,
+        rounded corners=2.0pt,
+        line width=0.7pt,
         inner sep=0pt
     }
 ]
 
-% ===========================================================================
-% LANE GEOMETRY (both panels, top -> bottom, true hub topology):
-%   Node B | Link B | Node A (hub) | Link C | Node C
-% Each cross-node flow crosses exactly its own link lane.
-% Timeline: warm steady state, CM-2 (Link B = 40 ms, Link C = 15 ms RTT).
-%   Tsparse = 79.2, Tdense = 114.0, Tfusion = 2, Tprefill = 423.6.
-%   One-way transit: Link B = 20 ms, Link C = 7.5 ms (half-RTT per direction).
-% ===========================================================================
+% Exact IEEE full textwidth bounding box: 18.18 cm wide x 6.40 cm high
+\path[use as bounding box] (0, -0.35) rectangle (18.18, 6.25);
+
+% Coordinate Mapping:
+% Left label gutter: x = 0.05 to 2.70
+% Swimlane timeline area: x = 2.85 to 18.10 (width = 15.25 cm for 0 to 600 ms -> 0.025417 cm / ms)
 
 % ===========================================================================
-% PANEL (a): BASELINE P2 (SERIALIZED)
+% PANEL (a): BASELINE P2 (SERIALIZED EXECUTION)
 % ===========================================================================
-\node[anchor=west, font=\bfseries\normalsize, text=textdark] at (0, 9.10)
+\node[anchor=west, font=\fontsize{7.5}{9.0}\selectfont\bfseries, text=textdark] at (0.05, 5.95)
     {(a) Baseline P2: Serialized Execution (Link~B RTT $= 40$\,ms, Link~C RTT $= 15$\,ms, BW $= 100$\,Mbps)};
 
-% Track backgrounds: Node B 8.10-8.80 | Link B 7.30-8.00 | Node A 6.50-7.20
-%                    | Link C 5.70-6.40 | Node C 4.90-5.60
-\draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 8.10) rectangle (580, 8.80);   % Node B
-\draw[fill=white, draw=gray!20, line width=0.5pt, dashed, rounded corners=2pt] (0, 7.30) rectangle (580, 8.00); % Link B
-\draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 6.50) rectangle (580, 7.20);   % Node A
-\draw[fill=white, draw=gray!20, line width=0.5pt, dashed, rounded corners=2pt] (0, 5.70) rectangle (580, 6.40); % Link C
-\draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 4.90) rectangle (580, 5.60);   % Node C
-
-% Track labels (left)
-\node[anchor=east, font=\scriptsize\bfseries, text=textdark] at (-8, 8.45) {Node B (Retrieval)};
-\node[anchor=east, font=\scriptsize\bfseries, text=wanshade] at (-8, 7.65) {Link B};
-\node[anchor=east, font=\scriptsize\bfseries, text=textdark] at (-8, 6.85) {Node A (Generation)};
-\node[anchor=east, font=\scriptsize\bfseries, text=wanshade] at (-8, 6.05) {Link C};
-\node[anchor=east, font=\scriptsize\bfseries, text=textdark] at (-8, 5.25) {Node C (Edge Ingress)};
-
-% Grid lines
-\foreach \t in {0, 100, 200, 300, 400, 500, 559.6} {
-    \draw[draw=gray!20, line width=0.5pt] (\t, 4.70) -- (\t, 8.95);
-}
-
-% --- Dense Retrieval on Node B: 0 to 114.0 ms ---
-\draw[barblock, draw=densestroke, fill=densefill] (0, 8.15) rectangle (114.0, 8.45);
-\node[font=\tiny\bfseries, text=densestroke] at (57.0, 8.30) {BGE-M3 (114 ms)};
-
-% RRF Fusion on Node B: 114.0 to 116.0 ms
-\draw[fill=rrfcolor, draw=rrfcolor, line width=0.6pt] (114.0, 8.15) rectangle (116.0, 8.62);
-\node[anchor=south, font=\tiny\bfseries, text=rrfcolor] at (115.0, 8.63) {RRF};
-
-% --- Stalled on Node A: 0 to 136.0 ms ---
-\draw[barblock, draw=stallstroke, fill=stallfill, pattern=north east lines, pattern color=gray!35] (0, 6.55) rectangle (136.0, 7.15);
-\node[font=\scriptsize\itshape, text=stallstroke!90!black, fill=white, inner sep=1pt] at (68.0, 6.85) {Idle (waiting for context)};
-
-% --- Context Transfer over Link B: 116.0 to 136.0 ms ---
-\draw[->, line width=1.1pt, draw=edgeshade] (116.0, 8.10) -- (136.0, 7.20);
-\node[anchor=west, font=\tiny\bfseries, text=edgeshade] at (141.0, 7.65) {Fused Context $\mathcal{F}$ (144\,B)};
-
-% --- Hydration + Prefill on Node A: 136.0 to 559.6 ms ---
-\draw[barblock, draw=prefillstroke, fill=prefillfill] (136.0, 6.55) rectangle (559.6, 7.15);
-\node[font=\footnotesize\bfseries, text=prefillstroke] at (347.8, 6.85)
-    {Hydration + Prefill ($P$)};
-
-% --- Sparse Retrieval on Node C: 0 to 79.2 ms (parallel, off critical path) ---
-\draw[barblock, draw=sparsestroke, fill=sparsefill] (0, 4.95) rectangle (79.2, 5.25);
-\node[font=\tiny\bfseries, text=sparsestroke] at (39.6, 5.10) {BM25 (79 ms)};
-
-% --- Baseline TTFT Marker ---
-\draw[line width=1.1pt, draw=baselinemarker, dashed] (559.6, 4.50) -- (559.6, 8.95);
-\node[anchor=south, font=\footnotesize\bfseries, text=baselinemarker, fill=white, inner sep=1.5pt] at (559.6, 8.95)
+\node[anchor=east, font=\fontsize{7.0}{8.5}\selectfont\bfseries, text=textdark] at (18.10, 5.95)
     {Baseline $\mathrm{TTFT} = 559.6$\,ms};
 
-% Timeline Axis (Panel a)
-\draw[line width=0.8pt, draw=gray!60] (0, 4.70) -- (580, 4.70);
-\foreach \t in {0, 100, 200, 300, 400, 500} {
-    \draw[line width=0.7pt, draw=gray!60] (\t, 4.70) -- (\t, 4.58);
-    \node[anchor=north, font=\scriptsize, text=textmuted] at (\t, 4.58) {\t};
-}
-\draw[line width=0.9pt, draw=baselinemarker] (559.6, 4.70) -- (559.6, 4.55);
-\node[anchor=north, font=\scriptsize\bfseries, text=baselinemarker] at (559.6, 4.55) {559.6};
+% Lane backgrounds (y: 3.40 to 5.40)
+\draw[fill=stallfill!70, draw=linegray, line width=0.5pt, rounded corners=1.5pt] (2.85, 5.02) rectangle (18.10, 5.38);
+\draw[fill=white, draw=linegray, dashed, line width=0.5pt, rounded corners=1.5pt] (2.85, 4.62) rectangle (18.10, 4.98);
+\draw[fill=stallfill!70, draw=linegray, line width=0.5pt, rounded corners=1.5pt] (2.85, 4.22) rectangle (18.10, 4.58);
+\draw[fill=white, draw=linegray, dashed, line width=0.5pt, rounded corners=1.5pt] (2.85, 3.82) rectangle (18.10, 4.18);
+\draw[fill=stallfill!70, draw=linegray, line width=0.5pt, rounded corners=1.5pt] (2.85, 3.42) rectangle (18.10, 3.78);
 
-
-% ===========================================================================
-% PANEL (b): P2-SPHP (SPECULATIVE PREFILL OVERLAP)
-% ===========================================================================
-\node[anchor=west, font=\bfseries\normalsize, text=textdark] at (0, 2.45)
-    {(b) P2-SPHP: Provisional Prefill Overlaps Dense Retrieval (Link~B RTT $= 40$\,ms, Link~C RTT $= 15$\,ms, BW $= 100$\,Mbps)};
-
-% Track backgrounds: Node B 1.30-2.00 | Link B 0.50-1.20 | Node A -0.30-0.40
-%                    | Link C -1.10--0.40 | Node C -1.90--1.20
-\draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, 1.30) rectangle (580, 2.00);    % Node B
-\draw[fill=white, draw=gray!20, line width=0.5pt, dashed, rounded corners=2pt] (0, 0.50) rectangle (580, 1.20); % Link B
-\draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, -0.30) rectangle (580, 0.40);   % Node A
-\draw[fill=white, draw=gray!20, line width=0.5pt, dashed, rounded corners=2pt] (0, -1.10) rectangle (580, -0.40); % Link C
-\draw[fill=stallfill, draw=gray!20, line width=0.5pt, rounded corners=2pt] (0, -1.90) rectangle (580, -1.20);  % Node C
-
-% Track labels (left)
-\node[anchor=east, font=\scriptsize\bfseries, text=textdark] at (-8, 1.65) {Node B (Retrieval)};
-\node[anchor=east, font=\scriptsize\bfseries, text=wanshade] at (-8, 0.85) {Link B};
-\node[anchor=east, font=\scriptsize\bfseries, text=textdark] at (-8, 0.05) {Node A (Generation)};
-\node[anchor=east, font=\scriptsize\bfseries, text=wanshade] at (-8, -0.75) {Link C};
-\node[anchor=east, font=\scriptsize\bfseries, text=textdark] at (-8, -1.55) {Node C (Edge Ingress)};
+% Lane Labels
+\node[anchor=east, font=\fontsize{6.2}{7.5}\selectfont\bfseries, text=textdark] at (2.75, 5.20) {Node B (Retrieval)};
+\node[anchor=east, font=\fontsize{5.8}{7.0}\selectfont, text=wanshade] at (2.75, 4.80) {Link B (WAN)};
+\node[anchor=east, font=\fontsize{6.2}{7.5}\selectfont\bfseries, text=textdark] at (2.75, 4.40) {Node A (Generation)};
+\node[anchor=east, font=\fontsize{5.8}{7.0}\selectfont, text=wanshade] at (2.75, 4.00) {Link C (WAN)};
+\node[anchor=east, font=\fontsize{6.2}{7.5}\selectfont\bfseries, text=textdark] at (2.75, 3.60) {Node C (Edge)};
 
 % Grid lines
-\foreach \t in {0, 100, 200, 300, 400, 500, 510.3, 559.6} {
-    \draw[draw=gray!20, line width=0.5pt] (\t, -2.10) -- (\t, 2.05);
+\foreach \t in {0, 100, 200, 300, 400, 500, 600} {
+    \draw[draw=linegray, line width=0.4pt] ({2.85 + \t*0.025417}, 3.30) -- ({2.85 + \t*0.025417}, 5.45);
 }
 
-% --- Dense Retrieval on Node B: 0 to 114.0 ms ---
-\draw[barblock, draw=densestroke, fill=densefill] (0, 1.35) rectangle (114.0, 1.65);
-\node[font=\tiny\bfseries, text=densestroke] at (57.0, 1.50) {BGE-M3 (114 ms)};
+% --- Dense Retrieval on Node B: 0 to 114 ms ---
+\draw[barblock, draw=edgeshade, fill=white] (2.85, 5.06) rectangle ({2.85 + 114.0*0.025417}, 5.34);
+\node[font=\fontsize{5.2}{6.2}\selectfont\bfseries, text=edgeshade] at ({2.85 + 57.0*0.025417}, 5.20) {BGE-M3 (114\,ms)};
 
-% RRF Fusion on Node B: 114.0 to 116.0 ms
-\draw[fill=rrfcolor, draw=rrfcolor, line width=0.6pt] (114.0, 1.35) rectangle (116.0, 1.82);
-\node[anchor=south, font=\tiny\bfseries, text=rrfcolor] at (115.0, 1.83) {RRF};
+% RRF on Node B: 114 to 116 ms
+\draw[fill=textdark, draw=textdark] ({2.85 + 114.0*0.025417}, 5.06) rectangle ({2.85 + 116.0*0.025417}, 5.34);
+\node[anchor=south, font=\fontsize{4.6}{5.6}\selectfont\bfseries, text=textdark] at ({2.85 + 115.0*0.025417}, 5.36) {RRF};
 
-% --- Sparse Retrieval on Node C: 0 to 79.2 ms ---
-\draw[barblock, draw=sparsestroke, fill=sparsefill] (0, -1.85) rectangle (79.2, -1.55);
-\node[font=\tiny\bfseries, text=sparsestroke] at (39.6, -1.70) {BM25 (79 ms)};
+% Stalled on Node A: 0 to 136 ms
+\draw[barblock, draw=stallstroke, fill=stallfill, pattern=north east lines, pattern color=gray!30]
+    (2.85, 4.26) rectangle ({2.85 + 136.0*0.025417}, 4.54);
+\node[font=\fontsize{5.2}{6.2}\selectfont\itshape, text=textmuted, fill=white, inner sep=0.8pt]
+    at ({2.85 + 68.0*0.025417}, 4.40) {Idle (waiting for context)};
 
-% --- FLOW 1: Speculative Hint over Link C: 79.2 to 86.7 ms ---
-\draw[->, dashed, line width=1.2pt, draw=specprefillstroke] (79.2, -1.20) -- (86.7, -0.30);
-\node[anchor=west, font=\tiny\bfseries, text=specprefillstroke] at (91.0, -0.75) {Early Hint $\mathcal{H}$ (104\,B)};
+% Context Transfer over Link B: 116 to 136 ms
+\draw[->, line width=0.85pt, draw=edgeshade]
+    ({2.85 + 116.0*0.025417}, 5.02) -- ({2.85 + 136.0*0.025417}, 4.58);
+\node[anchor=west, font=\fontsize{5.0}{6.0}\selectfont\bfseries, text=edgeshade]
+    at ({2.85 + 140.0*0.025417}, 4.80) {Fused Context $\mathcal{F}$ (144\,B)};
 
-% --- FLOW 2: Fused Context over Link B: 116.0 to 136.0 ms ---
-\draw[->, line width=1.0pt, draw=edgeshade] (116.0, 1.30) -- (136.0, 0.40);
-\node[anchor=west, font=\tiny\bfseries, text=edgeshade] at (141.0, 0.85) {Fused Context $\mathcal{F}$ (144\,B)};
+% Hydration + Prefill on Node A: 136 to 559.6 ms
+\draw[barblock, draw=edgeshade, fill=white]
+    ({2.85 + 136.0*0.025417}, 4.26) rectangle ({2.85 + 559.6*0.025417}, 4.54);
+\node[font=\fontsize{6.0}{7.2}\selectfont\bfseries, text=edgeshade]
+    at ({2.85 + 347.8*0.025417}, 4.40) {Hydration + Prefill ($P$)};
 
-% --- Node A Idle: 0 to 86.7 ms ---
-\draw[barblock, draw=stallstroke, fill=stallfill, pattern=north east lines, pattern color=gray!35] (0, -0.25) rectangle (86.7, 0.35);
-\node[font=\tiny\itshape, text=stallstroke!90!black, fill=white, inner sep=0.8pt] at (43.3, 0.05) {Idle};
+% Sparse Retrieval on Node C: 0 to 79.2 ms
+\draw[barblock, draw=edgeshade, fill=white]
+    (2.85, 3.46) rectangle ({2.85 + 79.2*0.025417}, 3.74);
+\node[font=\fontsize{5.2}{6.2}\selectfont\bfseries, text=edgeshade]
+    at ({2.85 + 39.6*0.025417}, 3.60) {BM25 (79\,ms)};
 
-% --- Speculative Prefill on Node A: 86.7 to 510.3 ms ---
-\draw[barblock, draw=specprefillstroke, fill=specprefillfill] (86.7, -0.25) rectangle (510.3, 0.35);
-\node[font=\footnotesize\bfseries, text=specprefillstroke] at (298.5, 0.05)
-    {Hydration + Speculative Prefill ($\hat{P}$)};
+% Baseline TTFT completion marker
+\draw[line width=0.9pt, draw=textdark, dashed]
+    ({2.85 + 559.6*0.025417}, 3.25) -- ({2.85 + 559.6*0.025417}, 5.50);
 
-% Verification Gate barrier at 136.0 ms
-\draw[line width=1.3pt, draw=barriercolor] (136.0, -0.25) -- (136.0, 0.35);
-\node[anchor=south west, font=\tiny\bfseries, text=barriercolor, fill=white, inner sep=1pt] at (138.0, 0.38)
-    {Barrier: $|\mathcal{H} \cap \mathcal{F}| \ge \theta$};
-\node[anchor=west, font=\tiny\bfseries, text=specprefillstroke] at (139.0, -0.10)
-    {Hit $\to$ Commit};
+% Time Axis (Panel a)
+\draw[line width=0.6pt, draw=linegray] (2.85, 3.30) -- (18.10, 3.30);
+\foreach \t in {0, 100, 200, 300, 400, 600} {
+    \draw[line width=0.5pt, draw=textmuted] ({2.85 + \t*0.025417}, 3.30) -- ({2.85 + \t*0.025417}, 3.22);
+    \node[anchor=north, font=\fontsize{5.2}{6.2}\selectfont, text=textmuted] at ({2.85 + \t*0.025417}, 3.22) {\t};
+}
+\node[anchor=north, font=\fontsize{5.5}{6.5}\selectfont\bfseries, text=textdark]
+    at ({2.85 + 559.6*0.025417}, 3.22) {559.6};
 
-% --- SPHP TTFT Marker ---
-\draw[line width=1.1pt, draw=specprefillstroke, dashed] (510.3, -2.30) -- (510.3, 2.00);
-\node[anchor=south, font=\footnotesize\bfseries, text=specprefillstroke, fill=white, inner sep=1.5pt] at (510.3, 2.00)
+
+% ===========================================================================
+% PANEL (b): P2-SPHP (PROVISIONAL PREFILL OVERLAPS DENSE RETRIEVAL)
+% ===========================================================================
+\node[anchor=west, font=\fontsize{7.5}{9.0}\selectfont\bfseries, text=textdark] at (0.05, 2.75)
+    {(b) P2-SPHP: Provisional Prefill Overlaps Dense Retrieval (Link~B RTT $= 40$\,ms, Link~C RTT $= 15$\,ms, BW $= 100$\,Mbps)};
+
+\node[anchor=east, font=\fontsize{7.0}{8.5}\selectfont\bfseries, text=specorange] at (18.10, 2.75)
     {SPHP $\mathrm{TTFT} = 510.3$\,ms};
 
+% Lane backgrounds (y: 0.25 to 2.25)
+\draw[fill=stallfill!70, draw=linegray, line width=0.5pt, rounded corners=1.5pt] (2.85, 1.85) rectangle (18.10, 2.21);
+\draw[fill=white, draw=linegray, dashed, line width=0.5pt, rounded corners=1.5pt] (2.85, 1.45) rectangle (18.10, 1.81);
+\draw[fill=stallfill!70, draw=linegray, line width=0.5pt, rounded corners=1.5pt] (2.85, 1.05) rectangle (18.10, 1.41);
+\draw[fill=white, draw=linegray, dashed, line width=0.5pt, rounded corners=1.5pt] (2.85, 0.65) rectangle (18.10, 1.01);
+\draw[fill=stallfill!70, draw=linegray, line width=0.5pt, rounded corners=1.5pt] (2.85, 0.25) rectangle (18.10, 0.61);
+
+% Lane Labels
+\node[anchor=east, font=\fontsize{6.2}{7.5}\selectfont\bfseries, text=textdark] at (2.75, 2.03) {Node B (Retrieval)};
+\node[anchor=east, font=\fontsize{5.8}{7.0}\selectfont, text=wanshade] at (2.75, 1.63) {Link B (WAN)};
+\node[anchor=east, font=\fontsize{6.2}{7.5}\selectfont\bfseries, text=textdark] at (2.75, 1.23) {Node A (Generation)};
+\node[anchor=east, font=\fontsize{5.8}{7.0}\selectfont, text=wanshade] at (2.75, 0.83) {Link C (WAN)};
+\node[anchor=east, font=\fontsize{6.2}{7.5}\selectfont\bfseries, text=textdark] at (2.75, 0.43) {Node C (Edge)};
+
+% Grid lines
+\foreach \t in {0, 100, 200, 300, 400, 500, 600} {
+    \draw[draw=linegray, line width=0.4pt] ({2.85 + \t*0.025417}, 0.15) -- ({2.85 + \t*0.025417}, 2.28);
+}
+
+% Dense Retrieval on Node B: 0 to 114 ms
+\draw[barblock, draw=edgeshade, fill=white] (2.85, 1.89) rectangle ({2.85 + 114.0*0.025417}, 2.17);
+\node[font=\fontsize{5.2}{6.2}\selectfont\bfseries, text=edgeshade] at ({2.85 + 57.0*0.025417}, 2.03) {BGE-M3 (114\,ms)};
+
+% RRF on Node B: 114 to 116 ms
+\draw[fill=textdark, draw=textdark] ({2.85 + 114.0*0.025417}, 1.89) rectangle ({2.85 + 116.0*0.025417}, 2.17);
+\node[anchor=south, font=\fontsize{4.6}{5.6}\selectfont\bfseries, text=textdark] at ({2.85 + 115.0*0.025417}, 2.19) {RRF};
+
+% Sparse Retrieval on Node C: 0 to 79.2 ms
+\draw[barblock, draw=edgeshade, fill=white] (2.85, 0.29) rectangle ({2.85 + 79.2*0.025417}, 0.57);
+\node[font=\fontsize{5.2}{6.2}\selectfont\bfseries, text=edgeshade] at ({2.85 + 39.6*0.025417}, 0.43) {BM25 (79\,ms)};
+
+% Early Hint over Link C: 79.2 to 86.7 ms
+\draw[->, dashed, line width=1.0pt, draw=specorange]
+    ({2.85 + 79.2*0.025417}, 0.61) -- ({2.85 + 86.7*0.025417}, 1.05);
+\node[anchor=west, font=\fontsize{5.0}{6.0}\selectfont\bfseries, text=specorange]
+    at ({2.85 + 88.0*0.025417}, 0.83) {Hint $\mathcal{H}$ (104\,B)};
+
+% Node A Idle: 0 to 86.7 ms
+\draw[barblock, draw=stallstroke, fill=stallfill, pattern=north east lines, pattern color=gray!30]
+    (2.85, 1.09) rectangle ({2.85 + 86.7*0.025417}, 1.37);
+\node[font=\fontsize{5.0}{6.0}\selectfont\itshape, text=textmuted, fill=white, inner sep=0.6pt]
+    at ({2.85 + 43.3*0.025417}, 1.23) {Idle};
+
+% Speculative Prefill on Node A: 86.7 to 510.3 ms
+\draw[barblock, draw=specorange, fill=white]
+    ({2.85 + 86.7*0.025417}, 1.09) rectangle ({2.85 + 510.3*0.025417}, 1.37);
+\node[font=\fontsize{6.0}{7.2}\selectfont\bfseries, text=specorange]
+    at ({2.85 + 298.5*0.025417}, 1.23) {Hydration + Speculative Prefill ($\hat{P}$)};
+
+% Context Transfer over Link B: 116 to 136 ms
+\draw[->, line width=0.85pt, draw=edgeshade]
+    ({2.85 + 116.0*0.025417}, 1.85) -- ({2.85 + 136.0*0.025417}, 1.41);
+\node[anchor=south west, font=\fontsize{5.0}{6.0}\selectfont\bfseries, text=edgeshade]
+    at ({2.85 + 138.0*0.025417}, 1.55) {Context $\mathcal{F}$ (144\,B)};
+
+% Verification Barrier at 136 ms
+\draw[line width=1.1pt, draw=textdark]
+    ({2.85 + 136.0*0.025417}, 1.09) -- ({2.85 + 136.0*0.025417}, 1.37);
+\node[anchor=north west, font=\fontsize{4.8}{5.8}\selectfont\bfseries, text=textdark, fill=white, inner sep=0.8pt]
+    at ({2.85 + 138.0*0.025417}, 1.05) {Barrier: $|\mathcal{H} \cap \mathcal{F}| \ge \theta$};
+\node[anchor=west, font=\fontsize{5.0}{6.0}\selectfont\bfseries, text=specorange]
+    at ({2.85 + 138.0*0.025417}, 1.23) {Hit $\to$ Commit};
+
+% SPHP TTFT completion marker
+\draw[line width=0.9pt, draw=specorange, dashed]
+    ({2.85 + 510.3*0.025417}, 0.15) -- ({2.85 + 510.3*0.025417}, 2.30);
+
 % Baseline reference line
-\draw[line width=0.8pt, draw=baselinemarker, dotted] (559.6, -2.30) -- (559.6, 2.00);
+\draw[line width=0.7pt, draw=textdark, dotted]
+    ({2.85 + 559.6*0.025417}, 0.15) -- ({2.85 + 559.6*0.025417}, 2.30);
 
-% Latency Delta Bracket: 510.3 to 559.6 ms
-\draw[<->, line width=1.0pt, draw=deltacolor] (510.3, 0.85) -- node[above, font=\scriptsize\bfseries, text=deltacolor, fill=white, inner sep=1pt] {$\Delta = 49.3$\,ms} (559.6, 0.85);
+% Delta Bracket: 510.3 to 559.6 ms
+\draw[<->, line width=0.85pt, draw=specorange]
+    ({2.85 + 510.3*0.025417}, 1.70) -- node[above, font=\fontsize{5.5}{6.5}\selectfont\bfseries, text=specorange, fill=white, inner sep=0.8pt] {$\Delta = 49.3$\,ms} ({2.85 + 559.6*0.025417}, 1.70);
 
-% Timeline Axis (Panel b)
-\draw[line width=0.8pt, draw=gray!60] (0, -2.10) -- (580, -2.10);
-\foreach \t in {0, 100, 200, 300, 400, 500} {
-    \draw[line width=0.7pt, draw=gray!60] (\t, -2.10) -- (\t, -2.22);
+% Time Axis (Panel b)
+\draw[line width=0.6pt, draw=linegray] (2.85, 0.15) -- (18.10, 0.15);
+\foreach \t in {0, 100, 200, 300, 400, 600} {
+    \draw[line width=0.5pt, draw=textmuted] ({2.85 + \t*0.025417}, 0.15) -- ({2.85 + \t*0.025417}, 0.07);
+    \node[anchor=north, font=\fontsize{5.2}{6.2}\selectfont, text=textmuted] at ({2.85 + \t*0.025417}, 0.07) {\t};
 }
-% skip the 500 label: it collides with the 510.3 marker label
-\foreach \t in {0, 100, 200, 300, 400} {
-    \node[anchor=north, font=\scriptsize, text=textmuted] at (\t, -2.22) {\t};
-}
-\draw[line width=0.9pt, draw=specprefillstroke] (510.3, -2.10) -- (510.3, -2.25);
-\node[anchor=north, font=\scriptsize\bfseries, text=specprefillstroke] at (510.3, -2.25) {510.3};
-
-\draw[line width=0.9pt, draw=baselinemarker] (559.6, -2.10) -- (559.6, -2.25);
-\node[anchor=north, font=\scriptsize\bfseries, text=textdark] at (559.6, -2.25) {559.6};
+\node[anchor=north, font=\fontsize{5.5}{6.5}\selectfont\bfseries, text=specorange]
+    at ({2.85 + 510.3*0.025417}, 0.07) {510.3};
+\node[anchor=north, font=\fontsize{5.5}{6.5}\selectfont\bfseries, text=textdark]
+    at ({2.85 + 559.6*0.025417}, 0.07) {559.6};
 
 \end{tikzpicture}
 \end{document}

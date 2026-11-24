@@ -610,10 +610,11 @@ def fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
 
 
 def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
-    fig, axes = plt.subplots(1, 2, figsize=(FULL_W, 2.0))
+    # Enhanced large prominence plot as requested by PI (stacked 2x1 with generous height)
+    fig, axes = plt.subplots(2, 1, figsize=(COL_W, 3.15), sharex=True)
 
-    for ax, (state, title) in zip(axes, [("cold", "(a) Cold prefix (repeat 0)"),
-                                         ("warm", "(b) Warm (repeats 1+)")]):
+    for ax, (state, title) in zip(axes, [("cold", "(a) Cold-Prefix State (Initial Load, Repeat 0)"),
+                                         ("warm", "(b) Warm Steady-State (Warmed Cache, Repeats 1+)")]):
         recs = [r for r in campaign
                 if (r.get("repeat_index", 0) == 0) == (state == "cold")]
         tiers, base_vals = _tier_means([r for r in recs if r.get("variant") == "baseline"])
@@ -624,40 +625,39 @@ def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
         sphp_mean = [float(np.mean(v)) for v in sphp_vals]
         sphp_ci = [boot_ci(v) for v in sphp_vals]
 
-        # Series encoded per figstyle slots (CVD/grayscale-safe): slot 0
-        # (blue, solid, o) for P2 baseline, slot 1 (orange, dashed, s) for
-        # P2-SPHP, so distinguishability never depends on hue alone.
         (c_base, ls_base, mk_base) = figstyle.series_style(0)
         (c_sphp, ls_sphp, mk_sphp) = figstyle.series_style(1)
         ax.errorbar(tiers, base_mean,
                     yerr=[[m - c[0] for m, c in zip(base_mean, base_ci)],
                           [c[1] - m for m, c in zip(base_mean, base_ci)]],
-                    marker=mk_base, linestyle=ls_base, color=c_base,
-                    capsize=3, label="P2 baseline")
+                    marker=mk_base, markersize=5.2, linestyle=ls_base, linewidth=1.3,
+                    color=c_base, capsize=3.0, capthick=1.0, label="P2 baseline")
         ax.errorbar(tiers, sphp_mean,
                     yerr=[[m - c[0] for m, c in zip(sphp_mean, sphp_ci)],
                           [c[1] - m for m, c in zip(sphp_mean, sphp_ci)]],
-                    marker=mk_sphp, linestyle=ls_sphp, color=c_sphp,
-                    capsize=3, label="P2-SPHP")
+                    marker=mk_sphp, markersize=5.2, linestyle=ls_sphp, linewidth=1.3,
+                    color=c_sphp, capsize=3.0, capthick=1.0, label="P2-SPHP")
 
         lo, hi, rel = boot_ci_rel(
             [r["ttft_ms"] for r in recs if r.get("variant") == "sphp"],
             [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"])
         ax.annotate(f"Mean $\\Delta$: {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
-                    xy=(0.28, 0.04), xycoords="axes fraction",
-                    fontsize=7, color=figstyle.INK_SECONDARY)
+                    xy=(0.32, 0.09), xycoords="axes fraction",
+                    fontsize=7.2, color=figstyle.INK_SECONDARY,
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor=figstyle.INK_MUTED, linewidth=0.4, alpha=0.95))
 
-        ax.set_xticks(tiers)
-        ax.set_xlabel("WAN RTT (ms)")
-        ax.set_title(title, loc="left", fontsize=8, color=figstyle.INK)
+        ax.set_ylabel("TTFT (ms)", fontsize=7.8)
+        ax.set_title(title, loc="left", fontsize=8.0, fontweight="bold", color=figstyle.INK)
         figstyle.despine(ax)
         figstyle.grid(ax)
 
-    axes[0].set_ylabel("TTFT (ms)")
+    axes[1].set_xticks(tiers)
+    axes[1].set_xlabel("WAN RTT (ms)", fontsize=8.0)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.01),
-               ncol=2, frameon=False, fontsize=8)
-    plt.tight_layout(rect=[0, 0, 1, 0.94])
+               ncol=2, frameon=True, facecolor="white", edgecolor=figstyle.INK_MUTED,
+               fontsize=7.5)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     return _save(fig, "fig5_ttft_vs_rtt.pdf")
 
 
