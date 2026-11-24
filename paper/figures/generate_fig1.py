@@ -35,7 +35,29 @@ WHITE        = figstyle.SURFACE
 PAD_X     = 0.045   # in: horizontal clearance between text and its box border
 TITLE_GAP = 0.055   # in: vertical clearance from container top border to title glyph top
 
+def compile_tikz():
+    tex_path = os.path.join(_HERE, "fig1_arch.tex")
+    if os.path.exists(tex_path):
+        import shutil
+        import subprocess
+        pdflatex = shutil.which("pdflatex")
+        if not pdflatex and os.path.exists(r"C:\Users\Apath\AppData\Local\Programs\MiKTeX\miktex\bin\x64\pdflatex.exe"):
+            pdflatex = r"C:\Users\Apath\AppData\Local\Programs\MiKTeX\miktex\bin\x64\pdflatex.exe"
+        if pdflatex:
+            try:
+                res = subprocess.run([pdflatex, "-interaction=nonstopmode", "fig1_arch.tex"],
+                                     cwd=_HERE, capture_output=True, text=True, check=True)
+                out_pdf = os.path.join(_HERE, "fig1_arch.pdf")
+                if os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0:
+                    print("Publication-grade TikZ Fig 1 generated at:", out_pdf)
+                    return True
+            except Exception as e:
+                print("TikZ pdflatex compilation failed, falling back to matplotlib:", e)
+    return False
+
 def generate_publication_fig1():
+    if compile_tikz():
+        return
     # Exact IEEE full textwidth dimensions
     # Width: 7.16 inches (515.4 pt), Height: 2.80 inches (201.6 pt)
     fig_w, fig_h = 7.16, 2.80

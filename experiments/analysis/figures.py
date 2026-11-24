@@ -310,32 +310,34 @@ def fig2_topologies() -> Path:
 def _fig2_topologies() -> Path:
     topologies = [
         ("P0", "Colocated",
-         [["Query"], [], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
-        ("P1", "All stages on A",
-         [["Query"], ["Gateway"], ["Sparse", "Dense", "Fusion", "Hydrate", "Prefill", "Decode"]]),
-        ("P2", "Retrieval B,\nGen A",
-         [["Query"], ["Sparse", "Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
-        ("P2-SPHP", "SPHP spec.\nprefill",
-         [["Query"], ["Sparse", "Dense", "Fusion"], ["Hydrate", "Spec. Prefill", "Decode"]]),
-        ("P3", "Retrieval +\nHydrate B",
-         [["Query"], ["Sparse", "Dense", "Fusion", "Hydrate"], ["Prefill", "Decode"]]),
+         [["Ingress"], [], ["All stages"]]),
+        ("P1", "Cloud Baseline",
+         [["Ingress proxy"], [], ["Sparse, Dense", "Fusion, Hydrate", "Generation"]]),
+        ("P2", "3-Node Split",
+         [["Ingress", "Sparse"], ["Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
+        ("P2-SPHP", "Spec. 3-Node",
+         [["Ingress, Sparse", "Early Hint H"], ["Dense", "Fusion"], ["Hydrate", "Spec. Prefill", "Decode"]]),
+        ("P2-Consol", "2-Node Control",
+         [["Ingress"], ["Sparse, Dense", "Fusion"], ["Hydrate", "Prefill", "Decode"]]),
+        ("P3", "Edge Hydrate",
+         [["Ingress", "Sparse"], ["Dense, Fusion", "Hydrate"], ["Prefill", "Decode"]]),
     ]
-    col_titles = ["", "Client", "Edge (Node B)", "Cloud (Node A)"]
+    col_titles = ["", "Edge (Node C)", "Retrieval (Node B)", "Generation (Node A)"]
     col_x = [0, 1.4, 4.0, 6.8, 10.0]
     # Column fills are light tints of the categorical palette (figstyle.TINTS);
     # strokes are neutral ink so the tint carries the node role and grayscale
-    # / CVD survival never rests on a saturated hue.  Role -> tint: Client ->
-    # aqua (user/entry side), Edge (Node B) -> blue (retrieval), Cloud (Node A)
+    # / CVD survival never rests on a saturated hue.  Role -> tint: Edge (Node C) ->
+    # aqua (entry side), Retrieval (Node B) -> blue (retrieval), Generation (Node A)
     # -> orange (generation host).  The taxonomy-label column (j0) is white
     # with a muted stroke, like the diagram chrome in fig1_arch.
     col_fc = ["white",
-              figstyle.TINTS["aqua"],   # Client (entry side)
-              figstyle.TINTS["blue"],   # Edge (Node B) -- retrieval
-              figstyle.TINTS["orange"]]  # Cloud (Node A) -- generation
+              figstyle.TINTS["aqua"],   # Edge (Node C) -- entry side
+              figstyle.TINTS["blue"],   # Retrieval (Node B) -- retrieval
+              figstyle.TINTS["orange"]]  # Generation (Node A) -- generation
     col_ec = [figstyle.INK_MUTED,   # taxonomy-label column
-              figstyle.INK_SECONDARY,  # Client (softer, external)
-              figstyle.INK,   # Edge (Node B)
-              figstyle.INK]  # Cloud (Node A)
+              figstyle.INK_SECONDARY,  # Edge (Node C)
+              figstyle.INK,   # Retrieval (Node B)
+              figstyle.INK]  # Generation (Node A)
 
     n_rows = len(topologies)
     row_h = 1.2
@@ -638,13 +640,12 @@ def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
                     marker=mk_sphp, linestyle=ls_sphp, color=c_sphp,
                     capsize=3, label="P2-SPHP")
 
-        if state == "cold":
-            lo, hi, rel = boot_ci_rel(
-                [r["ttft_ms"] for r in recs if r.get("variant") == "sphp"],
-                [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"])
-            ax.annotate(f"Mean $\\Delta$: {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
-                        xy=(0.28, 0.04), xycoords="axes fraction",
-                        fontsize=7, color=figstyle.INK_SECONDARY)
+        lo, hi, rel = boot_ci_rel(
+            [r["ttft_ms"] for r in recs if r.get("variant") == "sphp"],
+            [r["ttft_ms"] for r in recs if r.get("variant") == "baseline"])
+        ax.annotate(f"Mean $\\Delta$: {rel:+.1f}% [{lo:+.1f}, {hi:+.1f}]",
+                    xy=(0.28, 0.04), xycoords="axes fraction",
+                    fontsize=7, color=figstyle.INK_SECONDARY)
 
         ax.set_xticks(tiers)
         ax.set_xlabel("WAN RTT (ms)")
@@ -654,9 +655,9 @@ def _fig5_ttft_vs_rtt(campaign: list[dict]) -> Path:
 
     axes[0].set_ylabel("TTFT (ms)")
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.03),
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.01),
                ncol=2, frameon=False, fontsize=8)
-    plt.tight_layout(rect=[0, 0, 1, 0.92])
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
     return _save(fig, "fig5_ttft_vs_rtt.pdf")
 
 
